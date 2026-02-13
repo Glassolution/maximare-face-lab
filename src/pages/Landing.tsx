@@ -7,8 +7,8 @@ import faceScanHero from "@/assets/face-scan-hero.jpg";
 export default function Landing() {
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background relative overflow-hidden">
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-[hsl(224,76%,20%)] to-[hsl(224,76%,30%)] pointer-events-none" />
+      {/* Background gradient - black at top, blue at bottom */}
+      <div className="absolute inset-0 bg-gradient-to-b from-[hsl(0,0%,8%)] from-0% via-[hsl(0,0%,8%)] via-40% via-[hsl(224,76%,25%)] to-[hsl(224,76%,35%)] pointer-events-none" />
 
       {/* Content */}
       <div className="relative z-10 flex flex-col flex-1 items-center justify-between px-6 py-12 max-w-md mx-auto w-full">
