@@ -8,7 +8,7 @@ export default function Landing() {
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background relative overflow-hidden">
       {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-[hsl(270,50%,15%)] pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[hsl(224,76%,38%)] via-[hsl(224,76%,28%)] to-[hsl(224,76%,18%)] pointer-events-none" />
 
       {/* Content */}
       <div className="relative z-10 flex flex-col flex-1 items-center justify-between px-6 py-12 max-w-md mx-auto w-full">
