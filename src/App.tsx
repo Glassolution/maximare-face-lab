@@ -3,8 +3,13 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
+import Header from "@/components/Header";
+import Landing from "@/pages/Landing";
+import Analysis from "@/pages/Analysis";
+import Results from "@/pages/Results";
+import Recommendations from "@/pages/Recommendations";
+import ProgressPage from "@/pages/Progress";
+import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
 
@@ -14,9 +19,13 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <Header />
         <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="/" element={<Landing />} />
+          <Route path="/analysis" element={<Analysis />} />
+          <Route path="/results/:id" element={<Results />} />
+          <Route path="/recommendations" element={<Recommendations />} />
+          <Route path="/progress" element={<ProgressPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
