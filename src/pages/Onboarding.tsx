@@ -121,7 +121,7 @@ function StepAge({ onNext }: { onNext: () => void }) {
   }, [ages]);
 
   return (
-    <div className="flex flex-col items-center text-center flex-1 justify-between py-8 bg-gradient-to-b from-[hsl(270,60%,12%)] to-[hsl(270,40%,8%)] -mx-6 px-6 rounded-none min-h-0">
+    <div className="flex flex-col items-center text-center flex-1 justify-between py-8 bg-gradient-to-b from-[hsl(224,60%,12%)] to-[hsl(224,40%,8%)] -mx-6 px-6 rounded-none min-h-0">
       <div className="flex flex-col items-center gap-4 w-full">
         <h1 className="font-heading text-3xl font-extrabold text-foreground leading-tight">
           Qual é sua
@@ -171,7 +171,7 @@ function StepAge({ onNext }: { onNext: () => void }) {
       <Button
         onClick={onNext}
         size="lg"
-        className="w-full rounded-2xl py-7 text-base font-bold bg-[hsl(270,80%,55%)] hover:bg-[hsl(270,80%,48%)] text-foreground"
+        className="w-full rounded-2xl py-7 text-base font-bold bg-destructive hover:bg-destructive/90 text-destructive-foreground"
       >
         Continuar
       </Button>
@@ -190,7 +190,7 @@ function StepGoal({ onNext }: { onNext: () => void }) {
   ];
 
   return (
-    <div className="flex flex-col items-center text-center flex-1 justify-between py-8 bg-gradient-to-b from-[hsl(270,60%,12%)] to-[hsl(270,40%,8%)] -mx-6 px-6">
+    <div className="flex flex-col items-center text-center flex-1 justify-between py-8 bg-gradient-to-b from-[hsl(224,60%,12%)] to-[hsl(224,40%,8%)] -mx-6 px-6">
       <div className="flex flex-col items-center gap-6 w-full">
         <h1 className="font-heading text-3xl font-extrabold text-foreground leading-tight">
           Qual é sua
@@ -225,7 +225,7 @@ function StepGoal({ onNext }: { onNext: () => void }) {
         onClick={onNext}
         disabled={selected === null}
         size="lg"
-        className="w-full rounded-2xl py-7 text-base font-bold bg-[hsl(270,80%,55%)] hover:bg-[hsl(270,80%,48%)] text-foreground mt-4 disabled:opacity-40"
+        className="w-full rounded-2xl py-7 text-base font-bold bg-destructive hover:bg-destructive/90 text-destructive-foreground mt-4 disabled:opacity-40"
       >
         Continuar
       </Button>
@@ -351,7 +351,7 @@ function StepProjection({ onNext }: { onNext: () => void }) {
   ];
 
   return (
-    <div className="flex flex-col items-center text-center flex-1 justify-between py-8 bg-gradient-to-b from-[hsl(270,80%,40%)] to-[hsl(270,60%,25%)] -mx-6 px-6">
+    <div className="flex flex-col items-center text-center flex-1 justify-between py-8 bg-gradient-to-b from-primary to-[hsl(224,60%,25%)] -mx-6 px-6">
       <div className="flex flex-col items-center gap-6 w-full">
         <h1 className="font-heading text-3xl font-extrabold text-foreground leading-tight text-left w-full">
           Te entendemos.
