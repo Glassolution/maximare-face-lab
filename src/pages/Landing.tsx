@@ -61,7 +61,7 @@ export default function Landing() {
           transition={{ delay: 0.6, duration: 0.5 }}
           className="w-full"
         >
-          <Link to="/analysis" className="block">
+          <Link to="/onboarding" className="block">
             <Button
               size="lg"
               className="w-full rounded-2xl py-7 text-base font-bold gap-2 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 shadow-lg shadow-primary/25"
