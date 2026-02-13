@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import Header from "@/components/Header";
 import Landing from "@/pages/Landing";
 import Analysis from "@/pages/Analysis";
@@ -13,21 +13,32 @@ import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
 
+function Layout() {
+  const location = useLocation();
+  const isLanding = location.pathname === "/";
+
+  return (
+    <>
+      {!isLanding && <Header />}
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/analysis" element={<Analysis />} />
+        <Route path="/results/:id" element={<Results />} />
+        <Route path="/recommendations" element={<Recommendations />} />
+        <Route path="/progress" element={<ProgressPage />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
+  );
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Header />
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/analysis" element={<Analysis />} />
-          <Route path="/results/:id" element={<Results />} />
-          <Route path="/recommendations" element={<Recommendations />} />
-          <Route path="/progress" element={<ProgressPage />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <Layout />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
