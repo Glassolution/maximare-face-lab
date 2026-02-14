@@ -255,16 +255,16 @@ function StepGender({ onNext }: { onNext: () => void }) {
             <button
               key={g.id}
               onClick={() => setSelected(g.id)}
-              className={`relative rounded-2xl overflow-hidden h-36 border transition-all flex items-end ${
+              className={`relative rounded-2xl overflow-hidden h-28 border transition-all flex items-end ${
                 selected === g.id ? "border-destructive ring-1 ring-destructive" : "border-border/30"
               }`}
             >
                <img
                  src={g.img}
                  alt={g.label}
-                 className="absolute inset-0 w-full h-full object-cover object-center opacity-90"
+                 className="absolute inset-0 w-full h-full object-cover object-[center_20%] opacity-90"
                />
-              <div className="absolute inset-0 bg-gradient-to-r from-background/40 to-background/20" />
+              <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-transparent to-transparent" />
               <span className="relative z-10 font-heading font-bold text-foreground text-xl p-5 block text-left">
                 {g.label}
               </span>
