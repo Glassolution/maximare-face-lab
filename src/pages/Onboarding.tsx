@@ -356,16 +356,16 @@ function StepProjection({ onNext }: { onNext: () => void }) {
 
   return (
     <div className="flex flex-col items-center text-center flex-1 justify-between py-8 bg-gradient-to-b from-primary to-[hsl(224,60%,25%)] -mx-6 px-6">
-      <div className="flex flex-col items-center gap-6 w-full">
-        <h1 className="font-heading text-3xl font-extrabold text-foreground leading-tight text-left w-full">
+      <div className="flex flex-col items-center gap-6 w-full flex-1 justify-center">
+        <h1 className="font-heading text-3xl font-extrabold text-foreground leading-tight w-full text-left">
           Te entendemos.
         </h1>
 
         <div className="text-8xl font-heading font-black text-foreground leading-none">92%</div>
 
-        <div className="text-foreground text-xl font-heading font-bold leading-snug">
+        <div className="text-foreground text-lg font-heading font-bold leading-relaxed">
           de nossos usuários
-          <div className="inline-block bg-foreground text-background rounded-lg px-4 py-2 mx-1 my-1 font-extrabold">
+          <div className="inline-block bg-foreground text-background rounded-lg px-4 py-2 mx-1 my-2 font-extrabold text-base">
             se sentem
             <br />
             mais seguros
