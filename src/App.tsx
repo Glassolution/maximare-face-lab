@@ -10,6 +10,8 @@ import Analysis from "@/pages/Analysis";
 import Results from "@/pages/Results";
 import Recommendations from "@/pages/Recommendations";
 import ProgressPage from "@/pages/Progress";
+import Trends from "@/pages/Trends";
+import Profile from "@/pages/Profile";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +29,8 @@ function Layout() {
         <Route path="/results/:id" element={<Results />} />
         <Route path="/recommendations" element={<Recommendations />} />
         <Route path="/progress" element={<ProgressPage />} />
+        <Route path="/trends" element={<Trends />} />
+        <Route path="/profile" element={<Profile />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {!isLanding && <BottomNav />}
