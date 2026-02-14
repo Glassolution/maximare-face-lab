@@ -255,7 +255,7 @@ function StepGender({ onNext }: { onNext: () => void }) {
             <button
               key={g.id}
               onClick={() => setSelected(g.id)}
-              className={`relative rounded-2xl overflow-hidden h-28 border transition-all flex items-end ${
+              className={`relative rounded-2xl overflow-hidden h-40 border transition-all flex items-end ${
                 selected === g.id ? "border-destructive ring-1 ring-destructive" : "border-border/30"
               }`}
             >
