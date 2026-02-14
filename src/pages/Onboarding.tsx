@@ -262,9 +262,9 @@ function StepGender({ onNext }: { onNext: () => void }) {
               <img
                 src={g.img}
                 alt={g.label}
-                className="absolute right-0 top-0 h-full w-3/5 object-cover object-top opacity-70"
+                className="absolute inset-0 w-full h-full object-cover object-top opacity-50"
               />
-              <div className="absolute inset-0 bg-gradient-to-r from-background via-background/60 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-r from-background/70 via-background/30 to-transparent" />
               <span className="relative z-10 font-heading font-bold text-foreground text-xl p-5 block text-left">
                 {g.label}
               </span>
