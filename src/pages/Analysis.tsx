@@ -270,7 +270,7 @@ export default function Analysis() {
             <h3 className="font-heading text-sm font-bold text-foreground">Categorias</h3>
             <Link to="/recommendations" className="text-xs text-primary font-medium hover:underline">Ver Tudo</Link>
           </div>
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             {categories.map((cat, i) => {
               const Icon = cat.icon;
               const catScore = lastAnalysis?.categories.find(c => c.id === cat.id);
