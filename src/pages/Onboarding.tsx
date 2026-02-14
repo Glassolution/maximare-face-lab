@@ -259,12 +259,12 @@ function StepGender({ onNext }: { onNext: () => void }) {
                 selected === g.id ? "border-destructive ring-1 ring-destructive" : "border-border/30"
               }`}
             >
-              <img
-                src={g.img}
-                alt={g.label}
-                className="absolute inset-0 w-full h-full object-cover object-top opacity-50"
-              />
-              <div className="absolute inset-0 bg-gradient-to-r from-background/70 via-background/30 to-transparent" />
+               <img
+                 src={g.img}
+                 alt={g.label}
+                 className="absolute inset-0 w-full h-full object-cover object-center opacity-90"
+               />
+              <div className="absolute inset-0 bg-gradient-to-r from-background/40 to-background/20" />
               <span className="relative z-10 font-heading font-bold text-foreground text-xl p-5 block text-left">
                 {g.label}
               </span>
