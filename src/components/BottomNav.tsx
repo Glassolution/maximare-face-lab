@@ -1,22 +1,23 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, TrendingUp, Sparkles, Plus } from "lucide-react";
+import { Home, TrendingUp, Sparkles, Plus, User } from "lucide-react";
 
-const navItems = [
+const leftItems = [
   { label: "Home", path: "/analysis", icon: Home },
   { label: "Progresso", path: "/progress", icon: TrendingUp },
+];
+
+const rightItems = [
   { label: "Dicas", path: "/recommendations", icon: Sparkles },
+  { label: "Perfil", path: "/profile", icon: User },
 ];
 
 export default function BottomNav() {
   const location = useLocation();
 
-  const left = navItems.slice(0, 2);
-  const right = navItems.slice(2);
-
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-xl border-t border-border/50 pb-[env(safe-area-inset-bottom)]">
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-6">
-        {left.map((item) => {
+        {leftItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
           return (
@@ -39,7 +40,7 @@ export default function BottomNav() {
           <span className="text-[10px] font-semibold text-primary mt-1">Análise</span>
         </Link>
 
-        {right.map((item) => {
+        {rightItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
           return (
