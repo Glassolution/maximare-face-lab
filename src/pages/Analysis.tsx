@@ -94,7 +94,7 @@ export default function Analysis() {
   // Capture modal/overlay
   if (showCapture) {
     return (
-      <div className="min-h-screen pt-20 pb-16 px-4">
+      <div className="min-h-screen pt-6 pb-24 px-4">
         <div className="container max-w-lg mx-auto">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-6">
             <h1 className="font-heading text-2xl font-extrabold text-foreground mb-1">Análise Facial</h1>
@@ -185,7 +185,7 @@ export default function Analysis() {
 
   // Dashboard HUD
   return (
-    <div className="min-h-screen pt-20 pb-8 px-4">
+    <div className="min-h-screen pt-6 pb-24 px-4">
       <div className="container max-w-lg mx-auto">
 
         {/* Greeting */}

@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
-import Header from "@/components/Header";
+import BottomNav from "@/components/BottomNav";
 import Landing from "@/pages/Landing";
 import Onboarding from "@/pages/Onboarding";
 import Analysis from "@/pages/Analysis";
@@ -20,7 +20,6 @@ function Layout() {
 
   return (
     <>
-      {!isLanding && <Header />}
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/onboarding" element={<Onboarding />} />
@@ -30,6 +29,7 @@ function Layout() {
         <Route path="/progress" element={<ProgressPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
+      {!isLanding && <BottomNav />}
     </>
   );
 }
