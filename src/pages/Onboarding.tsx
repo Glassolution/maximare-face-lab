@@ -366,7 +366,7 @@ function StepProjection({ onNext }: { onNext: () => void }) {
         <div className="text-foreground text-lg font-heading font-bold leading-relaxed">
           de nossos usuários
           <br />
-          <span className="text-destructive font-black text-xl underline decoration-destructive decoration-2 underline-offset-4">
+          <span className="bg-foreground text-background rounded-lg px-4 py-2 font-extrabold text-base inline-block">
             se sentem mais seguros
           </span>
           <br />
