@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { saveAnalysis, getAnalysisHistory } from "@/lib/mockData";
 import { generateExtendedMockAnalysis, getTier } from "@/lib/rankingSystem";
+import motivationModel from "@/assets/motivation-model.png";
 
 const subscores = [
   { id: "jawline", label: "Mandíbula", icon: Target },
@@ -417,6 +418,22 @@ export default function Analysis() {
                     {lastAnalysis ? `Tier: ${currentTier.name}` : "Faça sua primeira análise"}
                 </p>
              </div>
+          </div>
+        </motion.div>
+
+        {/* Motivation Banner */}
+        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}
+          className="relative rounded-2xl overflow-hidden h-36 group cursor-pointer"
+          onClick={() => { setShowCapture(true); setCaptureStep("intro"); setErrorMsg(null); }}
+        >
+          <img src={motivationModel} alt="Motivação" className="absolute inset-0 w-full h-full object-cover object-top" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent" />
+          <div className="relative z-10 h-full flex flex-col justify-center px-5">
+            <p className="text-xs text-primary font-bold uppercase tracking-wider mb-1">True Adam • GER 95+</p>
+            <h3 className="font-heading text-lg font-bold text-foreground leading-tight">Descubra seu<br/>potencial máximo</h3>
+            <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
+              Faça sua análise agora <ChevronRight className="h-3 w-3" />
+            </p>
           </div>
         </motion.div>
 
