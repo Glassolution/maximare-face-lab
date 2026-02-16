@@ -100,7 +100,7 @@ function StepImpact({ onNext }: { onNext: () => void }) {
       </div>
 
       <Button
-        onClick={() => onNext(selectedAge)}
+        onClick={() => onNext()}
         size="lg"
         className="w-full rounded-2xl py-7 text-base font-bold bg-white text-primary hover:bg-white/90 shadow-xl shadow-black/20"
       >
@@ -194,7 +194,7 @@ function StepAge({ onNext, initialAge }: { onNext: (age: number) => void; initia
       </div>
 
       <Button
-        onClick={onNext}
+        onClick={() => onNext(selectedAge)}
         size="lg"
         className="w-full rounded-2xl py-7 text-base font-bold bg-white text-primary hover:bg-white/90 shadow-xl shadow-black/20"
       >

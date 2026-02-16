@@ -8,6 +8,7 @@ import Landing from "@/pages/Landing";
 import Onboarding from "@/pages/Onboarding";
 import Analysis from "@/pages/Analysis";
 import Results from "@/pages/Results";
+import GerResults from "@/pages/GerResults";
 import Recommendations from "@/pages/Recommendations";
 import ProgressPage from "@/pages/Progress";
 import Trends from "@/pages/Trends";
@@ -27,6 +28,7 @@ function Layout() {
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/analysis" element={<Analysis />} />
         <Route path="/results/:id" element={<Results />} />
+        <Route path="/ger-results/:id" element={<GerResults />} />
         <Route path="/recommendations" element={<Recommendations />} />
         <Route path="/progress" element={<ProgressPage />} />
         <Route path="/trends" element={<Trends />} />
