@@ -29,7 +29,7 @@ export interface GerResult {
 export const TIER_LABELS: Record<string, { label: string; emoji: string }> = {
   "sub3": { label: "SUB3", emoji: "💀" },
   "sub5": { label: "SUB5", emoji: "😐" },
-  "ltn": { label: "LTN", emoji: "😏" },
+  "ltn": { label: "LTN", emoji: "🤔" },
   "mtn": { label: "MTN", emoji: "😎" },
   "htn": { label: "HTN", emoji: "🔥" },
   "chadlite": { label: "CHADLITE", emoji: "💪" },

@@ -17,14 +17,14 @@ export interface ExtendedAnalysisResult extends Omit<AnalysisResult, "categories
 }
 
 export const TIERS = [
-  { name: "sub3", min: 0, max: 39, badge: "⚠️" },
-  { name: "sub5", min: 40, max: 54, badge: "😐" },
-  { name: "ltn", min: 55, max: 64, badge: "🙂" },
-  { name: "mtn", min: 65, max: 72, badge: "😎" },
-  { name: "htn", min: 73, max: 79, badge: "🔥" },
-  { name: "chadlite", min: 80, max: 84, badge: "💪" },
-  { name: "chad", min: 85, max: 89, badge: "👑" },
-  { name: "true adam", min: 90, max: 99, badge: "ELITE ⭐" },
+  { name: "sub3", min: 0, max: 29, badge: "💀" },
+  { name: "sub5", min: 30, max: 49, badge: "😐" },
+  { name: "ltn", min: 50, max: 59, badge: "🤔" },
+  { name: "mtn", min: 60, max: 69, badge: "😎" },
+  { name: "htn", min: 70, max: 79, badge: "🔥" },
+  { name: "chadlite", min: 80, max: 89, badge: "💪" },
+  { name: "chad", min: 90, max: 94, badge: "👑" },
+  { name: "true adam", min: 95, max: 99, badge: "⭐" },
 ];
 
 export const ATTRIBUTES = [

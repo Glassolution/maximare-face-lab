@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Crown, ChevronRight, Settings, Shield, Zap, Star, Award, TrendingUp, Info } from "lucide-react";
+import { Crown, ChevronRight, Settings, Shield, Zap, Star, Award, TrendingUp, Info, Search } from "lucide-react";
 import { getAnalysisHistory } from "@/lib/mockData";
 import { Link } from "react-router-dom";
 import { getTier, getNextTier, ExtendedAnalysisResult } from "@/lib/rankingSystem";
@@ -112,7 +112,7 @@ export default function Profile() {
           {/* Rank progress */}
           <div className="relative z-10 mt-4">
             <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
-              <span>Iniciante</span>
+              <span>Sub 3</span>
               <span>Chad</span>
               <span>True Adam</span>
             </div>
@@ -134,20 +134,32 @@ export default function Profile() {
             {badges.map((badge, i) => {
               const Icon = badge.icon;
               return (
-                <motion.div key={badge.label}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.12 + i * 0.04 }}
-                  className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl glass ${!badge.earned ? "opacity-30" : ""}`}
-                >
+                <div key={badge.label} className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl glass ${!badge.earned ? "opacity-30" : ""}`}>
                   <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${badge.earned ? "bg-primary/15" : "bg-muted"}`}>
                     <Icon className={`h-5 w-5 ${badge.earned ? "text-primary" : "text-muted-foreground"}`} />
                   </div>
                   <span className="text-[10px] text-center text-muted-foreground font-medium leading-tight">{badge.label}</span>
-                </motion.div>
+                </div>
               );
             })}
           </div>
+        </motion.div>
+
+        {/* Look Alike Feature */}
+        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}>
+          <Link to="/look-alike" className="block relative rounded-2xl bg-gradient-to-r from-indigo-500/10 to-purple-500/10 p-5 border border-indigo-500/20 overflow-hidden cursor-pointer hover:border-indigo-500/40 transition-colors group">
+             <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+             <div className="flex items-center gap-4 relative z-10">
+                <div className="h-12 w-12 rounded-full bg-background/50 flex items-center justify-center border border-indigo-500/20">
+                   <Search className="h-6 w-6 text-indigo-400" />
+                </div>
+                <div>
+                   <h3 className="font-heading font-bold text-lg text-foreground">Quem é seu sósia?</h3>
+                   <p className="text-xs text-muted-foreground">Descubra com qual famoso você se parece.</p>
+                </div>
+                <ChevronRight className="ml-auto h-5 w-5 text-muted-foreground group-hover:text-indigo-400 transition-colors" />
+             </div>
+          </Link>
         </motion.div>
 
         {/* Menu */}

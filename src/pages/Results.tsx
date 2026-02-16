@@ -19,7 +19,7 @@ export default function Results() {
   // Fallback if result is old format
   const isExtended = result && 'ger' in result;
   const ger = isExtended ? result.ger : Math.round(result?.overallScore * 10) || 0;
-  const tier = isExtended ? result.tier : "INICIANTE";
+  const tier = isExtended ? result.tier : "SUB3";
   const badge = isExtended ? result.badge : "";
   const categories = isExtended ? result.categories : (result?.categories.map(c => ({
     ...c,

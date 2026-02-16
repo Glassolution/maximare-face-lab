@@ -13,6 +13,7 @@ import Recommendations from "@/pages/Recommendations";
 import ProgressPage from "@/pages/Progress";
 import Trends from "@/pages/Trends";
 import Profile from "@/pages/Profile";
+import LookAlike from "@/pages/LookAlike";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +34,7 @@ function Layout() {
         <Route path="/progress" element={<ProgressPage />} />
         <Route path="/trends" element={<Trends />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/look-alike" element={<LookAlike />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {!isLanding && <BottomNav />}
