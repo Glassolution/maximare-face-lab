@@ -1,8 +1,10 @@
 import { motion } from "framer-motion";
-import { Crown, ChevronRight, Settings, Shield, Zap, Star, Award, TrendingUp, Info, Search } from "lucide-react";
+import { Crown, ChevronRight, Settings, Shield, Zap, Star, Award, TrendingUp, Info, Search, LogOut } from "lucide-react";
 import { getAnalysisHistory } from "@/lib/mockData";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { getTier, getNextTier, ExtendedAnalysisResult } from "@/lib/rankingSystem";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
 
 const badges = [
   { label: "Primeira Análise", icon: Star, earned: true },
@@ -12,6 +14,8 @@ const badges = [
 ];
 
 export default function Profile() {
+  const { profile, signOut } = useAuth();
+  const navigate = useNavigate();
   const history = getAnalysisHistory();
   const lastAnalysis = history.length > 0 ? history[0] as unknown as ExtendedAnalysisResult : null;
   
@@ -58,7 +62,7 @@ export default function Profile() {
                  <span className="font-heading text-2xl font-bold text-gradient">M</span>
              )}
           </div>
-          <h1 className="font-heading text-xl font-bold text-foreground">Usuário MAXIMARE</h1>
+          <h1 className="font-heading text-xl font-bold text-foreground">{profile?.display_name || profile?.username || "Usuário MAXIMARE"}</h1>
           <p className="text-sm text-muted-foreground mt-1">{totalAnalyses} análise{totalAnalyses !== 1 ? "s" : ""} realizada{totalAnalyses !== 1 ? "s" : ""}</p>
         </motion.div>
 
@@ -184,6 +188,23 @@ export default function Profile() {
               );
             })}
           </div>
+        </motion.div>
+
+        {/* Logout */}
+        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+          <Button
+            variant="ghost"
+            onClick={async () => { await signOut(); navigate("/auth/login"); }}
+            className="w-full rounded-2xl glass p-4 h-auto flex items-center gap-3 text-destructive hover:text-destructive hover:bg-destructive/10"
+          >
+            <div className="h-10 w-10 rounded-xl bg-destructive/10 flex items-center justify-center shrink-0">
+              <LogOut className="h-5 w-5" />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-sm font-medium">Sair da conta</p>
+              <p className="text-[11px] opacity-70">Encerrar sessão</p>
+            </div>
+          </Button>
         </motion.div>
       </div>
     </div>
