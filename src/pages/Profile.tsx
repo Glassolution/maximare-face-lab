@@ -3,8 +3,9 @@ import { Crown, ChevronRight, Settings, Shield, Zap, Star, Award, TrendingUp, In
 import { getAnalysisHistory } from "@/lib/mockData";
 import { Link, useNavigate } from "react-router-dom";
 import { getTier, getNextTier, ExtendedAnalysisResult } from "@/lib/rankingSystem";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 const badges = [
   { label: "Primeira Análise", icon: Star, earned: true },
@@ -14,7 +15,7 @@ const badges = [
 ];
 
 export default function Profile() {
-  const { profile, signOut } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const history = getAnalysisHistory();
   const lastAnalysis = history.length > 0 ? history[0] as unknown as ExtendedAnalysisResult : null;
@@ -40,6 +41,16 @@ export default function Profile() {
                       
   const pointsNeeded = Math.max(0, nextTierMin - ger);
 
+  const currentTierMin = currentTier.min;
+  const progressToNext = nextTier
+    ? Math.max(0, Math.min(1, (ger - currentTierMin) / (nextTier.min - currentTierMin)))
+    : 1;
+  const progressPercent = Math.round(progressToNext * 100);
+  const nextTierLabel = nextTier ? nextTier.label : "Nível máximo";
+
+  const displayName =
+    (user && (user.user_metadata?.full_name || user.user_metadata?.name || user.email)) || "Usuário MAXIMARE";
+
   const menuItems = [
     { label: "Plano Pro", icon: Crown, desc: "Desbloqueie tudo", path: "#" },
     { label: "Progresso", icon: TrendingUp, desc: "Seu histórico", path: "/progress" },
@@ -62,7 +73,7 @@ export default function Profile() {
                  <span className="font-heading text-2xl font-bold text-gradient">M</span>
              )}
           </div>
-          <h1 className="font-heading text-xl font-bold text-foreground">{profile?.display_name || profile?.username || "Usuário MAXIMARE"}</h1>
+          <h1 className="font-heading text-xl font-bold text-foreground">{displayName}</h1>
           <p className="text-sm text-muted-foreground mt-1">{totalAnalyses} análise{totalAnalyses !== 1 ? "s" : ""} realizada{totalAnalyses !== 1 ? "s" : ""}</p>
         </motion.div>
 
@@ -115,19 +126,27 @@ export default function Profile() {
 
           {/* Rank progress */}
           <div className="relative z-10 mt-4">
-            <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
-              <span>Sub 3</span>
-              <span>Chad</span>
-              <span>True Adam</span>
+            <div className="flex justify-between items-center text-[11px] text-muted-foreground mb-1">
+              <span className="font-medium">Atual: {currentTier.label}</span>
+              {nextTier ? (
+                <span>Próximo: {nextTierLabel} ({nextTierMin}+)</span>
+              ) : (
+                <span>No topo do ranking</span>
+              )}
             </div>
             <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
               <motion.div
                 initial={{ width: 0 }}
-                animate={{ width: `${ger}%` }}
+                animate={{ width: `${progressPercent}%` }}
                 transition={{ duration: 1 }}
                 className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
               />
             </div>
+            {nextTier && (
+              <div className="mt-1 text-[10px] text-muted-foreground text-right">
+                Faltam <span className="text-primary font-semibold">+{pointsNeeded}</span> para {nextTierLabel}.
+              </div>
+            )}
           </div>
         </motion.div>
 
@@ -194,7 +213,7 @@ export default function Profile() {
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
           <Button
             variant="ghost"
-            onClick={async () => { await signOut(); navigate("/auth/login"); }}
+            onClick={async () => { await supabase.auth.signOut(); navigate("/login"); }}
             className="w-full rounded-2xl glass p-4 h-auto flex items-center gap-3 text-destructive hover:text-destructive hover:bg-destructive/10"
           >
             <div className="h-10 w-10 rounded-xl bg-destructive/10 flex items-center justify-center shrink-0">

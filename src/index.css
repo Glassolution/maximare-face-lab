@@ -69,6 +69,64 @@
   }
 }
 
+/* Custom User Theme */
+.bg-background-dark { background-color: #050A18; }
+.bg-graphite { background-color: #1b1f27; }
+.bg-slate-custom { background-color: #282e39; }
+.text-text-muted { color: #9ca6ba; }
+.border-slate-custom { border-color: #282e39; }
+
+/* New Design Styles */
+.glass-node {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.02);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-node.selected {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: #3B82F6;
+  box-shadow: 0 0 25px rgba(59, 130, 246, 0.3), inset 0 0 15px rgba(59, 130, 246, 0.2);
+}
+
+.glass-node.selected .icon-container {
+  color: #3B82F6;
+  text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+}
+
+.blueprint-bg {
+  background-image: radial-gradient(circle at 2px 2px, rgba(59, 130, 246, 0.05) 1px, transparent 0);
+  background-size: 32px 32px;
+}
+
+.math-overlay {
+  mask-image: linear-gradient(to bottom, transparent, black, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black, transparent);
+  opacity: 0.15;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  pointer-events: none;
+}
+
+.neon-glow {
+  filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.6));
+}
+
+/* Biometric Theme Colors - Removed as they are now in tailwind.config.ts */
+
+.glass-card {
+  background: rgba(27, 31, 39, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(40, 46, 57, 0.5);
+}
+
+.glow-primary-custom {
+  box-shadow: 0 0 20px rgba(15, 86, 230, 0.3);
+}
+
 /* Scrollbar */
 .scrollbar-none::-webkit-scrollbar {
   display: none;
@@ -137,4 +195,51 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+  
+  .vertical-text {
+    writing-mode: vertical-rl;
+  }
+  
+  .mask-gradient-y {
+    mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent);
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent);
+  }
+}
+
+/* Biometric Age Selector Styles */
+.biometric-grid {
+  background-image:
+     linear-gradient(hsl(var(--primary) / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--primary) / 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+.radial-lines {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 280px;
+  height: 280px;
+  border: 1px solid hsl(var(--primary) / 0.1);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.radial-lines::before {
+  content: '';
+  position: absolute;
+  top: -40px;
+  bottom: -40px;
+  left: 50%;
+  width: 1px;
+  background: linear-gradient(to bottom, transparent, hsl(var(--primary) / 0.2), transparent);
+}
+.age-item {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.selected-age {
+  text-shadow: 0 0 30px hsl(var(--primary) / 0.3);
+}
+.laser-progress {
+  background-color: hsl(var(--primary));
+  box-shadow: 0 0 10px hsl(var(--primary) / 0.8), 0 0 20px hsl(var(--primary) / 0.4);
 }

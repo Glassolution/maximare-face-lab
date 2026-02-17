@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, type ComponentType } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Camera, Upload, Loader2, X, Scan, ChevronRight, ArrowUp, Crown, Info, CheckCircle2,
@@ -9,8 +9,15 @@ import { findLookAlike, LookAlikeResult } from "@/lib/lookAlikeSystem";
 import { Celebrity } from "@/lib/celebrityDatabase";
 import { Link } from "react-router-dom";
 
-// Helper for instructions (Reused from Analysis but customized)
-const InstructionScreen = ({ title, text, icon: Icon, onNext, image }: any) => (
+type InstructionScreenProps = {
+  title: string;
+  text: string;
+  icon: ComponentType<{ className?: string }>;
+  onNext: () => void;
+  image?: string;
+};
+
+const InstructionScreen = ({ title, text, icon: Icon, onNext }: InstructionScreenProps) => (
   <div className="flex flex-col items-center text-center justify-between h-full py-8">
     <div className="flex flex-col items-center gap-6">
       <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">

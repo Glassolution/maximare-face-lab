@@ -1,6 +1,6 @@
-import { GerResult } from "./gerTypes";
-import { getGerHistory } from "./gerTypes";
-import { getAnalysisHistory } from "./mockData";
+import { GerResult, getGerHistory } from "./gerTypes";
+import type { ExtendedAnalysisResult } from "./rankingSystem";
+import { getAnalysisHistory, type AnalysisResult } from "./mockData";
 
 export interface FacialBottleneck {
   id: string;
@@ -202,13 +202,15 @@ const TREND_DATABASE: Record<string, SmartTrend[]> = {
 };
 
 // ─── Score Mapping ───
-function mapAttributesToAreas(result: any): Record<string, number> {
+type TrendSource = GerResult | ExtendedAnalysisResult | AnalysisResult;
+
+function mapAttributesToAreas(result: TrendSource): Record<string, number> {
   const areas: Record<string, number> = {};
   
-  if (result.attributes) {
-    // GER analysis with attributes array
-    for (const attr of result.attributes) {
-      const name = attr.name?.toLowerCase() || attr.id?.toLowerCase() || "";
+  if ("attributes" in result) {
+    const attrs = (result as GerResult).attributes;
+    for (const attr of attrs) {
+      const name = (attr.name || attr.id).toLowerCase();
       if (name.includes("simetria")) areas.symmetry = attr.score;
       else if (name.includes("mandíbula") || name.includes("queixo") || name.includes("jaw") || name.includes("goní")) areas.jawline = Math.max(areas.jawline || 0, attr.score);
       else if (name.includes("pele") || name.includes("skin") || name.includes("rugas")) areas.skin = Math.min(areas.skin ?? 100, attr.score);
@@ -218,9 +220,10 @@ function mapAttributesToAreas(result: any): Record<string, number> {
       else if (name.includes("zigomátic") || name.includes("maçã")) areas.cheekbones = attr.score;
       else if (name.includes("masculinidade") || name.includes("maxilar")) areas.harmony = Math.min(areas.harmony ?? 100, attr.score);
     }
-  } else if (result.categories) {
-    // Legacy mock analysis
-    for (const cat of result.categories) {
+  } else if ("categories" in result) {
+    type CommonCategory = { id: string; score: number };
+    const cats = (result as ExtendedAnalysisResult | AnalysisResult).categories as unknown as CommonCategory[];
+    for (const cat of cats) {
       const score = cat.score >= 10 ? cat.score : cat.score * 10;
       if (cat.id === "simetria") areas.symmetry = score;
       else if (cat.id === "estrutura") areas.jawline = score;
@@ -271,8 +274,13 @@ export function generatePersonalizedPlan(): PersonalizedPlan {
     return { bottlenecks: [], trends: [], gerScore: 0, hasAnalysis: false };
   }
   
-  const areas = mapAttributesToAreas(latestResult);
-  const gerScore = (latestResult as any).ger || Math.round((latestResult as any).overallScore * 10) || 0;
+  const areas = mapAttributesToAreas(latestResult as TrendSource);
+  let gerScore = 0;
+  if ("ger" in latestResult && typeof latestResult.ger === "number") {
+    gerScore = latestResult.ger;
+  } else if ("overallScore" in latestResult && typeof latestResult.overallScore === "number") {
+    gerScore = Math.round(latestResult.overallScore * 10);
+  }
   
   // Build bottlenecks sorted by score (worst first)
   const bottlenecks: FacialBottleneck[] = Object.entries(areas)

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -46,160 +46,228 @@ const GENDERS = [
 ];
 
 /* ─── Step 1: Emotional Impact ─── */
-function StepImpact({ onNext }: { onNext: () => void }) {
+function StepImpact({ onNext, onBack }: { onNext: (habits: number[]) => void; onBack: () => void }) {
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+
+  const toggleSelection = (index: number) => {
+    const newSelected = new Set(selected);
+    if (newSelected.has(index)) {
+      newSelected.delete(index);
+    } else {
+      newSelected.add(index);
+    }
+    setSelected(newSelected);
+  };
+
   const habits = [
-    { icon: Wind, title: "Respiração pela Boca", sub: "(Queixo Fraco)" },
-    { icon: Scissors, title: "Penteado Errado", sub: "(Formato de Cabeça de Ovo)" },
-    { icon: Droplets, title: "Inchaço", sub: "(Rosto com Alto Sódio)" },
+    { icon: "air", title: "Respiração Bucal", sub: "Queixo Fraco" },
+    { icon: "accessibility_new", title: "Má Postura", sub: "Pescoço Curvado" },
+    { icon: "face_6", title: "Inchaço", sub: "Rosto com Alto Sódio" },
   ];
 
   return (
-    <div className="flex flex-col items-center text-center flex-1 justify-between py-8 -mx-6 px-6">
-      <div className="flex flex-col items-center gap-6">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-            <span className="font-heading font-extrabold text-sm text-primary-foreground">M</span>
+    <div className="dark font-display antialiased bg-background-dark text-white h-[100dvh] overflow-hidden relative flex flex-col">
+      <div className="fixed inset-0 blueprint-bg pointer-events-none"></div>
+
+      <main className="relative z-10 max-w-md mx-auto h-full flex flex-col px-5 pt-6 pb-4 w-full">
+        <header
+          className="grid grid-cols-[auto,1fr,auto] items-center mb-4"
+          style={{
+            paddingLeft: "calc(env(safe-area-inset-left))",
+            paddingRight: "calc(env(safe-area-inset-right))",
+          }}
+        >
+          <button 
+            onClick={onBack}
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-200/50 dark:bg-white/5 backdrop-blur-md hover:bg-slate-200/70 dark:hover:bg-white/10 transition-colors"
+          >
+            <span className="material-symbols-outlined text-xl">arrow_back</span>
+          </button>
+          <div className="flex gap-1.5 justify-center min-w-0 overflow-hidden">
+            <div className="w-12 h-1 rounded-full bg-primary neon-glow"></div>
+            <div className="w-8 h-1 rounded-full bg-slate-200/20 dark:bg-white/10"></div>
+            <div className="w-8 h-1 rounded-full bg-slate-200/20 dark:bg-white/10"></div>
+            <div className="w-8 h-1 rounded-full bg-slate-200/20 dark:bg-white/10"></div>
+            <div className="w-8 h-1 rounded-full bg-slate-200/20 dark:bg-white/10"></div>
           </div>
-          <span className="font-heading font-bold text-foreground">
+          <button
+            onClick={() => onNext(Array.from(selected))}
+            className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors shrink-0"
+          >
+            Pular
+          </button>
+        </header>
+
+        <div className="flex items-center justify-center gap-3 mb-3">
+          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold text-xs shadow-lg shadow-primary/20">
+            M
+          </div>
+          <span className="font-bold tracking-tight text-sm uppercase">
             Maximare <span className="text-primary">AI</span>
           </span>
         </div>
 
-        <h1 className="font-heading text-3xl sm:text-4xl font-extrabold text-foreground leading-tight">
-          Você está se
-          <br />
-          Segurando
-        </h1>
-        <p className="text-muted-foreground text-sm leading-relaxed max-w-xs">
-          A maioria das falhas são hábitos.
-          <br />
-          E hábitos podem ser corrigidos.
-        </p>
-
-        <div className="grid grid-cols-2 gap-6 mt-4">
-          {habits.map((h, i) => {
-            const Icon = h.icon;
-            return (
-              <div
-                key={h.title}
-                className={`flex flex-col items-center gap-2 ${i === 2 ? "col-span-2" : ""}`}
-              >
-                <div className="relative h-20 w-20 rounded-full border-2 border-primary flex items-center justify-center">
-                  <Icon className="h-8 w-8 text-primary" />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="h-[2px] w-16 bg-primary rotate-45 rounded-full" />
-                    <div className="absolute h-[2px] w-16 bg-primary -rotate-45 rounded-full" />
-                  </div>
-                </div>
-                <span className="font-heading font-bold text-foreground text-xs">{h.title}</span>
-                <span className="text-muted-foreground text-[10px]">{h.sub}</span>
-              </div>
-            );
-          })}
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-extrabold mb-2 tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white to-slate-400">
+            Você está se Segurando
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed px-4">
+            A maioria das falhas são hábitos estruturais.
+            <br />
+            Nossa IA identifica e sugere correções biométricas.
+          </p>
         </div>
-      </div>
 
-      <Button
-        onClick={() => onNext()}
-        size="lg"
-        className="w-full rounded-2xl py-7 text-base font-bold bg-white text-primary hover:bg-white/90 shadow-xl shadow-black/20"
-      >
-        Continuar
-      </Button>
+        <div className="flex-grow grid grid-cols-2 gap-3 mb-3 content-start">
+          {habits.map((h, i) => (
+            <button
+              key={i}
+              className={`glass-node flex flex-col items-center justify-center p-6 rounded-[2rem] group transition-all duration-300 ${
+                selected.has(i) ? "selected" : ""
+              } ${i === 2 ? "col-span-2 h-28" : "h-32"}`}
+              onClick={() => toggleSelection(i)}
+            >
+              <div
+                className={`icon-container mb-4 transition-transform group-hover:scale-110 ${
+                  selected.has(i) ? "" : "text-slate-400"
+                }`}
+              >
+                <span className="material-symbols-outlined text-4xl">{h.icon}</span>
+              </div>
+              <h3 className="text-sm font-bold mb-1">{h.title}</h3>
+              <p className="text-[10px] text-slate-500 uppercase tracking-widest font-mono">{h.sub}</p>
+            </button>
+          ))}
+        </div>
+
+        <footer className="relative z-10 px-8 pb-8 pt-4 bg-gradient-to-t from-background-dark via-background-dark to-transparent shrink-0">
+          <Button
+            onClick={() => onNext(Array.from(selected))}
+            className="w-full h-14 bg-white text-primary font-bold rounded-full shadow-lg shadow-primary/20 text-base tracking-wide hover:bg-white/90 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40"
+          >
+            <ArrowRight className="h-4 w-4" />
+            Continuar
+          </Button>
+        </footer>
+      </main>
     </div>
   );
 }
 
-/* ─── Step 2: Age Picker ─── */
-function StepAge({ onNext, initialAge }: { onNext: (age: number) => void; initialAge: number }) {
+/* ─── Step 2: Age Picker (Biometric Style) ─── */
+function StepAge({ onNext, onBack, initialAge }: { onNext: (age: number) => void; onBack: () => void; initialAge: number }) {
   const [selectedAge, setSelectedAge] = useState(initialAge);
-  const ages = Array.from({ length: 50 }, (_, i) => i + 12);
+  const ages = Array.from({ length: 83 }, (_, i) => i + 12); // Range 12-94
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
-      const itemH = 56;
       const idx = ages.indexOf(selectedAge);
-      // Center the selected item: scrollTop = index * itemHeight
-      scrollRef.current.scrollTop = idx * itemH;
+      scrollRef.current.scrollTop = idx * 120;
     }
-  }, []);
-
-  const handleScroll = useCallback(() => {
-    if (!scrollRef.current) return;
-    const itemH = 56;
-    const scrollTop = scrollRef.current.scrollTop;
-    // Calculate index based on scroll position
-    const centerIdx = Math.round(scrollTop / itemH);
-    const clamped = Math.max(0, Math.min(ages.length - 1, centerIdx));
-    
-    // Only update if changed to avoid unnecessary re-renders
-    if (ages[clamped] !== selectedAge) {
-      setSelectedAge(ages[clamped]);
-    }
-  }, [ages, selectedAge]);
+  }, []); // Run once on mount
 
   return (
-    <div className="flex flex-col items-center text-center flex-1 justify-between py-8 -mx-6 px-6 rounded-none min-h-0">
-      <div className="flex flex-col items-center gap-4 w-full">
-        <h1 className="font-heading text-3xl font-extrabold text-foreground leading-tight">
-          Qual é sua
-          <br />
-          idade?
-        </h1>
-        <p className="text-muted-foreground text-sm">Selecione sua idade para melhorar sua experiência!</p>
+    <div className="bg-white text-slate-900 h-[100dvh] flex flex-col overflow-hidden fixed inset-0 z-50">
+      {/* Background Radial Gradient for subtle depth */}
+      <div className="fixed inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-50/50 via-white to-white pointer-events-none"></div>
 
-        <div
-          ref={scrollRef}
-          onScroll={handleScroll}
-          className="relative h-[336px] w-full overflow-y-auto scrollbar-hide snap-y snap-mandatory mt-4 [mask-image:linear-gradient(to_bottom,transparent,black_10%,black_90%,transparent)]"
-          style={{ scrollSnapType: "y mandatory" }}
-        >
-          <div className="py-[140px]">
+      {/* Header */}
+      <header
+        className="relative z-10 grid grid-cols-[auto,1fr,auto] items-center px-6 pt-14 pb-4 shrink-0"
+        style={{
+          paddingLeft: "calc(1.5rem + env(safe-area-inset-left))",
+          paddingRight: "calc(1.5rem + env(safe-area-inset-right))",
+          paddingTop: "calc(3.5rem + env(safe-area-inset-top))",
+        }}
+      >
+        <button onClick={onBack} className="p-2 -ml-2 text-slate-500 hover:text-primary transition-colors">
+          <ArrowLeft className="w-6 h-6" />
+        </button>
+        
+        <div className="flex gap-2 px-4 justify-center min-w-0 overflow-hidden">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <div
+              key={i}
+              className={`h-1 rounded-full transition-colors ${
+                i === 1 ? "w-12 bg-primary neon-glow" : "w-8 bg-slate-300"
+              }`}
+            ></div>
+          ))}
+        </div>
+
+        <button onClick={() => onNext(selectedAge)} className="text-sm font-semibold text-primary hover:text-primary/80 uppercase tracking-wider transition-colors shrink-0">
+          PULAR
+        </button>
+      </header>
+
+      <main className="flex-1 relative flex flex-col items-center justify-center shrink-0">
+        <div className="text-center z-10 mb-8 px-6 mt-[-40px]">
+          <h1 className="text-3xl font-bold text-slate-900 mb-3">Qual é sua idade?</h1>
+          <p className="text-slate-500 text-sm max-w-[280px] mx-auto leading-relaxed">
+            Selecione sua idade para calibrar o motor de análise biométrica.
+          </p>
+        </div>
+
+        <div className="relative w-full max-w-[320px] h-[320px] flex items-center justify-center">
+          <div className="radial-lines border-slate-200"></div>
+          <div className="radial-lines w-[280px] h-[280px] opacity-30 border-slate-200"></div>
+          
+          <div className="absolute left-0 right-0 h-24 pointer-events-none flex items-center justify-between px-10 z-20">
+            <div className="w-12 h-[1px] bg-primary/40"></div>
+            <div className="w-12 h-[1px] bg-primary/40"></div>
+          </div>
+
+          <div 
+            ref={scrollRef}
+            onScroll={(e) => {
+              const target = e.currentTarget;
+              const scrollTop = target.scrollTop;
+              const centerIdx = Math.round(scrollTop / 120); // 120 is ITEM_HEIGHT
+              const clamped = Math.max(0, Math.min(ages.length - 1, centerIdx));
+              if (ages[clamped] !== selectedAge) {
+                setSelectedAge(ages[clamped]);
+              }
+            }}
+            className="age-scroll flex flex-col items-center gap-0 overflow-y-auto snap-y snap-mandatory h-full w-full scrollbar-hide mask-gradient-y"
+          >
+            <div className="shrink-0 w-full" style={{ height: 'calc(50% - 60px)' }}></div>
             {ages.map((age) => {
               const isSelected = age === selectedAge;
-              const diff = Math.abs(age - selectedAge);
               return (
-                <div
-                  key={age}
-                  className="h-14 flex items-center justify-center snap-center cursor-pointer"
+                <div 
+                  key={age} 
+                  className={`age-item snap-center flex items-center justify-center h-[120px] min-h-[120px] w-full cursor-pointer transition-all duration-300 ${isSelected ? 'scale-110' : 'opacity-40'}`}
                   onClick={() => {
                     setSelectedAge(age);
-                    if (scrollRef.current) {
-                      const idx = ages.indexOf(age);
-                      scrollRef.current.scrollTo({ top: idx * 56, behavior: 'smooth' });
-                    }
+                    scrollRef.current?.scrollTo({ top: ages.indexOf(age) * 120, behavior: 'smooth' });
                   }}
                 >
-                  <span
-                    className={`font-heading font-extrabold transition-all duration-150 ${
-                      isSelected
-                        ? "text-5xl text-white scale-110"
-                        : diff === 1
-                        ? "text-3xl text-white/50"
-                        : diff === 2
-                        ? "text-xl text-white/20"
-                        : "text-lg text-white/5 blur-[1px]"
-                    }`}
-                  >
+                  <span className={`font-bold transition-all duration-300 relative font-heading ${
+                    isSelected 
+                      ? 'text-8xl text-slate-900 selected-age' 
+                      : 'text-6xl text-slate-300'
+                  }`}>
                     {age}
+                    {isSelected && <div className="text-[10px] font-bold tracking-[0.2em] uppercase text-primary text-center mt-2 absolute left-1/2 -translate-x-1/2 -bottom-6 whitespace-nowrap">SELECIONADO</div>}
                   </span>
                 </div>
               );
             })}
+            <div className="shrink-0 w-full" style={{ height: 'calc(50% - 60px)' }}></div>
           </div>
-          {/* Selection highlight */}
-          <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-14 pointer-events-none border-t border-b border-primary/50 bg-white/5" />
         </div>
-      </div>
+      </main>
 
-      <Button
-        onClick={() => onNext(selectedAge)}
-        size="lg"
-        className="w-full rounded-2xl py-7 text-base font-bold bg-white text-primary hover:bg-white/90 shadow-xl shadow-black/20"
-      >
-        Continuar
-      </Button>
+      <footer className="relative z-10 px-8 pb-8 pt-4 bg-gradient-to-t from-white via-white to-transparent shrink-0">
+        <Button 
+          onClick={() => onNext(selectedAge)}
+          className="w-full h-14 bg-white text-primary font-bold rounded-full shadow-xl shadow-primary/40 glow-primary text-base tracking-wide hover:bg-white/90 hover:scale-[1.04] active:scale-[0.98] transition-all disabled:opacity-40"
+        >
+          <ArrowRight className="h-4 w-4" />
+          Continuar
+        </Button>
+      </footer>
     </div>
   );
 }
@@ -243,9 +311,9 @@ function StepGoal({ onNext, initialGoal }: { onNext: (idx: number) => void; init
       <Button
         onClick={() => selected !== null && onNext(selected)}
         disabled={selected === null}
-        size="lg"
-        className="w-full rounded-2xl py-7 text-base font-bold bg-white text-primary hover:bg-white/90 shadow-xl shadow-black/20 mt-4 disabled:opacity-40"
+        className="w-full h-14 bg-white text-primary font-bold rounded-full shadow-lg shadow-primary/20 text-base tracking-wide hover:bg-white/90 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40 mt-4"
       >
+        <ArrowRight className="h-4 w-4" />
         Continuar
       </Button>
     </div>
@@ -257,19 +325,19 @@ function StepGender({ onNext, initialGender }: { onNext: (id: string) => void; i
   const [selected, setSelected] = useState<string | null>(initialGender);
 
   return (
-    <div className="flex flex-col flex-1 justify-between py-8 -mx-6 px-6">
+    <div className="flex flex-col flex-1 justify-between py-6 -mx-6 px-6 h-full">
       <div className="flex flex-col gap-4">
         <div className="text-left">
           <h1 className="font-heading text-3xl font-extrabold text-foreground leading-tight">Escolha o Gênero</h1>
           <p className="text-muted-foreground text-sm mt-2">Escolha um deles para uma experiência melhor</p>
         </div>
 
-        <div className="flex flex-col gap-3 mt-2 flex-1">
+        <div className="flex flex-col gap-3 mt-3">
           {GENDERS.map((g) => (
             <button
               key={g.id}
               onClick={() => setSelected(g.id)}
-              className={`relative rounded-2xl overflow-hidden flex-1 min-h-[160px] border transition-all bg-[#09090b] ${
+              className={`relative rounded-2xl overflow-hidden h-[120px] border transition-all bg-[#09090b] ${
                 selected === g.id ? "border-primary ring-1 ring-primary" : "border-border/30"
               }`}
             >
@@ -289,9 +357,9 @@ function StepGender({ onNext, initialGender }: { onNext: (id: string) => void; i
       <Button
         onClick={() => selected && onNext(selected)}
         disabled={!selected}
-        size="lg"
-        className="w-full rounded-2xl py-7 text-base font-bold bg-white text-primary hover:bg-white/90 shadow-xl shadow-black/20 mt-4 disabled:opacity-40"
+        className="w-full h-14 bg-white text-primary font-bold rounded-full shadow-lg shadow-primary/20 text-base tracking-wide hover:bg-white/90 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40 mt-4"
       >
+        <ArrowRight className="h-4 w-4" />
         Continuar
       </Button>
     </div>
@@ -307,8 +375,8 @@ function StepAuthority({ onNext }: { onNext: () => void }) {
   ];
 
   return (
-    <div className="flex flex-col items-center text-center flex-1 justify-between py-8 -mx-6 px-6">
-      <div className="flex flex-col items-center gap-6">
+    <div className="flex flex-col items-center text-center flex-1 justify-between py-6 -mx-6 px-6 h-full">
+      <div className="flex flex-col items-center gap-4">
         <div className="flex items-center gap-2">
           <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
             <span className="font-heading font-extrabold text-sm text-primary-foreground">M</span>
@@ -318,25 +386,25 @@ function StepAuthority({ onNext }: { onNext: () => void }) {
           </span>
         </div>
 
-        <h1 className="font-heading text-3xl font-extrabold text-foreground leading-tight">
+        <h1 className="font-heading text-2xl font-extrabold text-foreground leading-tight">
           Controle Total
           <br />
           da Atratividade
         </h1>
-        <p className="text-muted-foreground text-sm leading-relaxed max-w-xs">
+        <p className="text-muted-foreground text-xs leading-relaxed max-w-xs">
           Do seu Ângulo Goniaco à sua Estação de Cor,
           <br />
           nossa IA otimiza cada pixel da sua aparência.
         </p>
 
-        <div className="flex flex-col gap-3 w-full mt-2">
+        <div className="flex flex-col gap-2 w-full mt-2">
           {modules.map((m) => (
             <div
               key={m.name}
-              className="flex items-center gap-4 p-4 rounded-2xl border border-primary/30 bg-secondary/30"
+              className="flex items-center gap-3 p-3 rounded-2xl border border-primary/30 bg-secondary/30"
             >
-              <div className="h-14 w-14 rounded-xl bg-secondary flex items-center justify-center shrink-0 border border-primary/20">
-                <m.icon className={`h-6 w-6 ${m.color}`} />
+              <div className="h-12 w-12 rounded-xl bg-secondary flex items-center justify-center shrink-0 border border-primary/20">
+                <m.icon className={`h-5 w-5 ${m.color}`} />
               </div>
               <div className="text-left">
                 <span className="font-heading font-bold text-foreground">{m.name}</span>
@@ -349,9 +417,9 @@ function StepAuthority({ onNext }: { onNext: () => void }) {
 
       <Button
         onClick={onNext}
-        size="lg"
-        className="w-full rounded-2xl py-7 text-base font-bold bg-white text-primary hover:bg-white/90 shadow-xl shadow-black/20"
+        className="w-full h-14 bg-white text-primary font-bold rounded-full shadow-lg shadow-primary/20 text-base tracking-wide hover:bg-white/90 hover:scale-[1.02] active:scale-[0.98] transition-all"
       >
+        <ArrowRight className="h-4 w-4" />
         Continuar
       </Button>
     </div>
@@ -467,62 +535,50 @@ function StepProjection({ onNext, userData }: { onNext: () => void; userData: { 
                 <span className="font-heading font-bold text-foreground text-right pl-4">{goalLabel}</span>
               </div>
           </div>
+
+        <div className="w-full flex justify-center mt-4">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-primary/40 text-primary bg-white/5">
+            <span className="h-2 w-2 rounded-full bg-primary animate-pulse"></span>
+            <span className="text-xs font-bold tracking-wider uppercase">Algoritmo Maximare Ativo</span>
+          </div>
+        </div>
         </div>
 
-        <Button
-          onClick={onNext}
-          size="lg"
-          className="w-full rounded-2xl py-7 text-base font-bold bg-white text-primary hover:bg-white/90 shadow-xl shadow-black/20 mt-6"
-        >
-          Ver Resultados
-        </Button>
+      <Button
+        onClick={onNext}
+        size="lg"
+        className="w-full rounded-2xl py-7 text-base font-bold bg-white text-primary hover:bg-white/90 shadow-xl shadow-black/20 mt-6"
+      >
+        Ver Resultados
+      </Button>
       </div>
     </div>
   );
 }
 
 /* ─── Step 7: Brutal Truth ─── */
-function StepBrutalTruth({ onNext, userData }: { onNext: () => void; userData: { age: number; goal: number; gender: string } }) {
+function StepBrutalTruth({ onNext, userData }: { onNext: () => void; userData: { age: number; goal: number; gender: string; habits: number[] } }) {
   const { title, sub, metricLabel, metricValue, chartData } = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    const isFemale = userData.gender === 'female';
-    
-    // Dynamic Content Generation
-    const title = isFemale ? "A Realidade Estética" : "A Verdade Brutal";
-    
-    const sub = isFemale 
-      ? "A competição visual nunca foi tão alta. Redes sociais elevaram os padrões a níveis impossíveis."
-      : "99% dos homens não percebem o quanto a atratividade impacta suas vidas, especialmente no namoro.";
+    const habitsCount = userData.habits?.length || 0;
+    const title = "Análise Personalizada";
+    const sub = "Resultado baseado nas respostas do seu quiz.";
+    const metricLabel = "Índice de Preparação";
 
-    const metricLabel = isFemale ? "Pressão Estética" : "Índice de Solidão";
-    
-    // Calculate metric value based on user data
-    let score = 82; // Base score
+    const goalBase = [30, 50, 70, 85][userData.goal] || 50;
+    const ageAdj = userData.age < 18 ? 20 : userData.age <= 29 ? 60 : userData.age <= 39 ? 45 : 35;
+    const habitsAdj = Math.min(30, habitsCount * 12);
+    const genderAdj = 5;
 
-    // Age Factor
-    if (userData.age >= 18 && userData.age <= 29) score += 12; // Peak dating struggle
-    else if (userData.age >= 30 && userData.age <= 40) score += 8; // High pressure
-    else if (userData.age < 18) score += 6; // Teenage insecurity
-    else score += 4; // Mature maintenance
+    const metricValue = Math.min(99, Math.round((goalBase * 0.5) + (ageAdj * 0.3) + (habitsAdj * 0.2) + genderAdj));
 
-    // Goal Factor (Higher goals = Higher dissatisfaction/need)
-    if (userData.goal === 3) score += 5; // "Impulsionar meu look e confiança"
-    else if (userData.goal === 2) score += 4; // "Melhorar rosto e físico"
-    else if (userData.goal === 1) score += 2; // "Melhorar estética facial"
-    
-    // Cap at 99
-    const metricValue = Math.min(score, 99);
-
-    // Generate Chart Data
-    // Simulating a rising trend of difficulty/pressure over the last 10 years
     const chartData = [
-      { year: (currentYear - 10).toString(), value: Math.round(metricValue * 0.5) },
-      { year: (currentYear - 5).toString(), value: Math.round(metricValue * 0.75) },
-      { year: "Hoje", value: metricValue },
+      { label: "Objetivo", value: Math.round(goalBase) },
+      { label: "Idade", value: Math.round(ageAdj) },
+      { label: "Hábitos", value: Math.round(habitsAdj) },
     ];
 
     return { title, sub, metricLabel, metricValue, chartData };
-  }, [userData.age, userData.gender, userData.goal]);
+  }, [userData.age, userData.gender, userData.goal, userData.habits]);
 
   return (
     <div className="flex flex-col items-center text-center flex-1 justify-between py-8 -mx-6 px-6">
@@ -547,7 +603,7 @@ function StepBrutalTruth({ onNext, userData }: { onNext: () => void; userData: {
           </h3>
           <div className="flex items-center justify-between mt-2">
             <div>
-              <span className="text-sm text-muted-foreground uppercase tracking-wider">Metric: {userData.gender === 'female' ? 'Pressure' : 'Isolation'}</span>
+              <span className="text-sm text-muted-foreground uppercase tracking-wider">Metric: Preparação</span>
               <div className="flex items-baseline gap-1 mt-1">
                 <span className="text-3xl font-heading font-black text-foreground">{metricValue}%</span>
                 <AlertTriangle className="h-4 w-4 text-primary" />
@@ -569,7 +625,7 @@ function StepBrutalTruth({ onNext, userData }: { onNext: () => void; userData: {
                   </linearGradient>
                 </defs>
                 <XAxis
-                  dataKey="year"
+                  dataKey="label"
                   axisLine={false}
                   tickLine={false}
                   tick={{ fill: "hsl(215, 15%, 60%)", fontSize: 12 }}
@@ -590,9 +646,9 @@ function StepBrutalTruth({ onNext, userData }: { onNext: () => void; userData: {
 
       <Button
         onClick={onNext}
-        size="lg"
-        className="w-full rounded-2xl py-7 text-base font-bold bg-white text-primary hover:bg-white/90 shadow-xl shadow-black/20"
+        className="w-full h-14 bg-white text-primary font-bold rounded-full shadow-lg shadow-primary/20 text-base tracking-wide hover:bg-white/90 hover:scale-[1.02] active:scale-[0.98] transition-all"
       >
+        <ArrowRight className="h-4 w-4" />
         Continuar
       </Button>
     </div>
@@ -651,7 +707,7 @@ function StepFinalCTA({ onFinish }: { onFinish: () => void }) {
 /* ─── Main Onboarding ─── */
 export default function Onboarding() {
   const [step, setStep] = useState(0);
-  const [userData, setUserData] = useState({ age: 20, goal: 0, gender: "male" });
+  const [userData, setUserData] = useState({ age: 20, goal: 0, gender: "male", habits: [] as number[] });
   const navigate = useNavigate();
 
   const next = () => setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
@@ -678,7 +734,15 @@ export default function Onboarding() {
       setStep((s) => s - 1);
     }
   };
-  const finish = () => navigate("/analysis");
+  const finish = () => navigate("/login");
+
+  // Render StepAge in full screen mode without the default wrapper
+  if (step === 0) {
+    return <StepImpact onNext={(habits) => { setUserData((prev) => ({ ...prev, habits })); next(); }} onBack={back} />;
+  }
+  if (step === 1) {
+    return <StepAge onNext={handleAgeNext} onBack={back} initialAge={userData.age} />;
+  }
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background relative overflow-hidden">
@@ -718,8 +782,8 @@ export default function Onboarding() {
               exit="exit"
               className="flex flex-col flex-1"
             >
-              {step === 0 && <StepImpact onNext={next} />}
-              {step === 1 && <StepAge onNext={handleAgeNext} initialAge={userData.age} />}
+              {/* StepImpact is handled by the conditional return above */}
+              {/* StepAge is handled by the conditional return above */}
               {step === 2 && <StepGoal onNext={handleGoalNext} initialGoal={userData.goal} />}
               {step === 3 && <StepGender onNext={handleGenderNext} initialGender={userData.gender} />}
               {step === 4 && <StepAuthority onNext={next} />}

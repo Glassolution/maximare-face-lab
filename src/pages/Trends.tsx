@@ -43,10 +43,10 @@ export default function Trends() {
           </div>
           <div>
             <h1 className="font-heading text-2xl font-bold text-foreground mb-2">Plano Personalizado</h1>
-            <p className="text-muted-foreground max-w-xs">
+            <p className="text-muted-foreground max-w-xs mb-4">
             Faça sua primeira análise de Aura para receber recomendações baseadas na sua estrutura facial única.
           </p>
-          <Button onClick={() => navigate("/analysis")} className="rounded-2xl py-6 px-8 glow-primary">
+          <Button onClick={() => navigate("/analysis")} className="mt-2 rounded-2xl py-6 px-8 glow-primary">
             <Camera className="h-5 w-5 mr-2" /> Fazer Análise de Aura
           </Button>
         </div>
@@ -219,7 +219,7 @@ export default function Trends() {
                         </div>
 
                         {/* CTA */}
-                        <Button onClick={() => navigate("/analysis")} variant="outline" className="w-full rounded-xl glass border-primary/20 text-primary hover:text-primary">
+                        <Button onClick={() => navigate("/analysis")} variant="outline" className="mt-3 w-full rounded-xl glass border-primary/20 text-primary hover:text-primary">
                           <RotateCcw className="h-4 w-4 mr-2" /> Reanalisar esta área
                         </Button>
                       </div>

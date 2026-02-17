@@ -1,4 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,6 +19,8 @@ const TIERS = [
   { min: 90, max: 99, name: "true adam" },
 ];
 
+const COOLDOWN_SECONDS = 15;
+
 function getTier(ger: number) {
   return TIERS.find((t) => ger >= t.min && ger <= t.max) || TIERS[0];
 }
@@ -27,11 +31,295 @@ function getNextTier(ger: number) {
   return idx < TIERS.length - 1 ? TIERS[idx + 1] : null;
 }
 
-serve(async (req) => {
+function isoDateOnly(d = new Date()) {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function nextMidnightUTC() {
+  const now = new Date();
+  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0));
+  return next.toISOString();
+}
+
+function logEvent(event: Record<string, unknown>) {
+  console.log("[analyze-face]", JSON.stringify(event));
+}
+
+type CanAnalyzeOk = {
+  ok: true;
+  isPremium: boolean;
+  remaining: number | null;
+  limit: number | null;
+};
+
+type CanAnalyzeErrorBody = {
+  status: "error";
+  error_code: "RATE_LIMIT" | "QUOTA_EXCEEDED";
+  message: string;
+  retry_after_seconds?: number;
+  limit?: number;
+  remaining?: number;
+  reset_at?: string;
+};
+
+type CanAnalyzeError = {
+  ok: false;
+  status: number;
+  body: CanAnalyzeErrorBody;
+};
+
+async function canAnalyze(
+  supabase: SupabaseClient | null,
+  user_id: string | null,
+  planHint: "free" | "premium",
+): Promise<CanAnalyzeOk | CanAnalyzeError> {
+  if (!supabase || !user_id) {
+    return { ok: true, isPremium: false, remaining: null, limit: null };
+  }
+
+  const now = new Date();
+  const today = isoDateOnly(now);
+  const nowMs = now.getTime();
+
+  // Load profile to determine premium status
+  let isPremium = planHint === "premium";
+  let plan = planHint;
+  let premiumUntil: string | null = null;
+
+  try {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("is_premium, plan, premium_until")
+      .eq("user_id", user_id)
+      .maybeSingle();
+    if (profile) {
+      isPremium = !!profile.is_premium;
+      if (profile.plan) plan = profile.plan.toLowerCase() === "premium" ? "premium" : "free";
+      premiumUntil = profile.premium_until || null;
+    }
+  } catch (err) {
+    logEvent({ type: "profiles_fetch_error", error: String(err) });
+  }
+
+  const premiumActive =
+    isPremium ||
+    plan === "premium" ||
+    (premiumUntil && Date.parse(premiumUntil) > nowMs);
+
+  // Cooldown using last analysis timestamp
+  try {
+    const { data: lastAnalysis } = await supabase
+      .from("analysis_history")
+      .select("created_at")
+      .eq("user_id", user_id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (lastAnalysis?.created_at) {
+      const lastMs = Date.parse(lastAnalysis.created_at);
+      const diffSeconds = Math.max(0, Math.floor((nowMs - lastMs) / 1000));
+      if (diffSeconds < COOLDOWN_SECONDS) {
+        return {
+          ok: false,
+          status: 429,
+          body: {
+            status: "error",
+            error_code: "RATE_LIMIT",
+            message: "Aguarde alguns segundos para uma nova análise.",
+            retry_after_seconds: COOLDOWN_SECONDS - diffSeconds,
+          },
+        };
+      }
+    }
+  } catch (err) {
+    logEvent({ type: "analysis_history_fetch_error", error: String(err) });
+  }
+
+  const FAIR_USE_PREMIUM_LIMIT = 200;
+
+  if (premiumActive) {
+    // Fair use invisível: apenas impede abuso extremo, não exibe limite diário
+    try {
+      const { data, error } = await supabase
+        .from("usage_limits")
+        .select("scans_used, scans_limit")
+        .eq("user_id", user_id)
+        .eq("date", today)
+        .maybeSingle();
+      let scansLimit = FAIR_USE_PREMIUM_LIMIT;
+      let scansUsed = 0;
+      if (!error && data) {
+        scansLimit = data.scans_limit ?? scansLimit;
+        scansUsed = data.scans_used ?? 0;
+      }
+      if (scansUsed >= scansLimit) {
+        return {
+          ok: false,
+          status: 429,
+          body: {
+            status: "error",
+            error_code: "RATE_LIMIT",
+            message: "Aguarde alguns segundos para uma nova análise.",
+            retry_after_seconds: COOLDOWN_SECONDS,
+          },
+        };
+      }
+      const nextUsed = scansUsed + 1;
+      await supabase
+        .from("usage_limits")
+        .upsert({
+          user_id,
+          date: today,
+          scans_used: nextUsed,
+          scans_limit: scansLimit,
+          reset_at: nextMidnightUTC(),
+        });
+    } catch (err) {
+      logEvent({ type: "usage_limits_premium_error", error: String(err) });
+    }
+
+    return { ok: true, isPremium: true, remaining: null, limit: null };
+  }
+
+  // Free: limite diário explícito
+  try {
+    const { data, error } = await supabase
+      .from("usage_limits")
+      .select("scans_used, scans_limit, reset_at")
+      .eq("user_id", user_id)
+      .eq("date", today)
+      .maybeSingle();
+
+    let scansLimit = 3;
+    let scansUsed = 0;
+    let resetAt = nextMidnightUTC();
+
+    if (!error && data) {
+      scansLimit = data.scans_limit ?? scansLimit;
+      scansUsed = data.scans_used ?? 0;
+      resetAt = data.reset_at || resetAt;
+    } else {
+      await supabase.from("usage_limits").insert({
+        user_id,
+        date: today,
+        scans_used: 0,
+        scans_limit: scansLimit,
+        reset_at: resetAt,
+      });
+    }
+
+    if (scansUsed >= scansLimit) {
+      return {
+        ok: false,
+        status: 402,
+        body: {
+          status: "error",
+          error_code: "QUOTA_EXCEEDED",
+          message: "Você atingiu o limite diário gratuito.",
+          limit: scansLimit,
+          remaining: 0,
+          reset_at: resetAt,
+        },
+      };
+    }
+
+    const nextUsed = scansUsed + 1;
+    await supabase
+      .from("usage_limits")
+      .upsert({
+        user_id,
+        date: today,
+        scans_used: nextUsed,
+        scans_limit: scansLimit,
+        reset_at: resetAt,
+      });
+
+    const remaining = Math.max(0, scansLimit - nextUsed);
+    return {
+      ok: true,
+      isPremium: false,
+      remaining,
+      limit: scansLimit,
+    };
+  } catch (err) {
+    logEvent({ type: "usage_limits_free_error", error: String(err) });
+    // Em caso de erro, não bloqueia o usuário
+    return {
+      ok: true,
+      isPremium: false,
+      remaining: null,
+      limit: null,
+    };
+  }
+}
+
+async function getGuardInfo(
+  supabase: SupabaseClient | null,
+  user_id: string | null,
+  planHint: "free" | "premium",
+): Promise<{ isPremium: boolean; remaining: number | null; limit: number | null }> {
+  if (!supabase || !user_id) return { isPremium: false, remaining: null, limit: null };
+
+  const now = new Date();
+  const today = isoDateOnly(now);
+  const nowMs = now.getTime();
+
+  let isPremium = planHint === "premium";
+  let plan = planHint;
+  let premiumUntil: string | null = null;
+
+  try {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("is_premium, plan, premium_until")
+      .eq("user_id", user_id)
+      .maybeSingle();
+    if (profile) {
+      isPremium = !!profile.is_premium;
+      if (profile.plan) plan = profile.plan.toLowerCase() === "premium" ? "premium" : "free";
+      premiumUntil = profile.premium_until || null;
+    }
+  } catch {
+    // silent
+  }
+
+  const premiumActive =
+    isPremium ||
+    plan === "premium" ||
+    (premiumUntil && Date.parse(premiumUntil) > nowMs);
+
+  if (premiumActive) {
+    return { isPremium: true, remaining: null, limit: null };
+  }
+
+  try {
+    const { data } = await supabase
+      .from("usage_limits")
+      .select("scans_used, scans_limit, reset_at")
+      .eq("user_id", user_id)
+      .eq("date", today)
+      .maybeSingle();
+
+    const scansLimit = data?.scans_limit ?? 3;
+    const scansUsed = data?.scans_used ?? 0;
+    const remaining = Math.max(0, scansLimit - scansUsed);
+    return { isPremium: false, remaining, limit: scansLimit };
+  } catch {
+    return { isPremium: false, remaining: null, limit: null };
+  }
+}
+
+serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { frontalImage, lateralImage } = await req.json();
+    const body = await req.json();
+    const frontalImage = body.frontalImage;
+    const lateralImage = body.lateralImage;
+    const analysisId: string = body.analysisId || crypto.randomUUID();
 
     if (!frontalImage) {
       return new Response(JSON.stringify({ error: "Foto frontal é obrigatória." }), {
@@ -44,6 +332,121 @@ serve(async (req) => {
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) : null;
+
+    // Identify user and ip
+    const authHeader = req.headers.get("Authorization") || "";
+    const jwt = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    let user_id: string | null = null;
+    let plan: "free" | "premium" = "free";
+    if (supabase && jwt) {
+      try {
+        const { data } = await supabase.auth.getUser(jwt);
+        user_id = data.user?.id ?? null;
+        const meta = (data.user?.user_metadata || data.user?.app_metadata || {}) as Record<string, unknown>;
+        const planMeta = (meta["plan"] as string) || (meta["subscription"] as string) || "";
+        if (planMeta.toLowerCase() === "premium") plan = "premium";
+      } catch (err) {
+        logEvent({ type: "auth_error", error: String(err) });
+      }
+    }
+    const ip =
+      req.headers.get("x-forwarded-for") ||
+      req.headers.get("x-real-ip") ||
+      req.headers.get("cf-connecting-ip") ||
+      "unknown";
+    const safeInsertLog = async (payload: Record<string, unknown>) => {
+      if (!supabase) return;
+      try {
+        await supabase.from("ia_logs").insert({
+          created_at: new Date().toISOString(),
+          user_id,
+          ip,
+          ...payload,
+        });
+      } catch (err) {
+        logEvent({ type: "ia_logs_insert_error", error: String(err) });
+      }
+    };
+
+    // Cache-Hit short-circuit
+    if (supabase && user_id && analysisId) {
+      try {
+        const { data: existing } = await supabase
+          .from("analysis_history")
+          .select("id, created_at, result_json, user_id")
+          .eq("user_id", user_id)
+          .eq("analysis_id", analysisId)
+          .maybeSingle();
+        if (existing?.id) {
+          const guardRo = await getGuardInfo(supabase, user_id, plan);
+          const responseBody = {
+            ...existing.result_json,
+            remaining: guardRo.isPremium ? null : guardRo.remaining,
+            limit: guardRo.isPremium ? null : guardRo.limit,
+            is_premium: guardRo.isPremium,
+            history_id: existing.id,
+            created_at: existing.created_at,
+            cooldown_seconds: 0,
+          };
+          return new Response(JSON.stringify(responseBody), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const { data: otherUser } = await supabase
+          .from("analysis_history")
+          .select("user_id")
+          .eq("analysis_id", analysisId)
+          .maybeSingle();
+        if (otherUser?.user_id && otherUser.user_id !== user_id) {
+          return new Response(JSON.stringify({ status: "error", error_code: "NOT_FOUND" }), {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch {
+        // proceed with normal flow
+      }
+    }
+
+    let guardInfo: { isPremium: boolean; remaining: number | null; limit: number | null } = {
+      isPremium: false,
+      remaining: null,
+      limit: null,
+    };
+    if (supabase && user_id) {
+      const guard = await canAnalyze(supabase, user_id, plan);
+      if (!guard.ok) {
+        const body = guard.body;
+        if (body.error_code === "RATE_LIMIT") {
+          await safeInsertLog({
+            event_type: "rate_limit",
+            retry_after: body.retry_after_seconds ?? null,
+          });
+        }
+        if (body.error_code === "QUOTA_EXCEEDED") {
+          await safeInsertLog({
+            event_type: "quota_exceeded",
+            limit: body.limit ?? null,
+            used: body.limit && body.remaining != null ? body.limit - body.remaining : null,
+            reset_at: body.reset_at ?? null,
+          });
+        }
+        return new Response(JSON.stringify(body), {
+          status: guard.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      guardInfo = {
+        isPremium: guard.isPremium,
+        remaining: guard.remaining,
+        limit: guard.limit,
+      };
+    }
 
     const imageContents: Array<{ type: string; image_url?: { url: string }; text?: string }> = [];
 
@@ -103,6 +506,10 @@ Be realistic and precise. Do not inflate scores.`,
       });
     }
 
+    const provider = "lovable-gateway";
+    const model = "google/gemini-2.5-flash";
+    const startedAt = performance.now();
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -110,7 +517,7 @@ Be realistic and precise. Do not inflate scores.`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model,
         messages: [
           {
             role: "user",
@@ -120,25 +527,70 @@ Be realistic and precise. Do not inflate scores.`,
       }),
     });
 
+    const latencyMs = Math.round(performance.now() - startedAt);
+
     if (!response.ok) {
+      const retryAfter = Number(response.headers.get("retry-after") || "0");
+      const rateLimitRemaining = response.headers.get("x-ratelimit-remaining");
+      const requestId = response.headers.get("x-request-id") || response.headers.get("x-amzn-requestid") || null;
+      const status_code = response.status;
+      const error_text = await response.text();
+
+          logEvent({
+        type: "provider_error",
+        user_id,
+        ip,
+        provider,
+        status_code,
+        error_message: error_text,
+        rate_limit_headers: {
+          retry_after: retryAfter,
+          x_ratelimit_remaining: rateLimitRemaining,
+        },
+        request_id: requestId,
+      });
+          await safeInsertLog({
+        event_type: "provider_error",
+        provider,
+        status_code,
+        error_message: error_text.slice(0, 500),
+        retry_after: retryAfter,
+        x_ratelimit_remaining: rateLimitRemaining,
+        request_id: requestId,
+      });
+
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Muitas análises em pouco tempo. Tente novamente em alguns segundos." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({
+            status: "error",
+            error_code: "RATE_LIMIT",
+            message: "Aguarde alguns segundos para uma nova análise.",
+            retry_after_seconds: retryAfter || 30,
+          }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos de IA esgotados." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({
+            status: "error",
+            error_code: "QUOTA_EXCEEDED",
+            message: "Você atingiu o limite diário gratuito.",
+            limit: null,
+            remaining: null,
+            reset_at: null,
+          }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
       }
-      const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
-      return new Response(JSON.stringify({ error: "Erro na análise. Tente novamente." }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          status: "error",
+          error_code: "PROVIDER_ERROR",
+          message: "Erro na análise. Tente novamente.",
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     const aiResult = await response.json();
@@ -246,13 +698,191 @@ Be realistic and precise. Do not inflate scores.`,
       },
     };
 
-    return new Response(JSON.stringify(result), {
+    const providerMeta = {
+      provider,
+      model,
+      latency_ms: latencyMs,
+      request_id: response.headers.get("x-request-id") || response.headers.get("x-amzn-requestid") || null,
+    };
+
+    const imageMeta = (() => {
+      const meta: Record<string, unknown> = {};
+      const extract = (dataUrl: string | null, key: "front" | "side") => {
+        if (!dataUrl || typeof dataUrl !== "string") return;
+        if (!dataUrl.startsWith("data:")) return;
+        const [header, base64] = dataUrl.split(",");
+        const mimeMatch = header.match(/^data:(.*?);base64$/);
+        const mime = mimeMatch ? mimeMatch[1] : null;
+        const bytes = base64 ? Math.floor((base64.length * 3) / 4) : null;
+        meta[key] = {
+          mime,
+          bytes,
+        };
+      };
+      extract(frontalImage, "front");
+      extract(lateralImage, "side");
+      return Object.keys(meta).length > 0 ? meta : null;
+    })();
+
+    const pickMood = (score: number, tierName: string, s: string[], w: string[]) => {
+      let primary = "clean";
+      let secondary = "focus";
+      if (score >= 86) {
+        primary = "cinematic";
+        secondary = "luxury";
+      } else if (score >= 76) {
+        primary = "aura";
+        secondary = "cinematic";
+      } else if (score >= 66) {
+        primary = "confident";
+        secondary = "focus";
+      } else if (score >= 55) {
+        primary = "calm";
+        secondary = "clean";
+      } else {
+        primary = "dark";
+        secondary = "sigma";
+      }
+      return [primary, secondary];
+    };
+
+    type CandidateTrack = {
+      track_id: string;
+      track_name: string;
+      artist: string;
+      spotify_url: string;
+      preview_url: string | null;
+      tags: string[];
+    };
+
+    const chooseTrackDeterministic = (arr: CandidateTrack[], seedStr: string) => {
+      if (!arr || arr.length === 0) return null;
+      let h = 0;
+      for (let i = 0; i < seedStr.length; i++) h = (h * 31 + seedStr.charCodeAt(i)) >>> 0;
+      const idx = h % arr.length;
+      return arr[idx];
+    };
+
+    if (!Number.isFinite(result.ger) || typeof result.tier !== "string") {
+      return new Response(JSON.stringify({
+        status: "error",
+        error_code: "INVALID_RESULT",
+        message: "Erro ao processar análise. Tente novamente.",
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let historyRow: { id: number; created_at: string } | null = null;
+    let songMatch: {
+      track_name: string;
+      artist: string;
+      spotify_url: string;
+      preview_url: string | null;
+      mood_tags: string[];
+      reason: string;
+    } | null = null;
+
+    if (supabase && user_id) {
+      try {
+        const source = isPartial ? "front" : "front_lateral";
+        const [m1, m2] = pickMood(clampedGer, tier.name, strengths, weaknesses);
+        let { data: candidates } = await supabase
+          .from("spotify_tracks")
+          .select("track_id, track_name, artist, spotify_url, preview_url, tags")
+          .contains("tags", [m1, m2])
+          .eq("playlist_id", "54KgUD5Oji30CA9iNjdEZO");
+        if (!candidates || candidates.length === 0) {
+          const fallbackTags =
+            clampedGer >= 86 ? ["cinematic", "luxury"] :
+            clampedGer >= 76 ? ["aura", "cinematic"] :
+            clampedGer >= 66 ? ["confident", "focus"] :
+            clampedGer >= 55 ? ["calm", "clean"] :
+            ["dark", "sigma"];
+          const { data: candidates2 } = await supabase
+            .from("spotify_tracks")
+            .select("track_id, track_name, artist, spotify_url, preview_url, tags")
+            .contains("tags", fallbackTags)
+            .eq("playlist_id", "54KgUD5Oji30CA9iNjdEZO");
+          candidates = candidates2 || [];
+        }
+        if (!candidates || candidates.length === 0) {
+          const { data: allTracks } = await supabase
+            .from("spotify_tracks")
+            .select("track_id, track_name, artist, spotify_url, preview_url, tags")
+            .eq("playlist_id", "54KgUD5Oji30CA9iNjdEZO");
+          candidates = allTracks || [];
+        }
+        const picked = chooseTrackDeterministic(candidates as CandidateTrack[], `${user_id}:${analysisId}`);
+        if (picked) {
+          songMatch = {
+            track_name: picked.track_name,
+            artist: picked.artist,
+            spotify_url: picked.spotify_url,
+            preview_url: picked.preview_url || null,
+            mood_tags: [m1, m2],
+            reason: `Sua vibe está mais "${m1} + ${m2}".`,
+          };
+        }
+
+        const { data: history, error: historyError } = await supabase
+          .from("analysis_history")
+          .upsert(
+            {
+              user_id,
+              analysis_id: analysisId,
+              result_json: { ...result, ...(songMatch ? { song_match: songMatch } : {}) },
+              source,
+              score: clampedGer,
+              rank: tier.name,
+              provider_meta: providerMeta,
+              image_meta: imageMeta,
+            },
+            { onConflict: "user_id,analysis_id" },
+          )
+          .select("id, created_at")
+          .single();
+        if (historyError) {
+          throw historyError;
+        }
+        historyRow = history;
+        await safeInsertLog({
+          event_type: "analysis_success",
+          provider,
+          ger: clampedGer,
+          tier: tier.name,
+        });
+      } catch (err) {
+        logEvent({ type: "analysis_history_insert_error", error: String(err) });
+      }
+    }
+
+    const responseBody = {
+      ...result,
+      ...(songMatch ? { song_match: songMatch } : {}),
+      remaining: guardInfo.isPremium ? null : guardInfo.remaining,
+      limit: guardInfo.isPremium ? null : guardInfo.limit,
+      is_premium: guardInfo.isPremium,
+      history_id: historyRow?.id ?? null,
+      created_at: historyRow?.created_at ?? new Date().toISOString(),
+      cooldown_seconds: COOLDOWN_SECONDS,
+    };
+
+    return new Response(JSON.stringify(responseBody), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error("analyze-face error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Erro desconhecido" }), {
+    logEvent({
+      type: "function_error",
+      error_message: e instanceof Error ? e.message : String(e),
+    });
+    return new Response(JSON.stringify({
+      status: "error",
+      error_code: "FUNCTION_ERROR",
+      message: e instanceof Error ? e.message : "Erro desconhecido",
+    }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

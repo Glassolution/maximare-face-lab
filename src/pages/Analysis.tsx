@@ -1,33 +1,18 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, type ComponentType } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Camera, Upload, Loader2, X, Scan, Flame, Target, Zap, Settings,
-  ChevronRight, ArrowUp, Crown, Droplets, Scissors, Dumbbell, Sparkles, PersonStanding, Info,
-  Image as ImageIcon, Shirt
+  Camera, Upload, Loader2, X, Scan, Zap, Settings,
+  ArrowUp, PersonStanding, Info,
+  User, TrendingUp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { saveAnalysis, getAnalysisHistory } from "@/lib/mockData";
-import { generateExtendedMockAnalysis, getTier, getNextTier } from "@/lib/rankingSystem";
-import motivationModel from "@/assets/motivation-model.png";
+import { generateExtendedMockAnalysis, getTier, type ExtendedAnalysisResult } from "@/lib/rankingSystem";
 import faceScanHero from "@/assets/clark.png";
-
-const subscores = [
-  { id: "jawline", label: "Mandíbula", icon: Target },
-  { id: "symmetry", label: "Simetria", icon: Scan },
-  { id: "skin", label: "Pele", icon: Droplets },
-  { id: "cheekbones", label: "Maçãs", icon: Diamond },
-];
-
-// Placeholder for iconMap to avoid errors if Diamond isn't imported
-import { Diamond } from "lucide-react";
-
-const weeklyGoals = [
-  { label: "Jaw training", done: true },
-  { label: "Skincare AM/PM", done: true },
-  { label: "Postura 10min", done: false },
-  { label: "Ice face", done: false },
-];
+import { useAuth } from "@/auth/AuthProvider";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Analysis() {
   const navigate = useNavigate();
@@ -43,6 +28,15 @@ export default function Analysis() {
   const [sidePhoto, setSidePhoto] = useState<string | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [limitInfo, setLimitInfo] = useState<{ limit: number; remaining: number; resetAt: string } | null>(null);
+  const lastAttemptRef = useRef<number>(0);
+  const [usageStatus, setUsageStatus] = useState<{ limit: number; used: number; remaining: number; resetAt?: string } | null>(null);
+  const [isCooldownActive, setIsCooldownActive] = useState(false);
+  const [cooldownRemaining, setCooldownRemaining] = useState<number>(0);
+  const cooldownTimerRef = useRef<number | null>(null);
+
+  const { user } = useAuth();
 
   useEffect(() => {
     if (searchParams.get("start") === "true") {
@@ -51,30 +45,81 @@ export default function Analysis() {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    const endAtStr = localStorage.getItem("cooldown_end_at");
+    if (!endAtStr) return;
+    const endAt = Number(endAtStr);
+    const now = Date.now();
+    if (endAt > now) {
+      const remaining = Math.ceil((endAt - now) / 1000);
+      startCooldown(remaining);
+    } else {
+      localStorage.removeItem("cooldown_end_at");
+    }
+  }, []);
+
   const history = getAnalysisHistory();
   const lastAnalysis = history.length > 0 ? history[0] : null;
-  // Convert old score to GER if needed or use new GER
-  const currentGER = lastAnalysis ? (lastAnalysis as any).ger || Math.round(lastAnalysis.overallScore * 10) : 0;
-  const currentTier = getTier(currentGER);
+  const currentGER = lastAnalysis
+    ? (lastAnalysis as ExtendedAnalysisResult).ger ?? Math.round(lastAnalysis.overallScore * 10)
+    : 0;
   
-  const nextTier = getNextTier(currentGER);
-  const pointsToNext = nextTier ? nextTier.min - currentGER : 0;
-  const progressToNext = nextTier 
-    ? Math.min(100, Math.max(0, ((currentGER - currentTier.min) / (nextTier.min - currentTier.min)) * 100))
-    : 100;
-
-  const lowestCategory = lastAnalysis && 'categories' in lastAnalysis 
-    ? (lastAnalysis as any).categories.reduce((min: any, curr: any) => curr.score < min.score ? curr : min, (lastAnalysis as any).categories[0])
-    : null;
-    
-  const insightTip = lowestCategory 
-    ? `Focar em ${lowestCategory.name} trará o maior retorno para sua pontuação.`
-    : "Complete sua análise para desbloquear insights estratégicos.";
-
   const streak = Math.max(history.length, 1);
   const weekDelta = history.length > 1 ? +(history[0].overallScore - history[1].overallScore).toFixed(1) : 0;
 
+  useEffect(() => {
+    const loadUsage = async () => {
+      if (!user) return;
+      const today = new Date();
+      const isoDate = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}-${String(today.getUTCDate()).padStart(2, "0")}`;
+      const { data, error } = await supabase
+        .from("usage_limits")
+        .select("scans_used, scans_limit, reset_at")
+        .eq("user_id", user.id)
+        .eq("date", isoDate)
+        .maybeSingle();
+      if (!error && data) {
+        const used = data.scans_used ?? 0;
+        const limit = data.scans_limit ?? 3;
+        setUsageStatus({ limit, used, remaining: Math.max(0, limit - used), resetAt: data.reset_at ?? undefined });
+      } else {
+        setUsageStatus({ limit: 3, used: 0, remaining: 3 });
+      }
+    };
+    loadUsage();
+  }, [user, showCapture]);
+
+  const startCooldown = (seconds: number) => {
+    if (seconds <= 0) return;
+    setIsCooldownActive(true);
+    setCooldownRemaining(seconds);
+    localStorage.setItem("cooldown_end_at", String(Date.now() + seconds * 1000));
+    if (cooldownTimerRef.current) {
+      window.clearInterval(cooldownTimerRef.current);
+      cooldownTimerRef.current = null;
+    }
+    cooldownTimerRef.current = window.setInterval(() => {
+      setCooldownRemaining((prev) => {
+        const next = prev - 1;
+        if (next <= 0) {
+          if (cooldownTimerRef.current) {
+            window.clearInterval(cooldownTimerRef.current);
+            cooldownTimerRef.current = null;
+          }
+          setIsCooldownActive(false);
+          localStorage.removeItem("cooldown_end_at");
+          return 0;
+        }
+        return next;
+      });
+    }, 1000);
+  };
+
   const startWebcam = useCallback(async () => {
+    if (isCooldownActive) {
+      setErrorMsg(`Aguarde ${cooldownRemaining}s para nova análise.`);
+      return;
+    }
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 640, height: 480 } });
       setStream(s);
@@ -132,6 +177,10 @@ export default function Analysis() {
   };
 
   const nextStep = () => {
+    if (isCooldownActive) {
+      setErrorMsg(`Aguarde ${cooldownRemaining}s para nova análise.`);
+      return;
+    }
     if (captureStep === "intro") setCaptureStep("front-instruction");
     else if (captureStep === "front-instruction") {
       setCaptureStep("front-capture");
@@ -183,6 +232,16 @@ export default function Analysis() {
   };
 
   const handleAnalyze = async () => {
+    if (isCooldownActive) {
+      setErrorMsg(`Aguarde ${cooldownRemaining}s para nova análise.`);
+      return;
+    }
+    const now = Date.now();
+    if (now - (lastAttemptRef.current || 0) < 3000) {
+      setErrorMsg("Aguarde alguns segundos antes de tentar novamente.");
+      return;
+    }
+    lastAttemptRef.current = now;
     setErrorMsg(null);
     setCaptureStep("analyzing");
     
@@ -214,22 +273,73 @@ export default function Analysis() {
 
         // 3. Analysis Simulation (API Call)
         const analysisPromise = (async () => {
-            // Simulate network delay
-            await new Promise((r) => setTimeout(r, 3000));
-            
-            // Call "API" (Mock function)
-            const result = generateExtendedMockAnalysis();
-            
-            // Verify result integrity
-            if (!result || !result.id || typeof result.ger !== 'number') {
-                throw new Error("Resposta inválida da IA.");
+            await new Promise((r) => setTimeout(r, 1200));
+            const localResult = generateExtendedMockAnalysis();
+            try {
+              const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-face`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${localStorage.getItem("sb-access-token") || ""}`,
+                },
+                body: JSON.stringify({ frontalImage: frontPhoto, lateralImage: sidePhoto }),
+              });
+              const data = await resp.json();
+              if (!resp.ok) {
+                if (data?.error_code === "QUOTA_EXCEEDED") {
+                  setLimitInfo({
+                    limit: data.limit ?? 3,
+                    remaining: data.remaining ?? 0,
+                    resetAt: data.reset_at ?? "",
+                  });
+                  throw new Error(data.message || "Você atingiu o limite de análises por hoje.");
+                }
+                if (data?.error_code === "RATE_LIMIT") {
+                  const retry = Number(data?.retry_after_seconds) || 15;
+                  startCooldown(retry);
+                  throw new Error(`Aguarde ${retry}s para nova análise.`);
+                }
+                throw new Error(data?.message || "Erro na análise. Tente novamente.");
+              }
+              if (data?.isValidFace === false) {
+                throw new Error(data?.reason || "Imagem inválida. Envie uma foto clara do seu rosto.");
+              }
+              if (typeof data?.cooldown_seconds === "number" && data.cooldown_seconds > 0) {
+                startCooldown(Number(data.cooldown_seconds));
+              }
+              const mapped: ExtendedAnalysisResult = {
+                id: crypto.randomUUID(),
+                date: new Date().toISOString(),
+                overallScore: data.secondaryScore ?? Math.floor(data.ger / 10),
+                ger: data.ger,
+                categories: [],
+                tier: data.tier,
+                badge: undefined,
+                secondaryScore: data.secondaryScore,
+                photoSideUrl: sidePhoto || undefined,
+                nextTier: data.nextTier?.name,
+                pointsToNextTier: data.nextTier?.pointsNeeded ?? 0,
+                technicalBreakdown: {
+                  asymmetry: "N/A",
+                  thirds: "N/A",
+                  jawline: "N/A",
+                  cheekbones: "N/A",
+                  eyes: "N/A",
+                  nose: "N/A",
+                  fwhr: "N/A",
+                },
+              };
+              return mapped;
+            } catch (err) {
+              if (err instanceof Error && /limite|quota|tentativas/i.test(err.message)) {
+                throw err;
+              }
+              return localResult;
             }
-            
-            return result;
         })();
 
         // Race analysis against timeout
-        const result = await Promise.race([analysisPromise, timeoutPromise]) as any;
+        const result = (await Promise.race([analysisPromise, timeoutPromise])) as ExtendedAnalysisResult;
 
         // 4. Success Handling
         if (frontPhoto) result.photoUrl = frontPhoto;
@@ -240,17 +350,32 @@ export default function Analysis() {
         // Ensure navigation happens
         navigate(`/results/${result.id}`);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Erro na análise:", error);
-        setErrorMsg(error.message || "Erro desconhecido ao processar análise.");
+        if (error && typeof error === "object" && "message" in error) {
+          setErrorMsg(String((error as { message: string }).message));
+        } else {
+          setErrorMsg("Erro desconhecido ao processar análise.");
+        }
         // We stay in "analyzing" state but show error UI, or go back to intro?
         // Let's go back to intro with error message to allow retry
         setCaptureStep("intro");
+    } finally {
+        if (captureStep === "analyzing") {
+          setCaptureStep("intro");
+        }
     }
   };
 
-  // Helper for instructions
-  const InstructionScreen = ({ title, text, icon: Icon, onNext, image }: any) => (
+  interface InstructionScreenProps {
+    title: string;
+    text: string;
+    icon: ComponentType<{ className?: string }>;
+    onNext: () => void;
+    image?: boolean;
+  }
+
+  const InstructionScreen = ({ title, text, icon: Icon, onNext, image }: InstructionScreenProps) => (
     <div className="flex flex-col items-center text-center justify-between h-full py-8">
       <div className="flex flex-col items-center gap-6">
         <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
@@ -275,36 +400,6 @@ export default function Analysis() {
     </div>
   );
 
-  // Score ring SVG
-  const ScoreRing = ({ score }: { score: number }) => {
-    const pct = score; // 0-99
-    const circumference = 2 * Math.PI * 45;
-    const offset = circumference - (pct / 100) * circumference;
-    return (
-      <div className="relative w-32 h-32">
-        <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r="45" fill="none" stroke="hsl(var(--muted))" strokeWidth="6" />
-          <circle
-            cx="50" cy="50" r="45" fill="none"
-            stroke="url(#scoreGradient)" strokeWidth="6" strokeLinecap="round"
-            strokeDasharray={circumference} strokeDashoffset={offset}
-            className="animate-score-ring"
-          />
-          <defs>
-            <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="hsl(var(--primary))" />
-              <stop offset="100%" stopColor="hsl(var(--accent))" />
-            </linearGradient>
-          </defs>
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="font-heading text-3xl font-bold text-foreground">{score}</span>
-          <span className="text-[10px] text-muted-foreground font-medium">Aura</span>
-        </div>
-      </div>
-    );
-  };
-
   // Capture overlay
   if (showCapture) {
     return (
@@ -323,7 +418,13 @@ export default function Analysis() {
                      captureStep.includes("front") ? "1/2: Frente" : 
                      captureStep.includes("side") ? "2/2: Lateral" : "Instruções"}
                 </span>
-                <div className="w-10" /> {/* Spacer matched to button width */}
+                <div className="min-w-[80px] text-right">
+                  {usageStatus && (
+                    <span className="text-[11px] font-bold text-primary">
+                      {usageStatus.remaining}/{usageStatus.limit} hoje
+                    </span>
+                  )}
+                </div>
             </div>
 
             {errorMsg && captureStep === "intro" && (
@@ -477,172 +578,222 @@ export default function Analysis() {
                 </div>
             )}
         </div>
-      </div>
-    );
+            {/* Quota Modal (Capture overlay) */}
+            {limitInfo && (
+              <Dialog open={true} onOpenChange={(v) => !v && setLimitInfo(null)}>
+                <DialogContent className="rounded-2xl border-border/50 bg-card max-w-sm">
+                  <DialogHeader>
+                    <DialogTitle className="font-heading text-lg">Limite diário atingido</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-2 text-sm">
+                    <p>Você usou {limitInfo.limit - limitInfo.remaining}/{limitInfo.limit} análises hoje.</p>
+                    {limitInfo.resetAt && (
+                      <p className="text-muted-foreground">Reseta em: {new Date(limitInfo.resetAt).toLocaleString()}</p>
+                    )}
+                  </div>
+                  <div className="grid gap-2 mt-3">
+                    <Button className="rounded-xl" onClick={() => setLimitInfo(null)}>
+                      Voltar amanhã (ok)
+                    </Button>
+                    <Button variant="outline" className="rounded-xl">
+                      Assistir anúncio para +1 análise
+                    </Button>
+                    <Button
+                      className="rounded-xl"
+                      onClick={() => {
+                        setLimitInfo(null);
+                        navigate("/profile");
+                      }}
+                    >
+                      Assinar Premium
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+        </div>
+      );
   }
 
   // ───────── DASHBOARD ─────────
 
-  const categories = lastAnalysis && 'categories' in lastAnalysis ? (lastAnalysis as any).categories : [];
-  const getScore = (id: string) => {
-      const cat = categories.find((c: any) => c.id === id);
-      return cat ? (cat.score >= 10 ? (cat.score / 10).toFixed(1) : cat.score) : "-";
-  };
-  const getProgress = (id: string) => {
-      const cat = categories.find((c: any) => c.id === id);
-      return cat ? cat.score : 0;
-  };
+  const displayName =
+    (user && (user.user_metadata?.full_name || user.user_metadata?.name || user.email)) || "Usuário MAXIMARE";
 
   return (
     <div className="min-h-screen pt-6 pb-28 px-4 bg-background">
       <div className="container max-w-lg mx-auto space-y-8">
 
-        {/* Header */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground mb-0.5">Sua jornada de evolução</p>
-            <h1 className="font-heading text-xl font-bold text-foreground tracking-tight">MAXIMARE</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full glass">
-              <Flame className="h-4 w-4 text-orange-400 animate-fire" />
-              <span className="text-sm font-bold text-foreground">{streak}</span>
+        {/* Header / Top Bar */}
+        <header className="flex items-center justify-between px-6 py-4 sticky top-0 z-50 bg-background-dark/80 backdrop-blur-md border-b border-white/5">
+          <div className="flex items-center gap-3">
+            <div className="size-10 rounded-full bg-gradient-to-br from-primary to-blue-700 flex items-center justify-center border border-white/10 shadow-lg shadow-primary/20">
+               <User className="text-white h-5 w-5" />
             </div>
-            <button className="h-9 w-9 rounded-full glass flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
-              <Crown className="h-4 w-4" />
+            <div>
+              <p className="text-[10px] text-text-muted font-bold tracking-widest uppercase">Membro Elite</p>
+              <h2 className="text-sm font-bold text-white">{displayName}</h2>
+            </div>
+          </div>
+          <button onClick={() => setShowSettings(true)} className="size-10 rounded-lg flex items-center justify-center bg-graphite border border-slate-custom text-white hover:bg-slate-custom transition-colors">
+            <Settings className="h-5 w-5" />
+          </button>
+        </header>
+
+        {/* Main Content */}
+        <main className="flex-1 px-6 pt-4 pb-24 space-y-8">
+          {/* Hero Score Section */}
+          <section className="text-center py-8">
+            <div className="relative inline-block">
+              {/* Decorative Ring */}
+              <div className="absolute inset-0 rounded-full border-2 border-primary/20 scale-150 blur-sm animate-pulse"></div>
+              <div className="absolute inset-0 rounded-full border border-primary/10 scale-125"></div>
+              <h1 className="text-[84px] font-extrabold tracking-tighter leading-none text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+                {currentGER ? currentGER.toFixed(1) : "0.0"}
+              </h1>
+            </div>
+            <p className="mt-6 text-[11px] font-bold tracking-[0.2em] text-text-muted uppercase">Índice Facial Geral</p>
+            <div className="mt-4 flex justify-center gap-2">
+              <span className="px-2 py-1 rounded bg-green-500/10 text-green-500 text-[10px] font-bold border border-green-500/20 flex items-center gap-1">
+                <TrendingUp className="h-3 w-3 fill-current" /> +{weekDelta}% ESTE MÊS
+              </span>
+            </div>
+          </section>
+
+          {/* CTA Button */}
+          <section>
+            <button
+              onClick={() => {
+                if (isCooldownActive) {
+                  setErrorMsg(`Aguarde ${cooldownRemaining}s para nova análise.`);
+                  return;
+                }
+                setShowCapture(true);
+                setCaptureStep("intro-hero");
+              }}
+              disabled={isCooldownActive}
+              className={`w-full ${isCooldownActive ? "bg-muted text-muted-foreground cursor-not-allowed" : "bg-primary hover:bg-primary/90 text-white"} rounded-xl py-4 px-6 flex items-center justify-center gap-3 font-bold tracking-wide transition-all active:scale-[0.98] glow-primary-custom border border-white/10 shadow-xl`}
+            >
+              <Scan className="h-6 w-6" />
+              <span>{isCooldownActive ? `Aguarde ${cooldownRemaining}s` : "NOVA ANÁLISE"}</span>
             </button>
-          </div>
-        </motion.div>
+            {isCooldownActive && (
+              <p className="mt-2 text-[11px] text-text-muted text-center">Protegendo o sistema contra uso excessivo.</p>
+            )}
+          </section>
 
-        {/* Visual Score Card */}
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
-          className="relative rounded-[2rem] bg-card border border-border/50 p-6 overflow-hidden shadow-xl"
-        >
-          <div className="relative z-10 flex items-center gap-8 justify-center">
-             <div className="scale-125">
-                <ScoreRing score={currentGER} />
-             </div>
-             <div className="flex flex-col">
-                <h2 className="font-heading text-2xl font-bold text-foreground leading-none">Visual<br/>Score</h2>
-                <p className="text-sm text-muted-foreground mt-2 max-w-[100px] leading-tight">
-                    {lastAnalysis ? `Tier: ${currentTier.name}` : "Faça sua primeira análise"}
-                </p>
-             </div>
-          </div>
-        </motion.div>
 
-        {/* Motivation Banner */}
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}
-          className="relative rounded-2xl overflow-hidden h-36 group cursor-pointer"
-          onClick={() => { setShowCapture(true); setCaptureStep("intro"); setErrorMsg(null); }}
-        >
-          <img src={motivationModel} alt="Motivação" className="absolute inset-0 w-full h-full object-cover object-center" />
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent" />
-          <div className="relative z-10 h-full flex flex-col justify-end px-5 pb-4">
-            <p className="text-xs text-primary font-bold uppercase tracking-wider mb-1">True Adam • GER 95+</p>
-            <h3 className="font-heading text-lg font-bold text-foreground leading-tight">Descubra seu<br/>potencial máximo</h3>
-            <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
-              Faça sua análise agora <ChevronRight className="h-3 w-3" />
-            </p>
-          </div>
-        </motion.div>
 
-        {/* AI Insights Section */}
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-            <div className="flex items-center justify-between mb-4">
-                 <h3 className="font-heading text-lg font-bold text-foreground">Insights da IA</h3>
-                 <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-1 rounded-full border border-primary/20">BETA</span>
+          {/* Recent Analyses List */}
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold tracking-tight uppercase text-text-muted">Histórico Recente</h3>
+              <button onClick={() => navigate('/progress')} className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors">Ver tudo</button>
             </div>
-            
-            <div className="bg-card border border-border/50 rounded-2xl p-5 space-y-5 shadow-lg relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                    <Sparkles className="h-24 w-24 text-primary" />
+            <div className="space-y-3">
+              {history.slice(0, 3).map((analysis, idx) => (
+                <div key={analysis.id || idx} className="glass-card rounded-xl p-4 flex items-center justify-between border-l-2 border-l-primary hover:bg-white/5 transition-colors cursor-pointer" onClick={() => navigate(`/results/${analysis.id}`)}>
+                  <div className="flex items-center gap-4">
+                    <div className="size-12 rounded-lg bg-slate-custom flex items-center justify-center relative overflow-hidden">
+                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent z-10"></div>
+                       {analysis.photoUrl ? (
+                         <img className="w-full h-full object-cover opacity-80" src={analysis.photoUrl} alt="Analysis" />
+                       ) : (
+                         <Scan className="h-6 w-6 text-text-muted relative z-20" />
+                       )}
+                    </div>
+                    <div>
+                      <p className="text-xs text-text-muted font-medium">{analysis.date}</p>
+                      <h4 className="text-sm font-bold text-white">Structural Scan #{analysis.id.slice(0, 4)}</h4>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-bold text-white">{Math.round(analysis.overallScore * 10) / 10}</p>
+                    <span className="text-[10px] text-text-muted font-bold uppercase">{getTier(analysis.overallScore).name}</span>
+                  </div>
                 </div>
-
-                <div className="relative z-10 flex items-start gap-4">
-                    <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-primary/20 to-blue-500/20 flex items-center justify-center shrink-0 border border-primary/10">
-                        <Sparkles className="h-6 w-6 text-primary" />
-                    </div>
-                    <div className="space-y-1">
-                         <h4 className="font-heading font-bold text-base text-foreground">
-                            {nextTier ? `Rumo ao ${nextTier.name.toUpperCase()}` : "Nível Máximo Alcançado"}
-                         </h4>
-                         <p className="text-xs text-muted-foreground leading-snug">
-                            {nextTier 
-                                ? <span>Faltam <span className="text-primary font-bold">{pointsToNext} pontos</span> para o próximo nível.</span>
-                                : "Você atingiu o pináculo da estética."}
-                         </p>
-                    </div>
+              ))}
+              
+              {history.length === 0 && (
+                <div className="text-center py-8 text-text-muted text-sm">
+                    Nenhuma análise recente.
                 </div>
-
-                {/* Progress to next level */}
-                {nextTier && (
-                    <div className="relative z-10 space-y-2">
-                        <div className="flex justify-between text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                            <span>Progresso atual</span>
-                            <span>{Math.round(progressToNext)}%</span>
-                        </div>
-                        <div className="h-2.5 w-full bg-secondary rounded-full overflow-hidden border border-white/5">
-                            <motion.div 
-                                initial={{ width: 0 }}
-                                animate={{ width: `${progressToNext}%` }}
-                                transition={{ duration: 1, delay: 0.5 }}
-                                className="h-full bg-gradient-to-r from-primary to-blue-400 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)]" 
-                            />
-                        </div>
-                    </div>
+              )}
+            </div>
+          </section>
+        </main>
+        {/* Quota Modal (Dashboard) */}
+        {limitInfo && (
+          <Dialog open={true} onOpenChange={(v) => !v && setLimitInfo(null)}>
+            <DialogContent className="rounded-2xl border-border/50 bg-card max-w-sm">
+              <DialogHeader>
+                <DialogTitle className="font-heading text-lg">Limite diário atingido</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-2 text-sm">
+                <p>Você usou {limitInfo.limit - limitInfo.remaining}/{limitInfo.limit} análises hoje.</p>
+                {limitInfo.resetAt && (
+                  <p className="text-muted-foreground">Reseta em: {new Date(limitInfo.resetAt).toLocaleString()}</p>
                 )}
-
-                <div className="relative z-10 bg-secondary/30 rounded-xl p-4 border border-white/5 backdrop-blur-sm">
-                    <div className="flex gap-2">
-                        <Info className="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                            <span className="font-bold text-foreground block mb-1">Dica Personalizada:</span>
-                            {insightTip}
-                        </p>
-                    </div>
-                </div>
-
-                 <Button onClick={() => { setShowCapture(true); setCaptureStep("intro"); setErrorMsg(null); }}
-                    variant="ghost"
-                    className="relative z-10 w-full h-auto py-3 text-xs font-semibold text-primary hover:text-primary/80 hover:bg-primary/5 p-0 justify-center border border-dashed border-primary/30 rounded-xl hover:border-primary/60 transition-all"
-                >
-                    <Zap className="h-3 w-3 mr-2" />
-                    Nova análise para atualizar dados
+              </div>
+              <div className="grid gap-2 mt-3">
+                <Button className="rounded-xl" onClick={() => setLimitInfo(null)} disabled={isCooldownActive}>
+                  {isCooldownActive ? `Aguarde ${cooldownRemaining}s` : "Voltar amanhã (ok)"}
                 </Button>
+                <Button variant="outline" className="rounded-xl">
+                  Assistir anúncio para +1 análise
+                </Button>
+                <Button
+                  className="rounded-xl"
+                  onClick={() => {
+                    setLimitInfo(null);
+                    navigate("/profile");
+                  }}
+                >
+                  Assinar Premium
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+        <Dialog open={showSettings} onOpenChange={setShowSettings}>
+          <DialogContent className="rounded-2xl border-border/50 bg-card max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="font-heading text-lg">Configurações</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  setShowSettings(false);
+                  navigate("/profile");
+                }}
+                className="w-full flex items-center justify-between p-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors"
+              >
+                <span className="text-sm font-medium">Ver perfil</span>
+                <User className="h-4 w-4 text-muted-foreground" />
+              </button>
+              <button
+                onClick={() => {
+                  setShowSettings(false);
+                  navigate("/progress");
+                }}
+                className="w-full flex items-center justify-between p-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors"
+              >
+                <span className="text-sm font-medium">Progresso</span>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </button>
+              <button
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  setShowSettings(false);
+                  navigate("/login", { replace: true });
+                }}
+                className="w-full flex items-center justify-between p-3 rounded-xl bg-destructive/10 hover:bg-destructive/20 text-destructive transition-colors"
+              >
+                <span className="text-sm font-medium">Sair</span>
+              </button>
             </div>
-        </motion.div>
-
-        {/* Subscores Grid */}
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-            <h3 className="font-heading text-lg font-bold text-foreground mb-4">Seus Subscores</h3>
-            <div className="grid grid-cols-2 gap-3">
-                {[
-                    { id: "symmetry", label: "Simetria", icon: Scan },
-                    { id: "jawline", label: "Mandíbula", icon: Target },
-                    { id: "skin", label: "Pele", icon: Droplets },
-                    { id: "hairline", label: "Cabelo", icon: Scissors },
-                    { id: "eyes", label: "Olhos", icon: Sparkles }, // Replaced Estilo with Olhos
-                    { id: "posture", label: "Postura", icon: PersonStanding },
-                ].map((item) => (
-                    <div key={item.id} className="bg-card border border-border/50 rounded-2xl p-4 flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
-                            <item.icon className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-baseline mb-1">
-                                <span className="text-sm font-bold text-foreground truncate">{item.label}</span>
-                                <span className="text-sm font-bold text-primary">{getScore(item.id)}</span>
-                            </div>
-                            <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
-                                <div className="h-full bg-primary rounded-full" style={{ width: `${getProgress(item.id)}%` }} />
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </motion.div>
-
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
