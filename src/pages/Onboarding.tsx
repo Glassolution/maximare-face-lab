@@ -763,7 +763,7 @@ export default function Onboarding() {
             ))}
           </div>
           <button
-            onClick={finish}
+            onClick={next}
             className={`text-sm font-bold transition-colors ${
               step === TOTAL_STEPS - 1 ? "opacity-0 pointer-events-none" : "text-primary hover:text-primary/80"
             }`}

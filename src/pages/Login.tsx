@@ -37,7 +37,7 @@ export default function Login() {
         if (signInError) throw signInError;
       }
 
-      navigate("/onboarding", { replace: true });
+      navigate("/analysis", { replace: true });
     } catch (err: unknown) {
       if (err && typeof err === "object" && "message" in err) {
         setError(String((err as { message: string }).message));
