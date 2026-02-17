@@ -73,13 +73,13 @@ export default function Profile() {
                 <div className="flex items-center gap-2 mb-2">
                     <span className="text-2xl">{currentTier.badge}</span>
                     <h2 className="font-heading text-lg font-bold">Análise Estratégica</h2>
-                </div>
-                <p className="text-sm text-foreground/90 leading-relaxed">
-                    Seu <strong>GER atual é {ger}</strong> ({currentTier.name.toUpperCase()}). 
-                    Seu visual tem pontos fortes em <strong>{strongest}</strong>. 
-                    Para virar <strong>{nextTierName.toUpperCase()} ({nextTierMin}+)</strong>, 
-                    foque em melhorar <strong>{weakest}</strong>.
-                </p>
+            </div>
+            <p className="text-sm text-foreground/90 leading-relaxed">
+                Sua <strong>Aura atual é {ger}</strong> ({currentTier.name.toUpperCase()}). 
+                Seu visual tem pontos fortes em <strong>{strongest}</strong>. 
+                Para virar <strong>{nextTierName.toUpperCase()} ({nextTierMin}+)</strong>, 
+                foque em melhorar <strong>{weakest}</strong>.
+            </p>
                 
                 {pointsNeeded > 0 && (
                     <div className="mt-3 flex items-center gap-2 text-xs font-medium text-primary">
@@ -105,7 +105,7 @@ export default function Profile() {
             </div>
             <div className="text-right">
               <p className="font-heading text-2xl font-bold text-foreground">{ger}</p>
-              <p className="text-[10px] text-muted-foreground">GER Geral</p>
+              <p className="text-[10px] text-muted-foreground">Aura</p>
             </div>
           </div>
 

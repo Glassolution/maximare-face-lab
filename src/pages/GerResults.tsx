@@ -110,7 +110,7 @@ export default function GerResults() {
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              GER {result.ger} • {result.isPartial ? "Análise Parcial" : "Análise Completa"}
+              Aura {result.ger} • {result.isPartial ? "Análise Parcial" : "Análise Completa"}
             </p>
           </div>
         </div>
@@ -126,7 +126,7 @@ export default function GerResults() {
         >
           <div className="rounded-2xl glass p-3 text-center">
             <p className="text-sm text-foreground">
-              Você está no tier: <span className="font-bold text-primary">{tier.label}</span> (GER {result.ger})
+              Você está no tier: <span className="font-bold text-primary">{tier.label}</span> (Aura {result.ger})
             </p>
             <p className="text-xs text-muted-foreground mt-1">
               Faltam <span className="font-bold text-warning">+{result.nextTier.pointsNeeded} pontos</span> para subir para{" "}

@@ -14,6 +14,14 @@ export interface ExtendedAnalysisResult extends Omit<AnalysisResult, "categories
   ger: number; // 0 - 99
   nextTier?: string;
   pointsToNextTier?: number;
+  
+  // New fields for deep analysis
+  pslScore?: number;
+  jawType?: string;
+  mindset?: string;
+  strategy?: string;
+  breathing?: string;
+  appealLevel?: string;
 }
 
 export const TIERS = [
@@ -102,5 +110,13 @@ export function generateExtendedMockAnalysis(): ExtendedAnalysisResult {
     categories: categories,
     nextTier: nextTier ? nextTier.name : undefined,
     pointsToNextTier: nextTier ? nextTier.min - ger : 0,
+
+    // Deep analysis mock data
+    pslScore: Math.floor(Math.random() * 3) + 4, // 4-7 range
+    jawType: ["Mogger", "Average", "Recessed"][Math.floor(Math.random() * 3)],
+    mindset: ["Bluepilled", "Redpilled", "Blackpilled"][Math.floor(Math.random() * 3)],
+    strategy: ["Genemaxx", "Looksmax", "Softmax"][Math.floor(Math.random() * 3)],
+    breathing: ["Nose breather", "Mouth breather"][Math.floor(Math.random() * 2)],
+    appealLevel: ["Jordan Barrett", "Chico Lachowski", "Average Joe"][Math.floor(Math.random() * 3)],
   };
 }

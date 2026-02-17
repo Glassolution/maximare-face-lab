@@ -496,23 +496,33 @@ function StepBrutalTruth({ onNext, userData }: { onNext: () => void; userData: {
 
     const metricLabel = isFemale ? "Pressão Estética" : "Índice de Solidão";
     
-    // Calculate metric value based on age (peak pressure/loneliness around 20-30)
-    let baseValue = 85;
-    if (userData.age >= 18 && userData.age <= 35) baseValue = 92;
-    if (userData.age > 35) baseValue = 88;
+    // Calculate metric value based on user data
+    let score = 82; // Base score
+
+    // Age Factor
+    if (userData.age >= 18 && userData.age <= 29) score += 12; // Peak dating struggle
+    else if (userData.age >= 30 && userData.age <= 40) score += 8; // High pressure
+    else if (userData.age < 18) score += 6; // Teenage insecurity
+    else score += 4; // Mature maintenance
+
+    // Goal Factor (Higher goals = Higher dissatisfaction/need)
+    if (userData.goal === 3) score += 5; // "Impulsionar meu look e confiança"
+    else if (userData.goal === 2) score += 4; // "Melhorar rosto e físico"
+    else if (userData.goal === 1) score += 2; // "Melhorar estética facial"
     
-    const metricValue = baseValue;
+    // Cap at 99
+    const metricValue = Math.min(score, 99);
 
     // Generate Chart Data
     // Simulating a rising trend of difficulty/pressure over the last 10 years
     const chartData = [
-      { year: (currentYear - 10).toString(), value: baseValue - 45 },
-      { year: (currentYear - 5).toString(), value: baseValue - 25 },
-      { year: "Hoje", value: baseValue },
+      { year: (currentYear - 10).toString(), value: Math.round(metricValue * 0.5) },
+      { year: (currentYear - 5).toString(), value: Math.round(metricValue * 0.75) },
+      { year: "Hoje", value: metricValue },
     ];
 
     return { title, sub, metricLabel, metricValue, chartData };
-  }, [userData.age, userData.gender]);
+  }, [userData.age, userData.gender, userData.goal]);
 
   return (
     <div className="flex flex-col items-center text-center flex-1 justify-between py-8 -mx-6 px-6">

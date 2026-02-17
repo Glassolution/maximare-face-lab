@@ -76,7 +76,7 @@ export default function Results() {
                         </div>
                     </div>
                     <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-background border border-border/50 px-4 py-1 rounded-full shadow-lg flex items-center gap-2">
-                        <span className="text-xs font-bold text-muted-foreground">GER</span>
+                        <span className="text-xs font-bold text-muted-foreground">Aura</span>
                         <span className="font-heading text-2xl font-black text-foreground">{ger}</span>
                     </div>
                 </div>

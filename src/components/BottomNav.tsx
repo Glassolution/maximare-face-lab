@@ -33,7 +33,7 @@ export default function BottomNav() {
         })}
 
         {/* Center + button */}
-        <Link to="/analysis" className="flex flex-col items-center -mt-7">
+        <Link to="/analysis?start=true" className="flex flex-col items-center -mt-7">
           <div className="h-14 w-14 rounded-full bg-primary flex items-center justify-center shadow-lg glow-primary ring-4 ring-background">
             <Plus className="h-7 w-7 text-primary-foreground" strokeWidth={2.5} />
           </div>
