@@ -45,7 +45,12 @@ export default function Analysis() {
     }
   }, [searchParams]);
 
+  // Check if limits were disabled by backend in last response
+  const limitsDisabledRef = useRef(false);
+
   useEffect(() => {
+    // If limits are disabled, skip cooldown restoration
+    if (limitsDisabledRef.current) return;
     const endAtStr = localStorage.getItem("cooldown_end_at");
     if (!endAtStr) return;
     const endAt = Number(endAtStr);
@@ -70,6 +75,11 @@ export default function Analysis() {
   useEffect(() => {
     const loadUsage = async () => {
       if (!user) return;
+      // If limits disabled, don't show usage
+      if (limitsDisabledRef.current) {
+        setUsageStatus(null);
+        return;
+      }
       const today = new Date();
       const isoDate = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}-${String(today.getUTCDate()).padStart(2, "0")}`;
       const { data, error } = await supabase
@@ -116,7 +126,7 @@ export default function Analysis() {
   };
 
   const startWebcam = useCallback(async () => {
-    if (isCooldownActive) {
+    if (!limitsDisabledRef.current && isCooldownActive) {
       setErrorMsg(`Aguarde ${cooldownRemaining}s para nova análise.`);
       return;
     }
@@ -177,7 +187,7 @@ export default function Analysis() {
   };
 
   const nextStep = () => {
-    if (isCooldownActive) {
+    if (!limitsDisabledRef.current && isCooldownActive) {
       setErrorMsg(`Aguarde ${cooldownRemaining}s para nova análise.`);
       return;
     }
@@ -232,7 +242,7 @@ export default function Analysis() {
   };
 
   const handleAnalyze = async () => {
-    if (isCooldownActive) {
+    if (!limitsDisabledRef.current && isCooldownActive) {
       setErrorMsg(`Aguarde ${cooldownRemaining}s para nova análise.`);
       return;
     }
@@ -285,28 +295,39 @@ export default function Analysis() {
                 body: JSON.stringify({ frontalImage: frontPhoto, lateralImage: sidePhoto }),
               });
               const data = await resp.json();
-              if (!resp.ok) {
-                if (data?.error_code === "QUOTA_EXCEEDED") {
-                  setLimitInfo({
-                    limit: data.limit ?? 3,
-                    remaining: data.remaining ?? 0,
-                    resetAt: data.reset_at ?? "",
-                  });
-                  throw new Error(data.message || "Você atingiu o limite de análises por hoje.");
+                if (data?.limits_disabled) {
+                  limitsDisabledRef.current = true;
+                  setUsageStatus(null);
+                  setIsCooldownActive(false);
+                  setCooldownRemaining(0);
+                  localStorage.removeItem("cooldown_end_at");
                 }
-                if (data?.error_code === "RATE_LIMIT") {
-                  const retry = Number(data?.retry_after_seconds) || 15;
-                  startCooldown(retry);
-                  throw new Error(`Aguarde ${retry}s para nova análise.`);
+                if (!resp.ok) {
+                  // If limits disabled, never block
+                  if (data?.limits_disabled) {
+                    // ignore limit errors when disabled
+                  } else if (data?.error_code === "QUOTA_EXCEEDED") {
+                    setLimitInfo({
+                      limit: data.limit ?? 3,
+                      remaining: data.remaining ?? 0,
+                      resetAt: data.reset_at ?? "",
+                    });
+                    throw new Error(data.message || "Você atingiu o limite de análises por hoje.");
+                  } else if (data?.error_code === "RATE_LIMIT") {
+                    const retry = Number(data?.retry_after_seconds) || 15;
+                    startCooldown(retry);
+                    throw new Error(`Aguarde ${retry}s para nova análise.`);
+                  } else {
+                    throw new Error(data?.message || "Erro na análise. Tente novamente.");
+                  }
                 }
-                throw new Error(data?.message || "Erro na análise. Tente novamente.");
-              }
-              if (data?.isValidFace === false) {
-                throw new Error(data?.reason || "Imagem inválida. Envie uma foto clara do seu rosto.");
-              }
-              if (typeof data?.cooldown_seconds === "number" && data.cooldown_seconds > 0) {
-                startCooldown(Number(data.cooldown_seconds));
-              }
+                if (data?.isValidFace === false) {
+                  throw new Error(data?.reason || "Imagem inválida. Envie uma foto clara do seu rosto.");
+                }
+                // Only start cooldown if limits are NOT disabled
+                if (!data?.limits_disabled && typeof data?.cooldown_seconds === "number" && data.cooldown_seconds > 0) {
+                  startCooldown(Number(data.cooldown_seconds));
+                }
               const mapped: ExtendedAnalysisResult = {
                 id: crypto.randomUUID(),
                 date: new Date().toISOString(),
@@ -419,7 +440,7 @@ export default function Analysis() {
                      captureStep.includes("side") ? "2/2: Lateral" : "Instruções"}
                 </span>
                 <div className="min-w-[80px] text-right">
-                  {usageStatus && (
+                  {usageStatus && !limitsDisabledRef.current && (
                     <span className="text-[11px] font-bold text-primary">
                       {usageStatus.remaining}/{usageStatus.limit} hoje
                     </span>

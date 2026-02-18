@@ -66,7 +66,7 @@ type PlaylistItem = { track: SpotifyTrack | null };
 type PlaylistPage = { items: PlaylistItem[]; next?: string | null };
 
 async function fetchPlaylistTracks(token: string) {
-  let url = `https://api.spotify.com/v1/playlists/${PLAYLIST_ID}/tracks?limit=100`;
+  let url: string | null = `https://api.spotify.com/v1/playlists/${PLAYLIST_ID}/tracks?limit=100`;
   const all: {
     track_id: string;
     track_name: string;
@@ -82,14 +82,15 @@ async function fetchPlaylistTracks(token: string) {
     for (const it of items) {
       const tr = it.track;
       if (!tr) continue;
-      const track_id = tr.id;
-      const track_name = tr.name || "";
-      const artist = Array.isArray(tr.artists) ? tr.artists.map((a) => a.name).join(", ") : "";
-      const spotify_url = tr.external_urls?.spotify || "";
-      const preview_url = tr.preview_url || null;
-      all.push({ track_id, track_name, artist, spotify_url, preview_url });
+      all.push({
+        track_id: tr.id,
+        track_name: tr.name || "",
+        artist: Array.isArray(tr.artists) ? tr.artists.map((a) => a.name).join(", ") : "",
+        spotify_url: tr.external_urls?.spotify || "",
+        preview_url: tr.preview_url || null,
+      });
     }
-    url = j.next || "";
+    url = j.next || null;
   }
   return all;
 }
@@ -100,7 +101,7 @@ serve(async (req: Request) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) : null;
+  const supabase: any = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) : null;
 
   try {
     const token = await getSpotifyToken();
