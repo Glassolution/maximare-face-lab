@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -48,11 +47,16 @@ function logEvent(event: Record<string, unknown>) {
   console.log("[analyze-face]", JSON.stringify(event));
 }
 
+function isLimitsDisabled(): boolean {
+  return Deno.env.get("LOVABLE_DISABLE_LIMITS") === "1";
+}
+
 type CanAnalyzeOk = {
   ok: true;
   isPremium: boolean;
   remaining: number | null;
   limit: number | null;
+  limitsDisabled?: boolean;
 };
 
 type CanAnalyzeErrorBody = {
@@ -72,10 +76,15 @@ type CanAnalyzeError = {
 };
 
 async function canAnalyze(
-  supabase: SupabaseClient | null,
+  supabase: any,
   user_id: string | null,
   planHint: "free" | "premium",
 ): Promise<CanAnalyzeOk | CanAnalyzeError> {
+  // BYPASS: skip ALL limit checks when disabled
+  if (isLimitsDisabled()) {
+    return { ok: true, isPremium: true, remaining: null, limit: null, limitsDisabled: true };
+  }
+
   if (!supabase || !user_id) {
     return { ok: true, isPremium: false, remaining: null, limit: null };
   }
@@ -84,7 +93,6 @@ async function canAnalyze(
   const today = isoDateOnly(now);
   const nowMs = now.getTime();
 
-  // Load profile to determine premium status
   let isPremium = planHint === "premium";
   let plan = planHint;
   let premiumUntil: string | null = null;
@@ -141,7 +149,6 @@ async function canAnalyze(
   const FAIR_USE_PREMIUM_LIMIT = 200;
 
   if (premiumActive) {
-    // Fair use invisível: apenas impede abuso extremo, não exibe limite diário
     try {
       const { data, error } = await supabase
         .from("usage_limits")
@@ -246,7 +253,6 @@ async function canAnalyze(
     };
   } catch (err) {
     logEvent({ type: "usage_limits_free_error", error: String(err) });
-    // Em caso de erro, não bloqueia o usuário
     return {
       ok: true,
       isPremium: false,
@@ -257,10 +263,15 @@ async function canAnalyze(
 }
 
 async function getGuardInfo(
-  supabase: SupabaseClient | null,
+  supabase: any,
   user_id: string | null,
   planHint: "free" | "premium",
-): Promise<{ isPremium: boolean; remaining: number | null; limit: number | null }> {
+): Promise<{ isPremium: boolean; remaining: number | null; limit: number | null; limitsDisabled?: boolean }> {
+  // BYPASS
+  if (isLimitsDisabled()) {
+    return { isPremium: true, remaining: null, limit: null, limitsDisabled: true };
+  }
+
   if (!supabase || !user_id) return { isPremium: false, remaining: null, limit: null };
 
   const now = new Date();
@@ -329,26 +340,29 @@ serve(async (req: Request) => {
     }
 
     const isPartial = !lateralImage;
+    const limitsDisabled = isLimitsDisabled();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) : null;
+    const supabase: any = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) : null;
 
     // Identify user and ip
     const authHeader = req.headers.get("Authorization") || "";
     const jwt = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
     let user_id: string | null = null;
-    let plan: "free" | "premium" = "free";
+    let plan: "free" | "premium" = limitsDisabled ? "premium" : "free";
     if (supabase && jwt) {
       try {
         const { data } = await supabase.auth.getUser(jwt);
         user_id = data.user?.id ?? null;
-        const meta = (data.user?.user_metadata || data.user?.app_metadata || {}) as Record<string, unknown>;
-        const planMeta = (meta["plan"] as string) || (meta["subscription"] as string) || "";
-        if (planMeta.toLowerCase() === "premium") plan = "premium";
+        if (!limitsDisabled) {
+          const meta = (data.user?.user_metadata || data.user?.app_metadata || {}) as Record<string, unknown>;
+          const planMeta = (meta["plan"] as string) || (meta["subscription"] as string) || "";
+          if (planMeta.toLowerCase() === "premium") plan = "premium";
+        }
       } catch (err) {
         logEvent({ type: "auth_error", error: String(err) });
       }
@@ -388,9 +402,10 @@ serve(async (req: Request) => {
             remaining: guardRo.isPremium ? null : guardRo.remaining,
             limit: guardRo.isPremium ? null : guardRo.limit,
             is_premium: guardRo.isPremium,
+            limits_disabled: limitsDisabled,
             history_id: existing.id,
             created_at: existing.created_at,
-            cooldown_seconds: 0,
+            cooldown_seconds: limitsDisabled ? 0 : COOLDOWN_SECONDS,
           };
           return new Response(JSON.stringify(responseBody), {
             status: 200,
@@ -414,11 +429,11 @@ serve(async (req: Request) => {
     }
 
     let guardInfo: { isPremium: boolean; remaining: number | null; limit: number | null } = {
-      isPremium: false,
+      isPremium: limitsDisabled,
       remaining: null,
       limit: null,
     };
-    if (supabase && user_id) {
+    if (!limitsDisabled && supabase && user_id) {
       const guard = await canAnalyze(supabase, user_id, plan);
       if (!guard.ok) {
         const body = guard.body;
@@ -536,7 +551,7 @@ Be realistic and precise. Do not inflate scores.`,
       const status_code = response.status;
       const error_text = await response.text();
 
-          logEvent({
+      logEvent({
         type: "provider_error",
         user_id,
         ip,
@@ -549,7 +564,7 @@ Be realistic and precise. Do not inflate scores.`,
         },
         request_id: requestId,
       });
-          await safeInsertLog({
+      await safeInsertLog({
         event_type: "provider_error",
         provider,
         status_code,
@@ -596,7 +611,6 @@ Be realistic and precise. Do not inflate scores.`,
     const aiResult = await response.json();
     const rawContent = aiResult.choices?.[0]?.message?.content || "";
 
-    // Extract JSON from response (handle markdown code blocks)
     let jsonStr = rawContent;
     const jsonMatch = rawContent.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (jsonMatch) jsonStr = jsonMatch[1];
@@ -623,7 +637,6 @@ Be realistic and precise. Do not inflate scores.`,
       });
     }
 
-    // Calculate GER with weights
     const f = parsed.frontal;
     const l = parsed.lateral;
 
@@ -654,7 +667,6 @@ Be realistic and precise. Do not inflate scores.`,
     const nextTier = getNextTier(clampedGer);
     const secondaryScore = +(clampedGer / 10).toFixed(1);
 
-    // Build attributes array for display
     const attributes = [
       { id: "masculinidade", name: "Masculinidade", score: f.masculinidade_estrutural, icon: "masculinidade" },
       { id: "mandibula", name: "Linha da Mandíbula", score: l.definicao_mandibula, icon: "mandibula" },
@@ -672,7 +684,6 @@ Be realistic and precise. Do not inflate scores.`,
       { id: "goniaco", name: "Ângulo Goníaco", score: l.angulo_goniaco, icon: "goniaco" },
     ];
 
-    // Strengths and weaknesses
     const sorted = [...attributes].sort((a, b) => b.score - a.score);
     const strengths = sorted.slice(0, 3).map((a) => a.name);
     const weaknesses = sorted.slice(-3).map((a) => a.name);
@@ -714,36 +725,19 @@ Be realistic and precise. Do not inflate scores.`,
         const mimeMatch = header.match(/^data:(.*?);base64$/);
         const mime = mimeMatch ? mimeMatch[1] : null;
         const bytes = base64 ? Math.floor((base64.length * 3) / 4) : null;
-        meta[key] = {
-          mime,
-          bytes,
-        };
+        meta[key] = { mime, bytes };
       };
       extract(frontalImage, "front");
       extract(lateralImage, "side");
       return Object.keys(meta).length > 0 ? meta : null;
     })();
 
-    const pickMood = (score: number, tierName: string, s: string[], w: string[]) => {
-      let primary = "clean";
-      let secondary = "focus";
-      if (score >= 86) {
-        primary = "cinematic";
-        secondary = "luxury";
-      } else if (score >= 76) {
-        primary = "aura";
-        secondary = "cinematic";
-      } else if (score >= 66) {
-        primary = "confident";
-        secondary = "focus";
-      } else if (score >= 55) {
-        primary = "calm";
-        secondary = "clean";
-      } else {
-        primary = "dark";
-        secondary = "sigma";
-      }
-      return [primary, secondary];
+    const pickMood = (score: number) => {
+      if (score >= 86) return ["cinematic", "luxury"];
+      if (score >= 76) return ["aura", "cinematic"];
+      if (score >= 66) return ["confident", "focus"];
+      if (score >= 55) return ["calm", "clean"];
+      return ["dark", "sigma"];
     };
 
     type CandidateTrack = {
@@ -759,8 +753,7 @@ Be realistic and precise. Do not inflate scores.`,
       if (!arr || arr.length === 0) return null;
       let h = 0;
       for (let i = 0; i < seedStr.length; i++) h = (h * 31 + seedStr.charCodeAt(i)) >>> 0;
-      const idx = h % arr.length;
-      return arr[idx];
+      return arr[h % arr.length];
     };
 
     if (!Number.isFinite(result.ger) || typeof result.tier !== "string") {
@@ -787,19 +780,14 @@ Be realistic and precise. Do not inflate scores.`,
     if (supabase && user_id) {
       try {
         const source = isPartial ? "front" : "front_lateral";
-        const [m1, m2] = pickMood(clampedGer, tier.name, strengths, weaknesses);
+        const [m1, m2] = pickMood(clampedGer);
         let { data: candidates } = await supabase
           .from("spotify_tracks")
           .select("track_id, track_name, artist, spotify_url, preview_url, tags")
           .contains("tags", [m1, m2])
           .eq("playlist_id", "54KgUD5Oji30CA9iNjdEZO");
         if (!candidates || candidates.length === 0) {
-          const fallbackTags =
-            clampedGer >= 86 ? ["cinematic", "luxury"] :
-            clampedGer >= 76 ? ["aura", "cinematic"] :
-            clampedGer >= 66 ? ["confident", "focus"] :
-            clampedGer >= 55 ? ["calm", "clean"] :
-            ["dark", "sigma"];
+          const fallbackTags = pickMood(clampedGer);
           const { data: candidates2 } = await supabase
             .from("spotify_tracks")
             .select("track_id, track_name, artist, spotify_url, preview_url, tags")
@@ -864,9 +852,10 @@ Be realistic and precise. Do not inflate scores.`,
       remaining: guardInfo.isPremium ? null : guardInfo.remaining,
       limit: guardInfo.isPremium ? null : guardInfo.limit,
       is_premium: guardInfo.isPremium,
+      limits_disabled: limitsDisabled,
       history_id: historyRow?.id ?? null,
       created_at: historyRow?.created_at ?? new Date().toISOString(),
-      cooldown_seconds: COOLDOWN_SECONDS,
+      cooldown_seconds: limitsDisabled ? 0 : COOLDOWN_SECONDS,
     };
 
     return new Response(JSON.stringify(responseBody), {
