@@ -2,9 +2,18 @@ import { useState, useRef, useCallback, useEffect, type ComponentType } from "re
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Camera, Upload, Loader2, X, Scan, Zap, Settings,
-  ArrowUp, PersonStanding, Info,
-  User, TrendingUp
+  Camera,
+  Upload,
+  Loader2,
+  X,
+  Scan,
+  Zap,
+  Settings,
+  ArrowUp,
+  PersonStanding,
+  Info,
+  User,
+  TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -12,7 +21,6 @@ import { saveAnalysis, getAnalysisHistory } from "@/lib/mockData";
 import { generateExtendedMockAnalysis, getTier, type ExtendedAnalysisResult } from "@/lib/rankingSystem";
 import faceScanHero from "@/assets/clark.png";
 import { useAuth } from "@/auth/AuthProvider";
-import { supabase } from "@/integrations/supabase/client";
 
 export default function Analysis() {
   const navigate = useNavigate();
@@ -20,6 +28,7 @@ export default function Analysis() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const DISABLE_LIMITS = import.meta.env.VITE_LOVABLE_DISABLE_LIMITS === "1";
 
   const [showCapture, setShowCapture] = useState(false);
   const [captureStep, setCaptureStep] = useState<"intro-hero" | "intro" | "front-instruction" | "front-capture" | "side-instruction" | "side-capture" | "analyzing">("intro");
@@ -29,7 +38,7 @@ export default function Analysis() {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [limitInfo, setLimitInfo] = useState<{ limit: number; remaining: number; resetAt: string } | null>(null);
+  const [limitInfo, setLimitInfo] = useState<{ remainingAttempts: number; resetInSeconds: number } | null>(null);
   const lastAttemptRef = useRef<number>(0);
   const [usageStatus, setUsageStatus] = useState<{ limit: number; used: number; remaining: number; resetAt?: string } | null>(null);
   const [isCooldownActive, setIsCooldownActive] = useState(false);
@@ -45,12 +54,8 @@ export default function Analysis() {
     }
   }, [searchParams]);
 
-  // Check if limits were disabled by backend in last response
-  const limitsDisabledRef = useRef(false);
-
   useEffect(() => {
-    // If limits are disabled, skip cooldown restoration
-    if (limitsDisabledRef.current) return;
+    if (DISABLE_LIMITS) return;
     const endAtStr = localStorage.getItem("cooldown_end_at");
     if (!endAtStr) return;
     const endAt = Number(endAtStr);
@@ -74,32 +79,32 @@ export default function Analysis() {
 
   useEffect(() => {
     const loadUsage = async () => {
-      if (!user) return;
-      // If limits disabled, don't show usage
-      if (limitsDisabledRef.current) {
-        setUsageStatus(null);
-        return;
-      }
-      const today = new Date();
-      const isoDate = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}-${String(today.getUTCDate()).padStart(2, "0")}`;
-      const { data, error } = await supabase
-        .from("usage_limits")
-        .select("scans_used, scans_limit, reset_at")
-        .eq("user_id", user.id)
-        .eq("date", isoDate)
-        .maybeSingle();
-      if (!error && data) {
-        const used = data.scans_used ?? 0;
-        const limit = data.scans_limit ?? 3;
-        setUsageStatus({ limit, used, remaining: Math.max(0, limit - used), resetAt: data.reset_at ?? undefined });
-      } else {
-        setUsageStatus({ limit: 3, used: 0, remaining: 3 });
+      if (DISABLE_LIMITS) { setUsageStatus(null); return; }
+      try {
+        const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-face`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("sb-access-token") || ""}`,
+          },
+          body: JSON.stringify({ checkOnly: true }),
+        });
+        const data = await resp.json();
+        if (typeof data?.attempts_remaining === "number") {
+          setUsageStatus({ limit: data.limit ?? 3, used: 0, remaining: data.attempts_remaining });
+        }
+      } catch {
+        // ignore usage display errors
       }
     };
     loadUsage();
   }, [user, showCapture]);
 
   const startCooldown = (seconds: number) => {
+    if (DISABLE_LIMITS) return;
     if (seconds <= 0) return;
     setIsCooldownActive(true);
     setCooldownRemaining(seconds);
@@ -126,7 +131,7 @@ export default function Analysis() {
   };
 
   const startWebcam = useCallback(async () => {
-    if (!limitsDisabledRef.current && isCooldownActive) {
+    if (!DISABLE_LIMITS && isCooldownActive) {
       setErrorMsg(`Aguarde ${cooldownRemaining}s para nova análise.`);
       return;
     }
@@ -187,7 +192,7 @@ export default function Analysis() {
   };
 
   const nextStep = () => {
-    if (!limitsDisabledRef.current && isCooldownActive) {
+    if (!DISABLE_LIMITS && isCooldownActive) {
       setErrorMsg(`Aguarde ${cooldownRemaining}s para nova análise.`);
       return;
     }
@@ -242,7 +247,11 @@ export default function Analysis() {
   };
 
   const handleAnalyze = async () => {
+<<<<<<< HEAD
     if (!limitsDisabledRef.current && isCooldownActive) {
+=======
+    if (!DISABLE_LIMITS && isCooldownActive) {
+>>>>>>> 0887136 (feat: rolling 24h analysis limit and unlimited mode)
       setErrorMsg(`Aguarde ${cooldownRemaining}s para nova análise.`);
       return;
     }
@@ -295,12 +304,22 @@ export default function Analysis() {
                 body: JSON.stringify({ frontalImage: frontPhoto, lateralImage: sidePhoto }),
               });
               const data = await resp.json();
+<<<<<<< HEAD
                 if (data?.limits_disabled) {
                   limitsDisabledRef.current = true;
                   setUsageStatus(null);
                   setIsCooldownActive(false);
                   setCooldownRemaining(0);
                   localStorage.removeItem("cooldown_end_at");
+=======
+              if (!resp.ok) {
+                if (data && data.allowed === false) {
+                  setLimitInfo({
+                    remainingAttempts: data.attempts_remaining ?? 0,
+                    resetInSeconds: data.reset_in_seconds ?? 0,
+                  });
+                  throw new Error(data.message || "Limite de 24h atingido.");
+>>>>>>> 0887136 (feat: rolling 24h analysis limit and unlimited mode)
                 }
                 if (!resp.ok) {
                   // If limits disabled, never block
@@ -328,6 +347,7 @@ export default function Analysis() {
                 if (!data?.limits_disabled && typeof data?.cooldown_seconds === "number" && data.cooldown_seconds > 0) {
                   startCooldown(Number(data.cooldown_seconds));
                 }
+<<<<<<< HEAD
               const mapped: ExtendedAnalysisResult = {
                 id: crypto.randomUUID(),
                 date: new Date().toISOString(),
@@ -351,6 +371,24 @@ export default function Analysis() {
                 },
               };
               return mapped;
+=======
+                throw new Error(data?.message || "Erro na análise. Tente novamente.");
+              }
+              if (data?.isValidFace === false) {
+                throw new Error(data?.reason || "Imagem inválida. Envie uma foto clara do seu rosto.");
+              }
+              if (typeof data?.cooldown_seconds === "number" && data.cooldown_seconds > 0) {
+                startCooldown(Number(data.cooldown_seconds));
+              }
+              localResult.ger = data.ger;
+              const secondary = data.secondaryScore ?? Math.floor(data.ger / 10);
+              localResult.overallScore = secondary;
+              localResult.secondaryScore = secondary;
+              localResult.tier = data.tier;
+              localResult.nextTier = data.nextTier?.name;
+              localResult.pointsToNextTier = data.nextTier?.pointsNeeded ?? 0;
+              return localResult;
+>>>>>>> 0887136 (feat: rolling 24h analysis limit and unlimited mode)
             } catch (err) {
               if (err instanceof Error && /limite|quota|tentativas/i.test(err.message)) {
                 throw err;
@@ -368,8 +406,9 @@ export default function Analysis() {
         
         saveAnalysis(result);
         
-        // Ensure navigation happens
-        navigate(`/results/${result.id}`);
+        navigate(`/results/${result.id}`, {
+          state: { photoUrl: frontPhoto },
+        });
 
     } catch (error: unknown) {
         console.error("Erro na análise:", error);
@@ -440,9 +479,13 @@ export default function Analysis() {
                      captureStep.includes("side") ? "2/2: Lateral" : "Instruções"}
                 </span>
                 <div className="min-w-[80px] text-right">
+<<<<<<< HEAD
                   {usageStatus && !limitsDisabledRef.current && (
+=======
+                  {!DISABLE_LIMITS && usageStatus && typeof usageStatus.remaining === "number" && (
+>>>>>>> 0887136 (feat: rolling 24h analysis limit and unlimited mode)
                     <span className="text-[11px] font-bold text-primary">
-                      {usageStatus.remaining}/{usageStatus.limit} hoje
+                      Restam {usageStatus.remaining}
                     </span>
                   )}
                 </div>
@@ -604,17 +647,14 @@ export default function Analysis() {
               <Dialog open={true} onOpenChange={(v) => !v && setLimitInfo(null)}>
                 <DialogContent className="rounded-2xl border-border/50 bg-card max-w-sm">
                   <DialogHeader>
-                    <DialogTitle className="font-heading text-lg">Limite diário atingido</DialogTitle>
+                    <DialogTitle className="font-heading text-lg">Limite de 24h atingido</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-2 text-sm">
-                    <p>Você usou {limitInfo.limit - limitInfo.remaining}/{limitInfo.limit} análises hoje.</p>
-                    {limitInfo.resetAt && (
-                      <p className="text-muted-foreground">Reseta em: {new Date(limitInfo.resetAt).toLocaleString()}</p>
-                    )}
+                    <p className="text-muted-foreground">Reset em: {limitInfo.resetInSeconds}s</p>
                   </div>
                   <div className="grid gap-2 mt-3">
                     <Button className="rounded-xl" onClick={() => setLimitInfo(null)}>
-                      Voltar amanhã (ok)
+                      Ok
                     </Button>
                     <Button variant="outline" className="rounded-xl">
                       Assistir anúncio para +1 análise
@@ -685,20 +725,20 @@ export default function Analysis() {
           <section>
             <button
               onClick={() => {
-                if (isCooldownActive) {
+                if (!DISABLE_LIMITS && isCooldownActive) {
                   setErrorMsg(`Aguarde ${cooldownRemaining}s para nova análise.`);
                   return;
                 }
                 setShowCapture(true);
                 setCaptureStep("intro-hero");
               }}
-              disabled={isCooldownActive}
+              disabled={!DISABLE_LIMITS && isCooldownActive}
               className={`w-full ${isCooldownActive ? "bg-muted text-muted-foreground cursor-not-allowed" : "bg-primary hover:bg-primary/90 text-white"} rounded-xl py-4 px-6 flex items-center justify-center gap-3 font-bold tracking-wide transition-all active:scale-[0.98] glow-primary-custom border border-white/10 shadow-xl`}
             >
               <Scan className="h-6 w-6" />
-              <span>{isCooldownActive ? `Aguarde ${cooldownRemaining}s` : "NOVA ANÁLISE"}</span>
+              <span>{!DISABLE_LIMITS && isCooldownActive ? `Aguarde ${cooldownRemaining}s` : "NOVA ANÁLISE"}</span>
             </button>
-            {isCooldownActive && (
+            {!DISABLE_LIMITS && isCooldownActive && (
               <p className="mt-2 text-[11px] text-text-muted text-center">Protegendo o sistema contra uso excessivo.</p>
             )}
           </section>
@@ -744,21 +784,18 @@ export default function Analysis() {
           </section>
         </main>
         {/* Quota Modal (Dashboard) */}
-        {limitInfo && (
+        {!DISABLE_LIMITS && limitInfo && (
           <Dialog open={true} onOpenChange={(v) => !v && setLimitInfo(null)}>
             <DialogContent className="rounded-2xl border-border/50 bg-card max-w-sm">
               <DialogHeader>
-                <DialogTitle className="font-heading text-lg">Limite diário atingido</DialogTitle>
+                <DialogTitle className="font-heading text-lg">Limite de 24h atingido</DialogTitle>
               </DialogHeader>
               <div className="space-y-2 text-sm">
-                <p>Você usou {limitInfo.limit - limitInfo.remaining}/{limitInfo.limit} análises hoje.</p>
-                {limitInfo.resetAt && (
-                  <p className="text-muted-foreground">Reseta em: {new Date(limitInfo.resetAt).toLocaleString()}</p>
-                )}
+                <p className="text-muted-foreground">Reset em: {limitInfo.resetInSeconds}s</p>
               </div>
               <div className="grid gap-2 mt-3">
-                <Button className="rounded-xl" onClick={() => setLimitInfo(null)} disabled={isCooldownActive}>
-                  {isCooldownActive ? `Aguarde ${cooldownRemaining}s` : "Voltar amanhã (ok)"}
+                <Button className="rounded-xl" onClick={() => setLimitInfo(null)} disabled={!DISABLE_LIMITS && isCooldownActive}>
+                  {!DISABLE_LIMITS && isCooldownActive ? `Aguarde ${cooldownRemaining}s` : "Ok"}
                 </Button>
                 <Button variant="outline" className="rounded-xl">
                   Assistir anúncio para +1 análise

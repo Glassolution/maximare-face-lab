@@ -7,6 +7,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const DISABLE_LIMITS = Deno.env.get("LOVABLE_DISABLE_LIMITS") === "1";
+
 const TIERS = [
   { min: 0, max: 39, name: "sub3" },
   { min: 40, max: 54, name: "sub5" },
@@ -47,8 +49,36 @@ function logEvent(event: Record<string, unknown>) {
   console.log("[analyze-face]", JSON.stringify(event));
 }
 
-function isLimitsDisabled(): boolean {
-  return Deno.env.get("LOVABLE_DISABLE_LIMITS") === "1";
+const ROLLING_LIMIT = Number(Deno.env.get("LOVABLE_ROLLING_LIMIT") || "3");
+async function rollingGuard(
+  supabase: SupabaseClient | null,
+  user_id: string | null,
+): Promise<{ allowed: boolean; attempts_remaining: number; reset_in_seconds: number }> {
+  if (!supabase || !user_id) {
+    return { allowed: true, attempts_remaining: ROLLING_LIMIT, reset_in_seconds: 0 };
+  }
+  const now = new Date();
+  const windowStart = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  try {
+    const { data } = await supabase
+      .from("analysis_history")
+      .select("created_at")
+      .eq("user_id", user_id)
+      .gte("created_at", windowStart)
+      .order("created_at", { ascending: true });
+    const attempts = Array.isArray(data) ? data.length : 0;
+    if (attempts < ROLLING_LIMIT) {
+      return { allowed: true, attempts_remaining: ROLLING_LIMIT - attempts, reset_in_seconds: 0 };
+    }
+    const firstCreated = Array.isArray(data) && data.length > 0 ? data[0].created_at : null;
+    const firstMs = firstCreated ? Date.parse(firstCreated) : now.getTime();
+    const resetAtMs = firstMs + 24 * 60 * 60 * 1000;
+    const resetIn = Math.max(0, Math.ceil((resetAtMs - now.getTime()) / 1000));
+    return { allowed: false, attempts_remaining: 0, reset_in_seconds: resetIn };
+  } catch {
+    // On error, be permissive
+    return { allowed: true, attempts_remaining: ROLLING_LIMIT, reset_in_seconds: 0 };
+  }
 }
 
 type CanAnalyzeOk = {
@@ -81,10 +111,9 @@ async function canAnalyze(
   planHint: "free" | "premium",
 ): Promise<CanAnalyzeOk | CanAnalyzeError> {
   // BYPASS: skip ALL limit checks when disabled
-  if (isLimitsDisabled()) {
+  if (DISABLE_LIMITS) {
     return { ok: true, isPremium: true, remaining: null, limit: null, limitsDisabled: true };
   }
-
   if (!supabase || !user_id) {
     return { ok: true, isPremium: false, remaining: null, limit: null };
   }
@@ -267,11 +296,7 @@ async function getGuardInfo(
   user_id: string | null,
   planHint: "free" | "premium",
 ): Promise<{ isPremium: boolean; remaining: number | null; limit: number | null; limitsDisabled?: boolean }> {
-  // BYPASS
-  if (isLimitsDisabled()) {
-    return { isPremium: true, remaining: null, limit: null, limitsDisabled: true };
-  }
-
+  if (DISABLE_LIMITS) return { isPremium: true, remaining: null, limit: null, limitsDisabled: true };
   if (!supabase || !user_id) return { isPremium: false, remaining: null, limit: null };
 
   const now = new Date();
@@ -331,6 +356,37 @@ serve(async (req: Request) => {
     const frontalImage = body.frontalImage;
     const lateralImage = body.lateralImage;
     const analysisId: string = body.analysisId || crypto.randomUUID();
+    const checkOnly = body.checkOnly === true;
+
+    if (checkOnly) {
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+      const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) : null;
+      const authHeader = req.headers.get("Authorization") || "";
+      const jwt = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+      let user_id: string | null = null;
+      if (supabase && jwt) {
+        try {
+          const { data } = await supabase.auth.getUser(jwt);
+          user_id = data.user?.id ?? null;
+        } catch {
+          // ignore
+        }
+      }
+      if (DISABLE_LIMITS) {
+        return new Response(JSON.stringify({ allowed: true, attempts_remaining: null, reset_in_seconds: 0 }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const guard = await rollingGuard(supabase, user_id);
+      return new Response(JSON.stringify(guard), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (!frontalImage) {
       return new Response(JSON.stringify({ error: "Foto frontal é obrigatória." }), {
@@ -340,7 +396,7 @@ serve(async (req: Request) => {
     }
 
     const isPartial = !lateralImage;
-    const limitsDisabled = isLimitsDisabled();
+    const limitsDisabled = DISABLE_LIMITS;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
@@ -429,6 +485,7 @@ serve(async (req: Request) => {
     }
 
     let guardInfo: { isPremium: boolean; remaining: number | null; limit: number | null } = {
+<<<<<<< HEAD
       isPremium: limitsDisabled,
       remaining: null,
       limit: null,
@@ -453,13 +510,32 @@ serve(async (req: Request) => {
         }
         return new Response(JSON.stringify(body), {
           status: guard.status,
+=======
+      isPremium: DISABLE_LIMITS,
+      remaining: null,
+      limit: null,
+    };
+    if (!DISABLE_LIMITS) {
+      const guard = await rollingGuard(supabase, user_id);
+      if (!guard.allowed) {
+        await safeInsertLog({ event_type: "quota_exceeded", limit: ROLLING_LIMIT, used: ROLLING_LIMIT, reset_in_seconds: guard.reset_in_seconds });
+        return new Response(JSON.stringify({
+          allowed: false,
+          attempts_remaining: guard.attempts_remaining,
+          reset_in_seconds: guard.reset_in_seconds,
+          status: "error",
+          error_code: "QUOTA_EXCEEDED",
+          message: "Você atingiu o limite de análises nas últimas 24h.",
+        }), {
+          status: 429,
+>>>>>>> 0887136 (feat: rolling 24h analysis limit and unlimited mode)
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       guardInfo = {
-        isPremium: guard.isPremium,
-        remaining: guard.remaining,
-        limit: guard.limit,
+        isPremium: false,
+        remaining: guard.attempts_remaining,
+        limit: ROLLING_LIMIT,
       };
     }
 
@@ -849,7 +925,9 @@ Be realistic and precise. Do not inflate scores.`,
     const responseBody = {
       ...result,
       ...(songMatch ? { song_match: songMatch } : {}),
-      remaining: guardInfo.isPremium ? null : guardInfo.remaining,
+      allowed: true,
+      attempts_remaining: guardInfo.isPremium ? null : guardInfo.remaining,
+      reset_in_seconds: 0,
       limit: guardInfo.isPremium ? null : guardInfo.limit,
       is_premium: guardInfo.isPremium,
       limits_disabled: limitsDisabled,

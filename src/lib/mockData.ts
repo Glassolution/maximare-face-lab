@@ -96,11 +96,68 @@ export const mockRecommendations: Recommendation[] = [
 
 export function getAnalysisHistory(): AnalysisResult[] {
   const stored = localStorage.getItem("maximare_history");
-  return stored ? JSON.parse(stored) : [];
+  if (!stored) return [];
+  try {
+    const parsed = JSON.parse(stored);
+    if (Array.isArray(parsed)) {
+      return parsed as AnalysisResult[];
+    }
+    return [];
+  } catch {
+    return [];
+  }
 }
 
 export function saveAnalysis(analysis: AnalysisResult) {
-  const history = getAnalysisHistory();
-  history.unshift(analysis);
-  localStorage.setItem("maximare_history", JSON.stringify(history));
+  const history = getAnalysisHistory() as (AnalysisResult & {
+    ger?: number;
+    tier?: string;
+    badge?: string;
+    photoUrl?: string | null;
+  })[];
+
+  const extended = analysis as AnalysisResult & {
+    ger?: number;
+    tier?: string;
+    badge?: string;
+    photoUrl?: string | null;
+  };
+
+  const entry: AnalysisResult & {
+    ger?: number;
+    tier?: string;
+    badge?: string;
+    photoUrl?: string | null;
+  } = {
+    id: analysis.id,
+    date: analysis.date,
+    overallScore: analysis.overallScore,
+    categories: analysis.categories,
+    ger: extended.ger,
+    tier: extended.tier,
+    badge: extended.badge,
+    photoUrl: extended.photoUrl ?? null,
+  };
+
+  const newHistory = [entry, ...history].slice(0, 20);
+
+  try {
+    localStorage.setItem("maximare_history", JSON.stringify(newHistory));
+  } catch {
+    try {
+      const trimmed = newHistory.slice(0, 10).map((item) => ({
+        id: item.id,
+        date: item.date,
+        overallScore: item.overallScore,
+        categories: item.categories,
+        ger: item.ger,
+        tier: item.tier,
+        badge: item.badge,
+        photoUrl: item.photoUrl ?? null,
+      }));
+      localStorage.setItem("maximare_history", JSON.stringify(trimmed));
+    } catch {
+      localStorage.removeItem("maximare_history");
+    }
+  }
 }
