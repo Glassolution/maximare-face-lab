@@ -7,7 +7,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const DISABLE_LIMITS = Deno.env.get("LOVABLE_DISABLE_LIMITS") === "1";
+const DISABLE_LIMITS = Deno.env.get("DISABLE_LIMITS") === "1";
 
 const TIERS = [
   { min: 0, max: 39, name: "sub3" },
@@ -485,7 +485,6 @@ serve(async (req: Request) => {
     }
 
     let guardInfo: { isPremium: boolean; remaining: number | null; limit: number | null } = {
-<<<<<<< HEAD
       isPremium: limitsDisabled,
       remaining: null,
       limit: null,
@@ -510,32 +509,13 @@ serve(async (req: Request) => {
         }
         return new Response(JSON.stringify(body), {
           status: guard.status,
-=======
-      isPremium: DISABLE_LIMITS,
-      remaining: null,
-      limit: null,
-    };
-    if (!DISABLE_LIMITS) {
-      const guard = await rollingGuard(supabase, user_id);
-      if (!guard.allowed) {
-        await safeInsertLog({ event_type: "quota_exceeded", limit: ROLLING_LIMIT, used: ROLLING_LIMIT, reset_in_seconds: guard.reset_in_seconds });
-        return new Response(JSON.stringify({
-          allowed: false,
-          attempts_remaining: guard.attempts_remaining,
-          reset_in_seconds: guard.reset_in_seconds,
-          status: "error",
-          error_code: "QUOTA_EXCEEDED",
-          message: "Você atingiu o limite de análises nas últimas 24h.",
-        }), {
-          status: 429,
->>>>>>> 0887136 (feat: rolling 24h analysis limit and unlimited mode)
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       guardInfo = {
-        isPremium: false,
-        remaining: guard.attempts_remaining,
-        limit: ROLLING_LIMIT,
+        isPremium: guard.isPremium,
+        remaining: guard.remaining,
+        limit: guard.limit,
       };
     }
 
