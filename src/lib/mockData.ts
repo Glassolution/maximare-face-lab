@@ -108,27 +108,45 @@ export function getAnalysisHistory(): AnalysisResult[] {
   }
 }
 
-export function saveAnalysis(analysis: AnalysisResult) {
-  const history = getAnalysisHistory() as (AnalysisResult & {
-    ger?: number;
-    tier?: string;
-    badge?: string;
-    photoUrl?: string | null;
-  })[];
+export function deleteAnalysis(id: string) {
+  const history = getAnalysisHistory();
+  const filtered = history.filter((item) => item.id !== id);
+  if (filtered.length === 0) {
+    localStorage.removeItem("maximare_history");
+  } else {
+    localStorage.setItem("maximare_history", JSON.stringify(filtered));
+  }
+}
 
-  const extended = analysis as AnalysisResult & {
+export function saveAnalysis(analysis: AnalysisResult) {
+  type StoredAnalysis = AnalysisResult & {
     ger?: number;
     tier?: string;
     badge?: string;
     photoUrl?: string | null;
+    secondaryScore?: number;
+    technicalBreakdown?: {
+      asymmetry: string;
+      thirds: string;
+      jawline: string;
+      cheekbones: string;
+      eyes: string;
+      nose: string;
+      fwhr: string;
+    };
+    pslScore?: number;
+    jawType?: string;
+    mindset?: string;
+    strategy?: string;
+    breathing?: string;
+    appealLevel?: string;
   };
 
-  const entry: AnalysisResult & {
-    ger?: number;
-    tier?: string;
-    badge?: string;
-    photoUrl?: string | null;
-  } = {
+  const history = getAnalysisHistory() as StoredAnalysis[];
+
+  const extended = analysis as StoredAnalysis;
+
+  const entry: StoredAnalysis = {
     id: analysis.id,
     date: analysis.date,
     overallScore: analysis.overallScore,
@@ -137,6 +155,14 @@ export function saveAnalysis(analysis: AnalysisResult) {
     tier: extended.tier,
     badge: extended.badge,
     photoUrl: extended.photoUrl ?? null,
+    secondaryScore: extended.secondaryScore,
+    technicalBreakdown: extended.technicalBreakdown,
+    pslScore: extended.pslScore,
+    jawType: extended.jawType,
+    mindset: extended.mindset,
+    strategy: extended.strategy,
+    breathing: extended.breathing,
+    appealLevel: extended.appealLevel,
   };
 
   const newHistory = [entry, ...history].slice(0, 20);
@@ -145,16 +171,7 @@ export function saveAnalysis(analysis: AnalysisResult) {
     localStorage.setItem("maximare_history", JSON.stringify(newHistory));
   } catch {
     try {
-      const trimmed = newHistory.slice(0, 10).map((item) => ({
-        id: item.id,
-        date: item.date,
-        overallScore: item.overallScore,
-        categories: item.categories,
-        ger: item.ger,
-        tier: item.tier,
-        badge: item.badge,
-        photoUrl: item.photoUrl ?? null,
-      }));
+      const trimmed = newHistory.slice(0, 10) as StoredAnalysis[];
       localStorage.setItem("maximare_history", JSON.stringify(trimmed));
     } catch {
       localStorage.removeItem("maximare_history");

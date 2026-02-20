@@ -97,6 +97,7 @@ type CanAnalyzeErrorBody = {
   limit?: number;
   remaining?: number;
   reset_at?: string;
+  reset_in_seconds?: number;
 };
 
 type CanAnalyzeError = {
@@ -220,73 +221,37 @@ async function canAnalyze(
     return { ok: true, isPremium: true, remaining: null, limit: null };
   }
 
-  // Free: limite diário explícito
   try {
-    const { data, error } = await supabase
-      .from("usage_limits")
-      .select("scans_used, scans_limit, reset_at")
-      .eq("user_id", user_id)
-      .eq("date", today)
-      .maybeSingle();
-
-    let scansLimit = 3;
-    let scansUsed = 0;
-    let resetAt = nextMidnightUTC();
-
-    if (!error && data) {
-      scansLimit = data.scans_limit ?? scansLimit;
-      scansUsed = data.scans_used ?? 0;
-      resetAt = data.reset_at || resetAt;
-    } else {
-      await supabase.from("usage_limits").insert({
-        user_id,
-        date: today,
-        scans_used: 0,
-        scans_limit: scansLimit,
-        reset_at: resetAt,
-      });
-    }
-
-    if (scansUsed >= scansLimit) {
+    const guard = await rollingGuard(supabase, user_id);
+    if (!guard.allowed) {
+      const resetAt = new Date(Date.now() + guard.reset_in_seconds * 1000).toISOString();
       return {
         ok: false,
         status: 402,
         body: {
           status: "error",
           error_code: "QUOTA_EXCEEDED",
-          message: "Você atingiu o limite diário gratuito.",
-          limit: scansLimit,
+          message: "Você atingiu o limite de análises nas últimas 24h.",
+          limit: ROLLING_LIMIT,
           remaining: 0,
           reset_at: resetAt,
+          reset_in_seconds: guard.reset_in_seconds,
         },
       };
     }
-
-    const nextUsed = scansUsed + 1;
-    await supabase
-      .from("usage_limits")
-      .upsert({
-        user_id,
-        date: today,
-        scans_used: nextUsed,
-        scans_limit: scansLimit,
-        reset_at: resetAt,
-      });
-
-    const remaining = Math.max(0, scansLimit - nextUsed);
     return {
       ok: true,
       isPremium: false,
-      remaining,
-      limit: scansLimit,
+      remaining: guard.attempts_remaining,
+      limit: ROLLING_LIMIT,
     };
   } catch (err) {
-    logEvent({ type: "usage_limits_free_error", error: String(err) });
+    logEvent({ type: "rolling_guard_error", error: String(err) });
     return {
       ok: true,
       isPremium: false,
       remaining: null,
-      limit: null,
+      limit: ROLLING_LIMIT,
     };
   }
 }
@@ -298,10 +263,6 @@ async function getGuardInfo(
 ): Promise<{ isPremium: boolean; remaining: number | null; limit: number | null; limitsDisabled?: boolean }> {
   if (DISABLE_LIMITS) return { isPremium: true, remaining: null, limit: null, limitsDisabled: true };
   if (!supabase || !user_id) return { isPremium: false, remaining: null, limit: null };
-
-  const now = new Date();
-  const today = isoDateOnly(now);
-  const nowMs = now.getTime();
 
   let isPremium = planHint === "premium";
   let plan = planHint;
@@ -325,26 +286,21 @@ async function getGuardInfo(
   const premiumActive =
     isPremium ||
     plan === "premium" ||
-    (premiumUntil && Date.parse(premiumUntil) > nowMs);
+    (premiumUntil && Date.parse(premiumUntil) > Date.now());
 
   if (premiumActive) {
     return { isPremium: true, remaining: null, limit: null };
   }
 
   try {
-    const { data } = await supabase
-      .from("usage_limits")
-      .select("scans_used, scans_limit, reset_at")
-      .eq("user_id", user_id)
-      .eq("date", today)
-      .maybeSingle();
-
-    const scansLimit = data?.scans_limit ?? 3;
-    const scansUsed = data?.scans_used ?? 0;
-    const remaining = Math.max(0, scansLimit - scansUsed);
-    return { isPremium: false, remaining, limit: scansLimit };
+    const guard = await rollingGuard(supabase, user_id);
+    return {
+      isPremium: false,
+      remaining: guard.attempts_remaining,
+      limit: ROLLING_LIMIT,
+    };
   } catch {
-    return { isPremium: false, remaining: null, limit: null };
+    return { isPremium: false, remaining: null, limit: ROLLING_LIMIT };
   }
 }
 
@@ -492,7 +448,8 @@ serve(async (req: Request) => {
     if (!limitsDisabled && supabase && user_id) {
       const guard = await canAnalyze(supabase, user_id, plan);
       if (!guard.ok) {
-        const body = guard.body;
+        const errorGuard = guard as CanAnalyzeError;
+        const body = errorGuard.body;
         if (body.error_code === "RATE_LIMIT") {
           await safeInsertLog({
             event_type: "rate_limit",
@@ -508,7 +465,7 @@ serve(async (req: Request) => {
           });
         }
         return new Response(JSON.stringify(body), {
-          status: guard.status,
+          status: errorGuard.status,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -717,7 +674,7 @@ Seja realista e preciso. Não infle scores.`,
     if (jsonMatch) jsonStr = jsonMatch[1];
     jsonStr = jsonStr.trim();
 
-    let parsed;
+    let parsed: any;
     try {
       parsed = JSON.parse(jsonStr);
     } catch {

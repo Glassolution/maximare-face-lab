@@ -2,10 +2,10 @@ import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { getAnalysisHistory } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
-import { Scan, Share2 } from "lucide-react";
+import { Scan } from "lucide-react";
 import { useState } from "react";
 import PaywallModal from "@/components/PaywallModal";
-import { ExtendedAnalysisResult } from "@/lib/rankingSystem";
+import { ExtendedAnalysisResult, getTier } from "@/lib/rankingSystem";
 
 export default function Results() {
   const { id } = useParams();
@@ -20,8 +20,23 @@ export default function Results() {
   const ger = isExtended ? result.ger : Math.round((result?.overallScore || 0) * 10) || 0;
   const tier = isExtended ? result.tier : "SUB3";
   const badge = isExtended ? result.badge || "" : "";
-  const categories = result?.categories;
   const statePhoto = (location.state as { photoUrl?: string } | null)?.photoUrl;
+
+  const pslScore = typeof result?.pslScore === "number" ? result.pslScore : Math.floor(ger / 10);
+  const pslPercent = Math.max(0, Math.min(100, (pslScore / 10) * 100));
+  const tierInfo = getTier(ger);
+  const baseAppeal = result?.appealLevel || tierInfo.label || tierInfo.name.toUpperCase();
+  const mindset =
+    result?.mindset ||
+    (ger < 55 ? "Em desenvolvimento" : ger < 75 ? "Equilibrada" : "Dominante");
+  const strategy =
+    result?.strategy ||
+    (ger < 60 ? "Maximização intensa" : "Otimização refinada");
+  const jawType =
+    result?.jawType || result?.technicalBreakdown?.jawline || "Não avaliado";
+  const breathing = result?.breathing || "Não avaliado";
+  const appealLevel = baseAppeal;
+  const rankLabel = baseAppeal.toUpperCase();
 
   if (!result) return (
     <div className="min-h-screen pt-24 flex items-center justify-center">
@@ -33,95 +48,145 @@ export default function Results() {
   );
 
   return (
-    <div className="min-h-screen pt-20 pb-24 px-4 bg-background">
-      <div className="container max-w-md mx-auto space-y-6">
-        
-        {/* Header */}
-        <div className="flex justify-between items-center">
-            <h1 className="font-heading text-xl font-bold">Seu Relatório</h1>
-            <Button variant="ghost" size="icon" className="rounded-full">
-                <Share2 className="h-5 w-5" />
-            </Button>
+    <div className="min-h-screen bg-background text-white flex flex-col items-center justify-center px-4 py-6">
+      <div className="w-full max-w-[390px] mx-auto flex flex-col items-center">
+        <div className="relative mb-8">
+          <div className="w-48 h-48 rounded-full overflow-hidden border-2 border-white/10 ring-4 ring-primary/5">
+            <div className="w-full h-full relative">
+              {statePhoto ? (
+                <img
+                  src={statePhoto}
+                  alt="Usuário"
+                  className="w-full h-full object-cover grayscale brightness-90 contrast-110"
+                />
+              ) : result.photoUrl ? (
+                <img
+                  src={result.photoUrl}
+                  alt="Usuário"
+                  className="w-full h-full object-cover grayscale brightness-90 contrast-110"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-black/40">
+                  <Scan className="w-12 h-12 text-white/40" />
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="absolute inset-0 border-[0.5px] border-primary/20 rounded-full scale-110 pointer-events-none animate-pulse" />
         </div>
 
-        {/* FIFA Card Style */}
-        <motion.div 
-            initial={{ opacity: 0, y: 20 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            className="relative rounded-[2rem] overflow-hidden bg-card border border-border/50 shadow-2xl"
-        >
-            {/* Background Gradient */}
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-background" />
-            
-            <div className="relative p-6 flex flex-col items-center text-center">
-                {/* Badge & Tier */}
-                <div className="flex items-center gap-2 mb-4">
-                    <span className="text-2xl">{badge}</span>
-                    <span className="font-heading font-bold text-xl uppercase tracking-wider text-foreground">{tier}</span>
-                </div>
+        <div className="text-center mb-10">
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <span className="px-2 py-0.5 text-[10px] font-mono tracking-widest text-primary border border-primary/40 rounded bg-primary/5 uppercase">
+              {rankLabel}
+            </span>
+            <h1 className="text-2xl font-bold tracking-tight text-white">
+              Análise Estrutural
+            </h1>
+          </div>
+          <p className="text-white/40 text-xs font-mono uppercase tracking-[0.2em]">
+            Análise Maximare
+          </p>
+        </div>
 
-                {/* Photo & GER */}
-                <div className="relative mb-6">
-                <div className="w-32 h-32 rounded-full p-1 bg-gradient-to-br from-primary to-accent">
-                  <div className="w-full h-full rounded-full overflow-hidden bg-muted relative">
-                    {statePhoto ? (
-                      <img src={statePhoto} alt="User" className="w-full h-full object-cover" />
-                    ) : result.photoUrl ? (
-                      <img src={result.photoUrl} alt="User" className="w-full h-full object-cover" />
-                    ) : (
-                      <Scan className="w-12 h-12 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-muted-foreground" />
-                    )}
-                  </div>
-                </div>
-                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-background border border-border/50 px-4 py-1 rounded-full shadow-lg flex items-center gap-2">
-                        <span className="text-xs font-bold text-muted-foreground">Aura</span>
-                        <span className="font-heading text-2xl font-black text-foreground">{ger}</span>
-                    </div>
-                </div>
+        <div className="w-full bg-black/40 backdrop-blur-xl border border-white/10 rounded-[24px] p-8 shadow-2xl relative overflow-hidden">
+          <div
+            className="absolute inset-0 opacity-[0.03] pointer-events-none"
+            style={{
+              backgroundImage:
+                "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
+              backgroundSize: "20px 20px",
+            }}
+          />
 
-            </div>
-        </motion.div>
-
-        {categories && categories.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="rounded-2xl glass-strong p-4"
-          >
-            <h3 className="text-sm font-bold text-foreground mb-3">Seus pilares faciais</h3>
+          <div className="grid grid-cols-2 gap-x-8 gap-y-10 relative z-10">
             <div className="space-y-3">
-              {categories.map((cat) => {
-                const rawScore = typeof cat.score === "number" ? cat.score : parseFloat(String(cat.score));
-                const safeScore = Number.isFinite(rawScore) ? rawScore : 0;
-                const percent =
-                  safeScore <= 10 ? Math.max(0, Math.min(100, safeScore * 10)) : Math.max(0, Math.min(100, safeScore));
-                const displayScore =
-                  safeScore <= 10 ? Number(safeScore.toFixed(1)) : Math.round(safeScore);
-
-                return (
-                  <div key={cat.id} className="flex items-center gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="font-medium text-foreground">{cat.name}</span>
-                        <span className="font-semibold text-muted-foreground">{displayScore}</span>
-                      </div>
-                      <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${percent}%` }}
-                          transition={{ duration: 0.6 }}
-                          className="h-full rounded-full bg-primary"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
+                Pontuação PSL
+              </p>
+              <p className="text-xl font-semibold text-white">
+                {pslScore.toFixed(1)}
+              </p>
+              <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
+                <div
+                  className="h-full bg-primary shadow-[0_0_8px_rgba(0,240,255,0.6)]"
+                  style={{ width: `${pslPercent}%` }}
+                />
+              </div>
             </div>
-          </motion.div>
-        )}
 
-        {/* Music Card */}
+            <div className="space-y-3">
+              <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
+                Mentalidade
+              </p>
+              <p className="text-xl font-semibold text-white">{mindset}</p>
+              <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
+                <div className="h-full bg-primary w-[88%] shadow-[0_0_8px_rgba(0,240,255,0.6)]" />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
+                Estratégia
+              </p>
+              <p className="text-xl font-semibold text-white">{strategy}</p>
+              <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
+                <div className="h-full bg-primary w-[65%] shadow-[0_0_8px_rgba(0,240,255,0.6)]" />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
+                Tipo de mandíbula
+              </p>
+              <p className="text-xl font-semibold text-white">{jawType}</p>
+              <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
+                <div className="h-full bg-primary w-[92%] shadow-[0_0_8px_rgba(0,240,255,0.6)]" />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
+                Respiração
+              </p>
+              <p className="text-xl font-semibold text-white">{breathing}</p>
+              <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
+                <div className="h-full bg-primary w-[78%] shadow-[0_0_8px_rgba(0,240,255,0.6)]" />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
+                Nível de apelo
+              </p>
+              <p className="text-xl font-semibold text-white">{appealLevel}</p>
+              <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
+                <div className="h-full bg-primary w-[95%] shadow-[0_0_8px_rgba(0,240,255,0.6)]" />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-10 pt-6 border-t border-white/5 flex justify-between items-center relative z-10">
+            <div className="flex gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-primary/40" />
+              <div className="w-1.5 h-1.5 rounded-full bg-primary/20" />
+              <div className="w-1.5 h-1.5 rounded-full bg-primary/10" />
+            </div>
+            <span className="text-[9px] font-mono text-white/20 uppercase tracking-widest">
+              Dados biométricos verificados
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-12 opacity-30 flex flex-col items-center gap-2">
+          <span className="text-sm">▢▢</span>
+          <p className="text-[10px] font-mono tracking-tighter">
+            MAXIMARE-IA-0X92-2024
+          </p>
+        </div>
+      </div>
+
+      {/* Music Card */}
         {result.song_match && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl glass-strong p-4">
             <h3 className="text-sm font-bold text-foreground mb-2">Sua música</h3>
@@ -146,7 +211,6 @@ export default function Results() {
         {/* Technical Diagnosis - Removed per user request */}
 
         {/* Detailed Analysis - Removed per user request */}
-      </div>
 
       <PaywallModal open={showPaywall} onClose={() => setShowPaywall(false)} onContinue={() => { setShowPaywall(false); navigate("/recommendations"); }} />
     </div>

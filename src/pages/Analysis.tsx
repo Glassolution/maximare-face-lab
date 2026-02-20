@@ -14,10 +14,11 @@ import {
   Info,
   User,
   TrendingUp,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { saveAnalysis, getAnalysisHistory } from "@/lib/mockData";
+import { saveAnalysis, getAnalysisHistory, deleteAnalysis, type AnalysisResult } from "@/lib/mockData";
 import { generateExtendedMockAnalysis, getTier, type ExtendedAnalysisResult } from "@/lib/rankingSystem";
 import faceScanHero from "@/assets/clark.png";
 import { useAuth } from "@/auth/AuthProvider";
@@ -70,7 +71,7 @@ export default function Analysis() {
     }
   }, []);
 
-  const history = getAnalysisHistory();
+  const [history, setHistory] = useState<AnalysisResult[]>(() => getAnalysisHistory());
   const lastAnalysis = history.length > 0 ? history[0] : null;
   const currentGER = lastAnalysis
     ? (lastAnalysis as ExtendedAnalysisResult).ger ?? Math.round(lastAnalysis.overallScore * 10)
@@ -78,6 +79,21 @@ export default function Analysis() {
   
   const streak = Math.max(history.length, 1);
   const weekDelta = history.length > 1 ? +(history[0].overallScore - history[1].overallScore).toFixed(1) : 0;
+
+  const handleDeleteHistory = (id: string) => {
+    deleteAnalysis(id);
+    setHistory(getAnalysisHistory());
+  };
+
+  const formatHistoryDate = (iso: string) => {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
 
   useEffect(() => {
     const loadUsage = async () => {
@@ -331,27 +347,19 @@ export default function Analysis() {
               if (!data?.limits_disabled && typeof data?.cooldown_seconds === "number" && data.cooldown_seconds > 0) {
                 startCooldown(Number(data.cooldown_seconds));
               }
+
+              const secondary = data.secondaryScore ?? Math.floor(data.ger / 10);
               const mapped: ExtendedAnalysisResult = {
+                ...localResult,
                 id: crypto.randomUUID(),
                 date: new Date().toISOString(),
-                overallScore: data.secondaryScore ?? Math.floor(data.ger / 10),
+                overallScore: secondary,
                 ger: data.ger,
-                categories: [],
                 tier: data.tier,
-                badge: undefined,
-                secondaryScore: data.secondaryScore,
+                secondaryScore: secondary,
                 photoSideUrl: sidePhoto || undefined,
                 nextTier: data.nextTier?.name,
                 pointsToNextTier: data.nextTier?.pointsNeeded ?? 0,
-                technicalBreakdown: {
-                  asymmetry: "N/A",
-                  thirds: "N/A",
-                  jawline: "N/A",
-                  cheekbones: "N/A",
-                  eyes: "N/A",
-                  nose: "N/A",
-                  fwhr: "N/A",
-                },
               };
               return mapped;
             } catch (err) {
@@ -705,28 +713,53 @@ export default function Analysis() {
               <button onClick={() => navigate('/progress')} className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors">Ver tudo</button>
             </div>
             <div className="space-y-3">
-              {history.slice(0, 3).map((analysis, idx) => (
-                <div key={analysis.id || idx} className="glass-card rounded-xl p-4 flex items-center justify-between border-l-2 border-l-primary hover:bg-white/5 transition-colors cursor-pointer" onClick={() => navigate(`/results/${analysis.id}`)}>
-                  <div className="flex items-center gap-4">
-                    <div className="size-12 rounded-lg bg-slate-custom flex items-center justify-center relative overflow-hidden">
-                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent z-10"></div>
-                       {analysis.photoUrl ? (
-                         <img className="w-full h-full object-cover opacity-80" src={analysis.photoUrl} alt="Analysis" />
-                       ) : (
-                         <Scan className="h-6 w-6 text-text-muted relative z-20" />
-                       )}
+              {history.slice(0, 3).map((analysis, idx) => {
+                const extended = analysis as unknown as ExtendedAnalysisResult;
+                const ger = extended.ger ?? Math.round(analysis.overallScore * 10);
+                const tierInfo = getTier(ger);
+                const tierLabel = tierInfo.label || tierInfo.name;
+
+                return (
+                  <div
+                    key={analysis.id || idx}
+                    className="glass-card rounded-xl p-4 flex items-center justify-between border-l-2 border-l-primary hover:bg-white/5 transition-colors cursor-pointer"
+                    onClick={() => navigate(`/results/${analysis.id}`)}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="size-12 rounded-lg bg-slate-custom flex items-center justify-center relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent z-10"></div>
+                        {analysis.photoUrl ? (
+                          <img className="w-full h-full object-cover opacity-80" src={analysis.photoUrl} alt="Analysis" />
+                        ) : (
+                          <Scan className="h-6 w-6 text-text-muted relative z-20" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-xs text-text-muted font-medium">{formatHistoryDate(analysis.date)}</p>
+                        <h4 className="text-sm font-bold text-white">Análise Facial</h4>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xs text-text-muted font-medium">{analysis.date}</p>
-                      <h4 className="text-sm font-bold text-white">Structural Scan #{analysis.id.slice(0, 4)}</h4>
+                    <div className="flex flex-col items-end gap-1">
+                      <p className="text-xl font-bold text-white">
+                        {Math.round(analysis.overallScore * 10) / 10}
+                      </p>
+                      <span className="text-[10px] text-text-muted font-bold uppercase">
+                        {tierLabel}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteHistory(analysis.id);
+                        }}
+                        className="mt-1 inline-flex items-center gap-1 text-[10px] text-red-400 hover:text-red-300"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Excluir
+                      </button>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xl font-bold text-white">{Math.round(analysis.overallScore * 10) / 10}</p>
-                    <span className="text-[10px] text-text-muted font-bold uppercase">{getTier(analysis.overallScore).name}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               
               {history.length === 0 && (
                 <div className="text-center py-8 text-text-muted text-sm">

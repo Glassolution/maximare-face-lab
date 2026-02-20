@@ -326,6 +326,18 @@ export function generateExtendedMockAnalysis(): ExtendedAnalysisResult {
   tier = TIERS[Math.max(0, Math.min(TIERS.length - 1, tierIndex))];
   const nextTier = getNextTier(ger);
   const secondaryScore = +(ger / 10).toFixed(1);
+  const pslScore = secondaryScore;
+
+  const mindset =
+    ger < 55 ? "Em desenvolvimento" : ger < 75 ? "Equilibrada" : "Dominante";
+
+  const strategy = ger < 60 ? "Maximização intensa" : "Otimização refinada";
+
+  const jawType = technicalData.jawline || "Não avaliado";
+
+  const breathing = "Não avaliado";
+
+  const appealLevel = tier.label || tier.name.toUpperCase();
 
   return {
     id: crypto.randomUUID(),
@@ -349,12 +361,12 @@ export function generateExtendedMockAnalysis(): ExtendedAnalysisResult {
         fwhr: technicalData.fwhr || "N/A"
     },
 
-    // Legacy fields mapped
-    pslScore: Math.floor(secondaryScore),
-    jawType: technicalData.jawline,
-    mindset: "Analytical",
-    strategy: ger < 60 ? "Looksmax Hard" : "Softmax",
-    breathing: "N/A",
-    appealLevel: tier.label || "N/A",
+    // Campos agregados usados na tela de resultados
+    pslScore,
+    jawType,
+    mindset,
+    strategy,
+    breathing,
+    appealLevel,
   };
 }

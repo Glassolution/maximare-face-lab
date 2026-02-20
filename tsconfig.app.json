@@ -27,5 +27,9 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src"]
+  "include": [
+    "src",
+    "supabase/functions/**/*.ts",
+    "supabase/functions/types.d.ts"
+  ]
 }
