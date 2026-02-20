@@ -523,14 +523,52 @@ serve(async (req: Request) => {
 
     imageContents.push({
       type: "text",
-      text: `You are an expert facial aesthetics analyst. Analyze the provided face photo(s) and return a JSON object with scores from 0-99 for each attribute.
+      text: `Você é um avaliador técnico de estética facial e looksmaxxing (nível "auditável"), com foco em análise objetiva por foto.
+Você deve analisar uma foto frontal e, se disponível, uma foto lateral do mesmo rosto.
+Sua saída DEVE ser apenas JSON válido, sem markdown, sem texto extra.
 
-${isPartial ? "Only a FRONTAL photo was provided. Mark lateral-only attributes with your best estimate but reduce confidence." : "Both FRONTAL and LATERAL photos were provided. Analyze all attributes with full precision."}
+Regras de qualidade e validade (obrigatórias):
+- Se não houver rosto humano claro, retorne isValidFace=false.
+- Se a foto estiver muito escura, borrada, cortada, com rosto pequeno, filtro pesado, ângulo extremo, expressão exagerada, boca aberta demais, língua pra fora, careta, ou iluminação que distorce contornos (luz lateral dura), marque isPartial=true e reduza confidence (0–1).
+- Se a foto lateral não existir ou for inválida, retorne lateral.available=false e preencha scores laterais com null (não invente).
+- Não diagnostique saúde. Quando avaliar "inchaço"/"acima do peso", trate como facial adiposity/puffiness aparente.
+- Use escala 0–99 para scores (quanto maior, melhor), e inclua confidence geral (0.0–1.0).
 
-You MUST return ONLY a valid JSON object with this exact structure (no markdown, no explanation):
+${isPartial ? "Apenas uma foto FRONTAL foi fornecida. Marque lateral.available=false e todos os scores laterais como null." : "Fotos FRONTAL e LATERAL foram fornecidas. Analise todos os atributos com precisão total."}
+
+O que avaliar:
+
+FRONTAL:
+- simetria: alinhamento e equivalência dos lados
+- proporcao_tercos: terços faciais, harmonia vertical
+- largura_zigomatica: maçãs/zigomáticos vs mandíbula
+- masculinidade_estrutural: robustez óssea aparente (mandíbula/zigoma/sobrancelha)
+- harmonia_nariz: proporção/posição
+- linha_cabelo: hairline/temporal (sem suposições se coberto)
+- olheiras: olheira/sombra infraorbital (maior score = menos olheira)
+- qualidade_pele: uniformidade, textura, manchas aparentes
+- rugas: linhas/rugas (maior score = menos rugas)
+- definicao_facial: quão "defined" o rosto está — jawline aparente, pouca retenção, contorno nítido
+- puffiness_adiposidade_facial: quanto menos inchaço/adiposidade aparente, maior o score
+
+Nota: definicao_facial e puffiness_adiposidade_facial podem ser correlacionados, mas NÃO idênticos.
+
+LATERAL (se disponível):
+- projecao_queixo
+- definicao_mandibula
+- angulo_goniaco
+- projecao_maxilar
+- harmonia_perfil
+
+Consistência e penalidades:
+- Se puffiness_adiposidade_facial for baixo, deve refletir em definicao_facial e tende a reduzir definicao_mandibula (se lateral existir).
+- Se iluminação/ângulo distorcem contorno, reduza confidence e marque isPartial=true.
+
+Retorne APENAS este JSON (sem markdown):
 {
   "isValidFace": true,
   "isPartial": ${isPartial},
+  "confidence": 0.0,
   "frontal": {
     "simetria": <0-99>,
     "proporcao_tercos": <0-99>,
@@ -540,29 +578,36 @@ You MUST return ONLY a valid JSON object with this exact structure (no markdown,
     "linha_cabelo": <0-99>,
     "olheiras": <0-99>,
     "qualidade_pele": <0-99>,
-    "rugas": <0-99>
+    "rugas": <0-99>,
+    "definicao_facial": <0-99>,
+    "puffiness_adiposidade_facial": <0-99>
   },
   "lateral": {
-    "projecao_queixo": <0-99>,
-    "definicao_mandibula": <0-99>,
-    "angulo_goniaco": <0-99>,
-    "projecao_maxilar": <0-99>,
-    "harmonia_perfil": <0-99>
+    "available": ${!isPartial},
+    "projecao_queixo": ${isPartial ? "null" : "<0-99>"},
+    "definicao_mandibula": ${isPartial ? "null" : "<0-99>"},
+    "angulo_goniaco": ${isPartial ? "null" : "<0-99>"},
+    "projecao_maxilar": ${isPartial ? "null" : "<0-99>"},
+    "harmonia_perfil": ${isPartial ? "null" : "<0-99>"}
+  },
+  "notes": {
+    "top_strengths": ["até 3 itens curtos em pt-br"],
+    "top_weaknesses": ["até 3 itens curtos em pt-br"],
+    "quality_flags": []
   }
 }
 
-If the image is NOT a valid face photo (blurry, dark, filtered, not a human face), return:
-{"isValidFace": false, "reason": "brief explanation in Portuguese"}
+Se não for um rosto válido: {"isValidFace": false, "reason": "explicação breve em português"}
 
-Score guidelines:
-- 90-99: Exceptional, model-tier
-- 80-89: Very attractive, above average
-- 70-79: Attractive, good features
-- 60-69: Average, some areas to improve
-- 50-59: Below average
-- 0-49: Significant areas for improvement
+Diretrizes de score:
+- 90-99: Excepcional, nível modelo
+- 80-89: Muito atrativo
+- 70-79: Atrativo, boas features
+- 60-69: Médio
+- 50-59: Abaixo da média
+- 0-49: Áreas significativas para melhoria
 
-Be realistic and precise. Do not inflate scores.`,
+Seja realista e preciso. Não infle scores.`,
     });
 
     imageContents.push({
@@ -695,28 +740,60 @@ Be realistic and precise. Do not inflate scores.`,
 
     const f = parsed.frontal;
     const l = parsed.lateral;
+    const hasLateral = l?.available !== false && l?.projecao_queixo != null;
 
-    const mandibula = ((l.definicao_mandibula + l.projecao_queixo) / 2);
-    const simetria = f.simetria;
-    const macas = f.largura_zigomatica;
-    const perfil = ((l.harmonia_perfil + l.projecao_maxilar) / 2);
-    const pele = f.qualidade_pele;
-    const hairline = f.linha_cabelo;
-    const proporcoes = f.proporcao_tercos;
-    const olheirasRugas = ((f.olheiras + f.rugas) / 2);
-    const outros = ((f.masculinidade_estrutural + f.harmonia_nariz + l.angulo_goniaco) / 3);
+    // New component: definição/puffiness
+    const definicao = ((f.definicao_facial ?? 50) + (f.puffiness_adiposidade_facial ?? 50)) / 2;
 
-    const ger = Math.round(
-      mandibula * 0.20 +
-      simetria * 0.15 +
-      macas * 0.10 +
-      perfil * 0.15 +
-      pele * 0.10 +
-      hairline * 0.10 +
-      proporcoes * 0.10 +
-      olheirasRugas * 0.05 +
-      outros * 0.05
-    );
+    let ger: number;
+
+    if (hasLateral) {
+      // Full analysis with lateral
+      const mandibula = ((l.definicao_mandibula + l.projecao_queixo) / 2);
+      const simetria = f.simetria;
+      const macas = f.largura_zigomatica;
+      const perfil = ((l.harmonia_perfil + l.projecao_maxilar) / 2);
+      const pele = f.qualidade_pele;
+      const hairline = f.linha_cabelo;
+      const proporcoes = f.proporcao_tercos;
+      const olheirasRugas = ((f.olheiras + f.rugas) / 2);
+      const outros = ((f.masculinidade_estrutural + f.harmonia_nariz + l.angulo_goniaco) / 3);
+
+      ger = Math.round(
+        mandibula * 0.18 +
+        simetria * 0.14 +
+        macas * 0.10 +
+        perfil * 0.14 +
+        pele * 0.08 +
+        hairline * 0.08 +
+        proporcoes * 0.10 +
+        olheirasRugas * 0.05 +
+        outros * 0.05 +
+        definicao * 0.08
+      );
+    } else {
+      // Partial analysis (no lateral): redistribute lateral weights
+      const simetria = f.simetria;
+      const macas = f.largura_zigomatica;
+      const pele = f.qualidade_pele;
+      const hairline = f.linha_cabelo;
+      const proporcoes = f.proporcao_tercos;
+      const olheirasRugas = ((f.olheiras + f.rugas) / 2);
+      const outros = ((f.masculinidade_estrutural + f.harmonia_nariz) / 2);
+
+      // Weights redistributed from mandibula(0.18) + perfil(0.14) = 0.32
+      // -> definicao +0.12, simetria +0.08, proporcoes +0.07, outros +0.05
+      ger = Math.round(
+        simetria * 0.22 +
+        macas * 0.10 +
+        pele * 0.08 +
+        hairline * 0.08 +
+        proporcoes * 0.17 +
+        olheirasRugas * 0.05 +
+        outros * 0.10 +
+        definicao * 0.20
+      );
+    }
 
     const clampedGer = Math.max(0, Math.min(99, ger));
     const tier = getTier(clampedGer);
@@ -725,7 +802,8 @@ Be realistic and precise. Do not inflate scores.`,
 
     const attributes = [
       { id: "masculinidade", name: "Masculinidade", score: f.masculinidade_estrutural, icon: "masculinidade" },
-      { id: "mandibula", name: "Linha da Mandíbula", score: l.definicao_mandibula, icon: "mandibula" },
+      { id: "definicao_facial", name: "Definição Facial", score: f.definicao_facial ?? 50, icon: "definicao" },
+      { id: "puffiness", name: "Adiposidade Facial", score: f.puffiness_adiposidade_facial ?? 50, icon: "puffiness" },
       { id: "macas", name: "Maçãs do Rosto", score: f.largura_zigomatica, icon: "macas" },
       { id: "hairline", name: "Linha do Cabelo", score: f.linha_cabelo, icon: "hairline" },
       { id: "simetria", name: "Simetria", score: f.simetria, icon: "simetria" },
@@ -734,10 +812,13 @@ Be realistic and precise. Do not inflate scores.`,
       { id: "pele", name: "Qualidade da Pele", score: f.qualidade_pele, icon: "pele" },
       { id: "proporcao", name: "Proporção Facial", score: f.proporcao_tercos, icon: "proporcao" },
       { id: "nariz", name: "Harmonia do Nariz", score: f.harmonia_nariz, icon: "nariz" },
-      { id: "queixo", name: "Projeção do Queixo", score: l.projecao_queixo, icon: "queixo" },
-      { id: "maxilar", name: "Projeção Maxilar", score: l.projecao_maxilar, icon: "maxilar" },
-      { id: "perfil", name: "Harmonia do Perfil", score: l.harmonia_perfil, icon: "perfil" },
-      { id: "goniaco", name: "Ângulo Goníaco", score: l.angulo_goniaco, icon: "goniaco" },
+      ...(hasLateral ? [
+        { id: "mandibula", name: "Linha da Mandíbula", score: l.definicao_mandibula, icon: "mandibula" },
+        { id: "queixo", name: "Projeção do Queixo", score: l.projecao_queixo, icon: "queixo" },
+        { id: "maxilar", name: "Projeção Maxilar", score: l.projecao_maxilar, icon: "maxilar" },
+        { id: "perfil", name: "Harmonia do Perfil", score: l.harmonia_perfil, icon: "perfil" },
+        { id: "goniaco", name: "Ângulo Goníaco", score: l.angulo_goniaco, icon: "goniaco" },
+      ] : []),
     ];
 
     const sorted = [...attributes].sort((a, b) => b.score - a.score);
