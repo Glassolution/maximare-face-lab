@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Crown, ChevronRight, Settings, Shield, Zap, Star, TrendingUp, Search, LogOut, Moon, Sun } from "lucide-react";
+import { Crown, ChevronRight, Settings, Shield, Zap, Star, TrendingUp, Search, LogOut, Moon, Sun, CreditCard } from "lucide-react";
 import { getAnalysisHistory } from "@/lib/mockData";
 import { Link, useNavigate } from "react-router-dom";
 import { getTier, getNextTier, ExtendedAnalysisResult } from "@/lib/rankingSystem";
@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/theme/ThemeProvider";
+import { usePremiumStatus } from "@/hooks/usePremiumStatus";
 
 type MenuItem = {
   label: string;
@@ -28,11 +29,13 @@ const badges = [
 
 export default function Profile() {
   const { user } = useAuth();
+  const { isPremium, subscriptionStatus, expiresAt, planType } = usePremiumStatus();
   const navigate = useNavigate();
   const history = getAnalysisHistory();
   const lastAnalysis = history.length > 0 ? (history[0] as unknown as ExtendedAnalysisResult) : null;
   const { theme, setTheme } = useTheme();
   const [showPreferences, setShowPreferences] = useState(false);
+  const [showSubscription, setShowSubscription] = useState(false);
   
   // Calculate stats
   const ger = lastAnalysis?.ger || 0;
@@ -66,11 +69,16 @@ export default function Profile() {
     (user && (user.user_metadata?.full_name || user.user_metadata?.name || user.email)) || "Usuário MAXIMARE";
 
   const menuItems: MenuItem[] = [
-    { label: "Plano Pro", icon: Crown, desc: "Desbloqueie tudo", path: "/premium" },
+    { label: "Plano Pro", icon: Crown, desc: isPremium ? "Gerenciar assinatura" : "Desbloqueie tudo", path: isPremium ? "#" : "/premium", onClick: isPremium ? () => setShowSubscription(true) : undefined },
     { label: "Progresso", icon: TrendingUp, desc: "Seu histórico", path: "/progress" },
     { label: "Configurações", icon: Settings, desc: "Preferências", path: "#", onClick: () => setShowPreferences(true) },
     { label: "Privacidade", icon: Shield, desc: "Seus dados", path: "#" },
   ] as const;
+
+  const formatDate = (date: Date | null) => {
+    if (!date) return "N/A";
+    return new Intl.DateTimeFormat('pt-BR').format(date);
+  };
 
   return (
     <div className="min-h-screen pt-6 pb-28 px-4">
@@ -80,15 +88,86 @@ export default function Profile() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
           className="flex flex-col items-center text-center pt-4"
         >
-          <div className="h-20 w-20 rounded-full glass-strong flex items-center justify-center mb-3 glow-sm overflow-hidden">
+          <div className="h-20 w-20 rounded-full glass-strong flex items-center justify-center mb-3 glow-sm overflow-hidden relative">
+             {isPremium && (
+                <div className="absolute -top-1 -right-1 z-20 bg-background rounded-full p-0.5 shadow-sm">
+                   <Star className="h-6 w-6 text-amber-400 fill-amber-400 drop-shadow-md animate-pulse" />
+                </div>
+             )}
              {lastAnalysis?.photoUrl ? (
                  <img src={lastAnalysis.photoUrl} alt="User" className="w-full h-full object-cover" />
              ) : (
                  <span className="font-heading text-2xl font-bold text-gradient">M</span>
              )}
           </div>
-          <h1 className="font-heading text-xl font-bold text-foreground">{displayName}</h1>
+          <h1 className="font-heading text-xl font-bold text-foreground flex items-center justify-center gap-2">
+            {displayName}
+          </h1>
           <p className="text-sm text-muted-foreground mt-1">{totalAnalyses} análise{totalAnalyses !== 1 ? "s" : ""} realizada{totalAnalyses !== 1 ? "s" : ""}</p>
+        
+          {/* Status Badge */}
+          <div className="w-full mt-6 px-2">
+            {isPremium ? (
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-100 to-amber-50 border border-amber-200 shadow-lg shadow-amber-500/10 p-4">
+                 <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-amber-400/20 to-transparent rounded-full blur-2xl -mr-10 -mt-10" />
+                 
+                 <div className="relative z-10 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
+                            <Crown className="h-5 w-5 text-amber-600 fill-amber-600" />
+                        </div>
+                        <div className="text-left">
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-amber-700 uppercase tracking-wider bg-amber-200/50 px-1.5 py-0.5 rounded-md">Premium Ativo</span>
+                            </div>
+                            <p className="text-xs text-amber-800/80 mt-1 font-medium">
+                                {planType === 'premium_monthly' ? 'Plano Mensal' : planType === 'premium_yearly' ? 'Plano Anual' : 'Plano Premium'}
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <Button 
+                        size="sm" 
+                        variant="ghost"
+                        onClick={() => setShowSubscription(true)}
+                        className="h-8 px-3 text-xs font-semibold text-amber-700 hover:bg-amber-200/50 hover:text-amber-800"
+                    >
+                        Gerenciar
+                    </Button>
+                 </div>
+                 {expiresAt && (
+                    <div className="mt-3 pt-3 border-t border-amber-200/50 flex items-center gap-2 text-[10px] text-amber-800/70">
+                        <CreditCard className="h-3 w-3" />
+                        <span>Renova em: <strong>{formatDate(expiresAt)}</strong></span>
+                    </div>
+                 )}
+              </div>
+            ) : (
+              <div className="relative overflow-hidden rounded-2xl bg-card border border-border shadow-sm p-4">
+                 <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center">
+                            <Shield className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <div className="text-left">
+                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Plano Atual</p>
+                            <p className="text-sm font-bold text-foreground">FREE</p>
+                        </div>
+                    </div>
+                    
+                    <Link to="/premium">
+                        <Button 
+                            size="sm" 
+                            className="h-9 text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-md glow-sm"
+                        >
+                            <Zap className="h-3 w-3 mr-1.5 fill-current" />
+                            Seja Premium
+                        </Button>
+                    </Link>
+                 </div>
+              </div>
+            )}
+          </div>
         </motion.div>
 
         {/* FIFA Analysis Block */}

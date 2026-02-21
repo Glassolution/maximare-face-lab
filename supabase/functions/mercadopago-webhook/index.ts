@@ -99,6 +99,10 @@ serve(async (req) => {
               premium_plan: purchase.plan,
               premium_since: now.toISOString(),
               premium_until: until.toISOString(),
+              // New subscription columns
+              subscription_status: 'premium_active',
+              plan_type: purchase.plan === 'monthly' ? 'premium_monthly' : (purchase.plan === 'yearly' ? 'premium_yearly' : 'premium_weekly'),
+              subscription_expires_at: until.toISOString(),
             })
             .eq('id', purchase.user_id);
             
@@ -118,6 +122,10 @@ serve(async (req) => {
               premium_status: 'free',
               premium_plan: null,
               premium_until: new Date().toISOString(), // Expire immediately
+              // New subscription columns
+              subscription_status: 'premium_expired',
+              plan_type: 'free',
+              subscription_expires_at: new Date().toISOString(),
             })
             .eq('id', purchase.user_id);
             console.log(`Premium revoked for user ${purchase.user_id}`);

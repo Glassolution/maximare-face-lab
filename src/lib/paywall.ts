@@ -41,20 +41,26 @@ export async function shouldShowPaywall(context: PaywallContext): Promise<boolea
   if (!session?.user) return false;
 
   // Fetch profile with all paywall fields
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from('profiles')
-    .select('premium_status, premium_until, last_paywall_shown_at, paywall_show_count_7d, last_paywall_dismissed_at, paywall_dismiss_count_7d')
+    .select('subscription_status, subscription_expires_at, last_paywall_shown_at, paywall_show_count_7d, last_paywall_dismissed_at, paywall_dismiss_count_7d')
     .eq('id', session.user.id)
     .single();
 
-  if (!profile) return false;
+  if (error || !profile) {
+    console.error('Error fetching profile for paywall check:', error);
+    return false;
+  }
 
   // 1. Check if user is actively premium
-  if (profile.premium_status === 'premium') {
-    const premiumUntil = profile.premium_until ? new Date(profile.premium_until) : null;
-    if (premiumUntil && premiumUntil > new Date()) {
-      return false; // User is premium and valid
-    }
+  const isPremium = 
+    profile.subscription_status === 'premium_active' && 
+    profile.subscription_expires_at && 
+    new Date(profile.subscription_expires_at) > new Date();
+
+  if (isPremium) {
+    console.log('User is premium, not showing paywall');
+    return false;
   }
 
   // 2. Hard Gates (always show)
