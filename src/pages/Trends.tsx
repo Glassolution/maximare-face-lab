@@ -2,10 +2,10 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Flame, Zap, Clock, TrendingUp, ChevronDown, ChevronRight, AlertTriangle,
+  Zap, Clock, TrendingUp, ChevronDown, AlertTriangle,
   Eye, Droplets, Target, Scan, Sparkles, Scissors, Diamond,
   ShieldCheck, Smartphone, FlaskConical, RotateCcw, Camera,
-  BookOpen, CheckCircle2
+  BookOpen, CheckCircle2, XCircle, ThumbsUp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,10 +23,20 @@ const priorityConfig = {
   media: { label: "Prioridade Média", color: "bg-primary/15 text-primary", border: "border-primary/20" },
 };
 
-const validationConfig = {
+const validationConfig: Record<string, { label: string; icon: React.ElementType; color: string }> = {
+  Alta: { label: "Evidência Científica Alta", icon: ShieldCheck, color: "text-success" },
+  Moderada: { label: "Evidência Moderada", icon: FlaskConical, color: "text-warning" },
+  Baixa: { label: "Evidência Limitada", icon: Smartphone, color: "text-orange-400" },
+  // Backwards compatibility if needed
   cientifica: { label: "Cientificamente validada", icon: ShieldCheck, color: "text-success" },
   viral: { label: "Viral & Tendência", icon: Smartphone, color: "text-orange-400" },
   experimental: { label: "Experimental", icon: FlaskConical, color: "text-purple-400" },
+};
+
+const benefitConfig: Record<string, { label: string; color: string }> = {
+  Estrutural: { label: "Benefício Estrutural", color: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
+  Temporário: { label: "Efeito Temporário", color: "bg-purple-500/10 text-purple-500 border-purple-500/20" },
+  Comportamental: { label: "Hábito/Comportamental", color: "bg-green-500/10 text-green-500 border-green-500/20" },
 };
 
 export default function Trends() {
@@ -119,8 +129,9 @@ export default function Trends() {
             const isOpen = expandedTrend === trend.id;
             const areaPriority = plan.bottlenecks.find((b) => b.id === trend.area);
             const pConfig = areaPriority ? priorityConfig[areaPriority.priority] : priorityConfig.media;
-            const vConfig = validationConfig[trend.validation];
+            const vConfig = validationConfig[trend.validation] || validationConfig.experimental;
             const VIcon = vConfig.icon;
+            const bConfig = trend.benefit_type ? benefitConfig[trend.benefit_type] : null;
 
             return (
               <motion.div key={trend.id}
@@ -141,12 +152,17 @@ export default function Trends() {
                         <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[9px] font-bold ${pConfig.color}`}>
                           {areaPriority ? `${areaPriority.area}` : trend.area}
                         </span>
+                        {bConfig && (
+                           <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[9px] font-bold border ${bConfig.color}`}>
+                             {bConfig.label}
+                           </span>
+                        )}
                       </div>
                       <p className="text-xs text-muted-foreground line-clamp-2">{trend.subtitle}</p>
                       <div className="flex items-center gap-3 mt-2 text-[10px] text-muted-foreground">
                         <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {trend.duration}</span>
                         <span className="flex items-center gap-1"><Zap className="h-3 w-3 text-primary" /> Impacto {trend.impactEstimate}/10</span>
-                        <span className={`flex items-center gap-1 ${vConfig.color}`}><VIcon className="h-3 w-3" /> {vConfig.label.split(" ")[0]}</span>
+                        <span className={`flex items-center gap-1 ${vConfig.color}`}><VIcon className="h-3 w-3" /> {vConfig.label}</span>
                       </div>
                     </div>
                     <ChevronDown className={`h-4 w-4 text-muted-foreground shrink-0 mt-1 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
@@ -159,7 +175,7 @@ export default function Trends() {
                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                       <div className="px-4 pb-4 border-t border-border/20 pt-4 space-y-4">
 
-                        {/* Why You Need This */}
+                        {/* Why You Need This (Justificativa Personalizada) */}
                         <div className="rounded-xl bg-primary/5 border border-primary/10 p-3">
                           <h4 className="text-xs font-bold text-primary mb-1 flex items-center gap-1">
                             <Target className="h-3 w-3" /> Por que você precisa disso
@@ -200,11 +216,45 @@ export default function Trends() {
                           </ol>
                         </div>
 
+                        {/* Common Errors */}
+                        {trend.common_errors && trend.common_errors.length > 0 && (
+                          <div className="rounded-xl bg-destructive/5 border border-destructive/10 p-3">
+                            <h4 className="text-xs font-bold text-destructive mb-2 flex items-center gap-1">
+                              <XCircle className="h-3 w-3" /> Erros Comuns
+                            </h4>
+                            <ul className="space-y-1.5">
+                              {trend.common_errors.map((error, idx) => (
+                                <li key={idx} className="flex gap-2 text-xs text-muted-foreground">
+                                  <span className="text-destructive/60">•</span>
+                                  <span>{error}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                         {/* Success Signs */}
+                         {trend.success_signs && trend.success_signs.length > 0 && (
+                          <div className="rounded-xl bg-green-500/5 border border-green-500/10 p-3">
+                            <h4 className="text-xs font-bold text-green-600 mb-2 flex items-center gap-1">
+                              <ThumbsUp className="h-3 w-3" /> Sinais de Sucesso
+                            </h4>
+                            <ul className="space-y-1.5">
+                              {trend.success_signs.map((sign, idx) => (
+                                <li key={idx} className="flex gap-2 text-xs text-muted-foreground">
+                                  <span className="text-green-500/60">•</span>
+                                  <span>{sign}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
                         {/* Duration & Frequency */}
                         <div className="flex gap-3">
                           <div className="flex-1 rounded-xl bg-muted/30 p-3 text-center">
                             <p className="text-[10px] text-muted-foreground mb-0.5">Duração</p>
-                            <p className="text-sm font-bold text-foreground">{trend.duration}</p>
+                            <p className="text-sm font-bold text-foreground">{trend.session_duration || trend.duration}</p>
                           </div>
                           <div className="flex-1 rounded-xl bg-muted/30 p-3 text-center">
                             <p className="text-[10px] text-muted-foreground mb-0.5">Frequência</p>

@@ -26,11 +26,16 @@ export interface SmartTrend {
   validation: "Alta" | "Moderada" | "Baixa"; // Evidence level
   science: string;
   steps: { text: string; detail?: string }[];
+  common_errors?: string[];
+  success_signs?: string[];
+  frequency: string;
+  session_duration?: string;
   disclaimer: string;
   tags: string[];
   category: "skincare" | "exercicio" | "habito" | "procedimento";
   warning?: string;
   time_to_results?: string;
+  benefit_type?: "Estrutural" | "Temporário" | "Comportamental";
 }
 
 export interface PersonalizedPlan {
@@ -39,6 +44,77 @@ export interface PersonalizedPlan {
   gerScore: number;
   hasAnalysis: boolean;
   diagnosis?: ExtendedAnalysisResult["structural_diagnosis"];
+}
+
+// ─── HELPER: Generate Structural Diagnosis (Internal JSON) ───
+function generateStructuralDiagnosis(analysis: ExtendedAnalysisResult): ExtendedAnalysisResult["structural_diagnosis"] {
+  // Extract or default values
+  const ger = analysis.ger || analysis.overallScore * 10 || 50;
+  const cats = analysis.categories || [];
+  
+  const getScore = (id: string) => cats.find(c => c.id === id)?.score || (ger / 10);
+  
+  // Scores (0-10)
+  const jawScore = getScore("jawline");
+  const skinScore = getScore("skin");
+  const eyeScore = getScore("eyes");
+  const symScore = getScore("symmetry");
+  const fatScore = 10 - (getScore("cheekbones")); // Inverse logic: high cheekbones often means low fat/good definition
+  
+  // Generate Internal Diagnosis Object
+  // Logic: 
+  // - Low jaw score -> Receded/Weak projection
+  // - Low skin score -> Texture/Acne issues
+  // - Low eye score -> Puffiness/Dark circles
+  // - High fat score -> High body fat/Swelling
+  
+  const diag: ExtendedAnalysisResult["structural_diagnosis"] = {
+    projecao_mandibular: jawScore > 7 ? "Boa projeção" : jawScore > 5 ? "Média" : "Recuada",
+    alinhamento_cervical: "Análise não conclusiva (foto frontal)", // Default unless side profile
+    definicao_terco_inferior: jawScore > 6 ? "Definido" : "Pouca definição",
+    gordura_facial: fatScore > 6 ? "Alta" : fatScore > 4 ? "Média" : "Baixa",
+    simetria_estrutural: symScore > 8 ? "Alta" : symScore > 6 ? "Média" : "Baixa",
+    textura_pele: skinScore > 7 ? "Uniforme" : "Irregular",
+    regiao_ocular: eyeScore > 7 ? "Descansada" : "Sinais de fadiga",
+    sinais_inchaco: fatScore > 7 ? "Visíveis" : "Ausentes",
+    prioridades: [],
+    severidade: {},
+    impacto_visual: {}
+  };
+
+  // Determine Priorities based on lowest scores
+  const areas = [
+    { id: "projecao_mandibular", score: jawScore, label: "Mandíbula" },
+    { id: "textura_pele", score: skinScore, label: "Pele" },
+    { id: "regiao_ocular", score: eyeScore, label: "Olhos" },
+    { id: "simetria_estrutural", score: symScore, label: "Simetria" },
+    { id: "gordura_facial", score: 10 - fatScore, label: "Gordura Facial" } // Invert fat for priority (low score = bad)
+  ];
+
+  // Sort by lowest score (biggest problems first)
+  const sortedAreas = areas.sort((a, b) => a.score - b.score);
+  
+  diag.prioridades = sortedAreas.slice(0, 3).map(a => a.id);
+  
+  // Calculate Severity & Impact (0-10)
+  diag.severidade = {};
+  diag.impacto_visual = {};
+  
+  areas.forEach(a => {
+    // Severity is inverse of score (lower score = higher severity)
+    const severity = Math.max(1, Math.min(10, Math.round((10 - a.score) * 1.2))); 
+    diag.severidade![a.id] = severity;
+    
+    // Impact estimate (heuristic)
+    // Jaw/Fat usually have higher visual impact than skin texture
+    let impactMod = 1;
+    if (a.id === "projecao_mandibular" || a.id === "gordura_facial") impactMod = 1.2;
+    if (a.id === "textura_pele") impactMod = 0.8;
+    
+    diag.impacto_visual![a.id] = Math.max(1, Math.min(10, Math.round(severity * impactMod)));
+  });
+
+  return diag;
 }
 
 // ─── Intervention Database ───
@@ -51,11 +127,16 @@ export interface Intervention {
   category: "skincare" | "exercicio" | "habito" | "procedimento";
   targets: string[]; // Areas this helps: "mandibula", "pele", "olhos", "pescoço", "simetria", "gordura", "inchaço"
   evidence_level: "Alta" | "Moderada" | "Baixa";
+  benefit_type: "Estrutural" | "Temporário" | "Comportamental";
   science_explanation: string;
   impact_base: number; // 1-10 base impact
   time_to_results_days: number;
   contraindications: string[];
   steps: { text: string; detail?: string }[];
+  common_errors?: string[]; // New field
+  success_signs?: string[]; // New field
+  frequency: string; // New field
+  session_duration: string; // New field
   warning?: string;
   tags: string[];
 }
@@ -69,6 +150,7 @@ const INTERVENTION_POOL: Intervention[] = [
     category: "habito",
     targets: ["mandibula", "projecao_mandibular", "alinhamento_cervical", "simetria"],
     evidence_level: "Baixa", // Experimental in adults
+    benefit_type: "Estrutural",
     science_explanation: "A teoria ortotrópica sugere que a força da língua no palato (céu da boca) oferece suporte para a maxila, potencialmente influenciando a projeção facial e espaço das vias aéreas a longo prazo.",
     impact_base: 6,
     time_to_results_days: 90,
@@ -79,6 +161,10 @@ const INTERVENTION_POOL: Intervention[] = [
       { text: "Respiração Nasal", detail: "Respire EXCLUSIVAMENTE pelo nariz. A boca não deve abrir." },
       { text: "Deglutição", detail: "Ao engolir, use a língua para empurrar a saliva, sem usar as bochechas." }
     ],
+    common_errors: ["Empurrar os dentes da frente (pode entortar)", "Não levantar a parte de trás da língua", "Tencionar a mandíbula"],
+    success_signs: ["Sensação de pressão no palato", "Respiração nasal facilitada", "Leve cansaço na base da língua"],
+    frequency: "24/7 (tornar hábito)",
+    session_duration: "Contínuo",
     tags: ["Estrutura", "Gratuito", "Longo Prazo"]
   },
   {
@@ -88,6 +174,7 @@ const INTERVENTION_POOL: Intervention[] = [
     category: "exercicio",
     targets: ["mandibula", "definicao_terco_inferior", "largura_facial"],
     evidence_level: "Moderada",
+    benefit_type: "Estrutural",
     science_explanation: "O músculo masseter é um músculo esquelético que responde à hipertrofia por tensão mecânica. Mastigação de alimentos duros ou gomas resistentes estimula o crescimento das fibras musculares laterais.",
     impact_base: 8,
     time_to_results_days: 45,
@@ -98,6 +185,10 @@ const INTERVENTION_POOL: Intervention[] = [
       { text: "Volume de Treino", detail: "15-20 minutos por dia, 4-5x por semana. Não exceda para não lesionar a articulação." },
       { text: "Descanso", detail: "Se sentir dor na articulação (perto do ouvido), pare por 3 dias." }
     ],
+    common_errors: ["Mastigar de boca aberta", "Exceder o tempo (causa DTM)", "Mastigar só de um lado"],
+    success_signs: ["Pump muscular (inchaço temporário) após o treino", "Músculo mais rígido ao toque"],
+    frequency: "4-5x por semana",
+    session_duration: "15-20 min",
     warning: "Cuidado: Excesso pode causar problemas na articulação temporomandibular (ATM).",
     tags: ["Muscular", "Definição", "Jawline"]
   },
@@ -110,6 +201,7 @@ const INTERVENTION_POOL: Intervention[] = [
     category: "habito",
     targets: ["sinais_inchaco", "gordura_facial", "definicao_terco_inferior", "regiao_ocular"],
     evidence_level: "Alta",
+    benefit_type: "Temporário",
     science_explanation: "O sódio atrai água para o espaço extracelular. O excesso (comum na dieta moderna) causa edema facial visível, especialmente nas pálpebras e bochechas. A redução aguda gera 'desinchaço' rápido.",
     impact_base: 9, // High immediate impact
     time_to_results_days: 5,
@@ -120,6 +212,10 @@ const INTERVENTION_POOL: Intervention[] = [
       { text: "Potássio", detail: "Aumente ingestão de banana, batata doce ou água de coco (balanço Na/K)." },
       { text: "Evite Processados", detail: "Corte embutidos, molhos prontos e fast food." }
     ],
+    common_errors: ["Beber pouca água (o corpo retém mais)", "Cortar o sal totalmente por muito tempo (perigoso)"],
+    success_signs: ["Rosto mais fino pela manhã", "Menos marcas de travesseiro ao acordar", "Anéis mais frouxos nos dedos"],
+    frequency: "Ciclos de 1 semana",
+    session_duration: "Diário",
     tags: ["Rápido", "Definição", "Desinchaço"]
   },
   {
@@ -129,6 +225,7 @@ const INTERVENTION_POOL: Intervention[] = [
     category: "exercicio",
     targets: ["sinais_inchaco", "regiao_ocular", "textura_pele"],
     evidence_level: "Moderada",
+    benefit_type: "Temporário",
     science_explanation: "A estimulação manual dos canais linfáticos auxilia o retorno venoso e a remoção de metabólitos e fluidos intersticiais, reduzindo o aspecto 'puffy' do rosto.",
     impact_base: 7,
     time_to_results_days: 1, // Immediate but temporary
@@ -140,6 +237,10 @@ const INTERVENTION_POOL: Intervention[] = [
       { text: "Olhos", detail: "Do canto interno para as têmporas, muito suavemente (dedo anelar)." },
       { text: "Testa", detail: "Do centro para as laterais." }
     ],
+    common_errors: ["Muita pressão (fecha os vasos linfáticos)", "Fazer sem óleo (estica a pele)", "Esquecer o pescoço"],
+    success_signs: ["Redução imediata do inchaço matinal", "Pele com viço"],
+    frequency: "Diariamente (manhã)",
+    session_duration: "5 min",
     tags: ["Relaxamento", "Spa", "Manutenção"]
   },
   {
@@ -149,6 +250,7 @@ const INTERVENTION_POOL: Intervention[] = [
     category: "habito",
     targets: ["gordura_facial", "definicao_terco_inferior", "projecao_mandibular"],
     evidence_level: "Alta",
+    benefit_type: "Estrutural",
     science_explanation: "Não existe perda de gordura localizada. Para perder gordura no rosto, é necessário reduzir o percentual de gordura corporal total através de balanço energético negativo.",
     impact_base: 9,
     time_to_results_days: 45,
@@ -159,6 +261,10 @@ const INTERVENTION_POOL: Intervention[] = [
       { text: "Proteína Alta", detail: "2g de proteína por kg de peso para preservar músculo e saciedade." },
       { text: "Paciência", detail: "O rosto costuma ser um dos últimos lugares a perder gordura em algumas pessoas." }
     ],
+    common_errors: ["Corte calórico drástico (perda de músculo)", "Pouca proteína (flacidez)", "Esperar resultado em 1 semana"],
+    success_signs: ["Perda de peso na balança", "Roupas mais largas", "Definição da mandíbula aparecendo"],
+    frequency: "Diário",
+    session_duration: "Contínuo",
     tags: ["Fitness", "Perda de Peso", "Essencial"]
   },
 
@@ -170,6 +276,7 @@ const INTERVENTION_POOL: Intervention[] = [
     category: "skincare",
     targets: ["textura_pele", "qualidade_pele", "rugas"],
     evidence_level: "Alta",
+    benefit_type: "Comportamental",
     science_explanation: "Manter a barreira cutânea íntegra e protegida da radiação UV é a intervenção com maior respaldo científico para saúde e estética da pele a longo prazo.",
     impact_base: 8,
     time_to_results_days: 21,
@@ -179,6 +286,10 @@ const INTERVENTION_POOL: Intervention[] = [
       { text: "Hidratação", detail: "Hidratante adequado ao seu tipo de pele (gel para oleosa, creme para seca)." },
       { text: "Proteção Solar (Manhã)", detail: "FPS 30 ou superior. O sol é responsável por 80% do envelhecimento visível." }
     ],
+    common_errors: ["Não usar protetor em dias nublados", "Lavar o rosto com sabonete de corpo", "Esfregar a toalha no rosto"],
+    success_signs: ["Pele menos oleosa/seca", "Menos acne", "Textura mais suave"],
+    frequency: "2x ao dia",
+    session_duration: "3 min",
     tags: ["Essencial", "Saúde", "Básico"]
   },
   {
@@ -188,6 +299,7 @@ const INTERVENTION_POOL: Intervention[] = [
     category: "skincare",
     targets: ["textura_pele", "rugas", "acne", "manchas"],
     evidence_level: "Alta",
+    benefit_type: "Estrutural",
     science_explanation: "Derivados de Vitamina A (retinol/tretinoína) aumentam o turnover celular e estimulam colágeno. É o 'padrão ouro' da dermatologia anti-aging.",
     impact_base: 9,
     time_to_results_days: 60,
@@ -198,6 +310,10 @@ const INTERVENTION_POOL: Intervention[] = [
       { text: "Sanduíche", detail: "Aplique hidratante antes e depois para reduzir irritação." },
       { text: "Obrigatório", detail: "Uso de protetor solar rigoroso durante o dia (a pele fica fotossensível)." }
     ],
+    common_errors: ["Usar de manhã (o sol inativa)", "Usar muito produto", "Misturar com ácidos fortes"],
+    success_signs: ["Pele mais lisa e brilhante (glow)", "Redução de linhas finas", "Poros menos visíveis"],
+    frequency: "Noite (progressivo)",
+    session_duration: "1 min",
     warning: "Pode causar 'purging' (piora inicial) e descamação nas primeiras semanas.",
     tags: ["Avançado", "Anti-aging", "Textura"]
   },
@@ -210,6 +326,7 @@ const INTERVENTION_POOL: Intervention[] = [
     category: "habito",
     targets: ["regiao_ocular", "sinais_inchaco", "olheiras"],
     evidence_level: "Moderada",
+    benefit_type: "Temporário",
     science_explanation: "O frio causa vasoconstrição imediata, reduzindo o fluxo sanguíneo superficial (diminuindo a cor roxa vascular) e o extravasamento de líquidos (edema).",
     impact_base: 6,
     time_to_results_days: 1, // Immediate
@@ -219,6 +336,10 @@ const INTERVENTION_POOL: Intervention[] = [
       { text: "Massagem", detail: "Faça movimentos circulares ao redor dos olhos por 3-5 minutos pela manhã." },
       { text: "Consistência", detail: "Faça diariamente ao acordar para combater o inchaço matinal." }
     ],
+    common_errors: ["Queimar a pele com gelo direto", "Fazer por muito tempo (>10 min)", "Pressionar o globo ocular"],
+    success_signs: ["Olhar mais aberto", "Menos inchaço nas pálpebras"],
+    frequency: "Diariamente (manhã)",
+    session_duration: "5 min",
     tags: ["Rápido", "Manhã", "Olhar"]
   },
   {
@@ -228,6 +349,7 @@ const INTERVENTION_POOL: Intervention[] = [
     category: "skincare",
     targets: ["regiao_ocular", "olheiras"],
     evidence_level: "Baixa", // Cosmetic ingredient, less clinical data than drugs
+    benefit_type: "Estrutural",
     science_explanation: "Sarsasapogenina (Volufiline) estimula a diferenciação e proliferação de adipócitos. Usado para preencher áreas que perderam volume, como a calha lacrimal (olheira funda).",
     impact_base: 5,
     time_to_results_days: 60,
@@ -237,6 +359,10 @@ const INTERVENTION_POOL: Intervention[] = [
       { text: "Massagem", detail: "Massageie até absorção completa." },
       { text: "Frequência", detail: "2x ao dia (manhã e noite)." }
     ],
+    common_errors: ["Aplicar no rosto todo (pode inchar)", "Esperar resultado em 1 semana"],
+    success_signs: ["Olheira menos profunda", "Menos sombra na calha lacrimal"],
+    frequency: "2x ao dia",
+    session_duration: "2 min",
     warning: "Resultados variam muito entre indivíduos.",
     tags: ["Experimental", "Volume", "Olheiras"]
   },
@@ -249,6 +375,7 @@ const INTERVENTION_POOL: Intervention[] = [
     category: "exercicio",
     targets: ["alinhamento_cervical", "pescoço", "masculinidade_estrutural"],
     evidence_level: "Alta", // Muscle hypertrophy logic holds
+    benefit_type: "Estrutural",
     science_explanation: "Um pescoço desenvolvido (esternocleidomastóideo e trapézio) melhora a estética facial masculina e ajuda a manter a postura correta da cabeça.",
     impact_base: 7,
     time_to_results_days: 60,
@@ -259,6 +386,10 @@ const INTERVENTION_POOL: Intervention[] = [
       { text: "Progressão", detail: "Adicione peso (anilha na testa/nuca com toalha) gradualmente." },
       { text: "Segurança", detail: "Movimentos controlados, sem trancos." }
     ],
+    common_errors: ["Usar impulso", "Amplitude incompleta", "Excesso de carga inicial"],
+    success_signs: ["Aumento da medida do pescoço (fita métrica)", "Camisas mais justas no colarinho"],
+    frequency: "2-3x por semana",
+    session_duration: "15 min",
     tags: ["Muscular", "Masculinidade", "Postura"]
   },
   {
@@ -268,6 +399,7 @@ const INTERVENTION_POOL: Intervention[] = [
     category: "exercicio",
     targets: ["alinhamento_cervical", "projecao_mandibular", "papada"],
     evidence_level: "Alta", // Physiotherapy standard
+    benefit_type: "Comportamental",
     science_explanation: "Combate a 'Forward Head Posture' (cabeça projetada à frente), que cria a ilusão de queixo fraco e papada. Realinhar a vértebra cervical melhora instantaneamente o perfil.",
     impact_base: 8,
     time_to_results_days: 30,
@@ -278,6 +410,10 @@ const INTERVENTION_POOL: Intervention[] = [
       { text: "Repetição", detail: "Faça 10 repetições, 3x ao dia." },
       { text: "Consciência", detail: "Monitore sua postura ao usar celular e computador." }
     ],
+    common_errors: ["Inclinar a cabeça para cima ou baixo (deve ser horizontal)", "Tencionar os ombros"],
+    success_signs: ["Melhora na postura natural", "Orelha alinhada com ombro no espelho"],
+    frequency: "Diariamente (várias vezes)",
+    session_duration: "2 min",
     tags: ["Postura", "Perfil", "Saúde"]
   }
 ];
@@ -291,7 +427,13 @@ export function generatePersonalizedPlan(analysis?: ExtendedAnalysisResult): Per
   }
 
   // 1. Detect Logic Mode
-  const diag = analysis.structural_diagnosis;
+  let diag = analysis.structural_diagnosis;
+  
+  // FORCE GENERATION IF MISSING (User Requirement 1)
+  if (!diag) {
+    diag = generateStructuralDiagnosis(analysis);
+  }
+  
   const isDynamic = !!diag;
 
   // 2. Determine GER Score
@@ -364,14 +506,18 @@ export function generatePersonalizedPlan(analysis?: ExtendedAnalysisResult): Per
       // Generate Dynamic Justification
       let justification = `Recomendado para melhorar ${inv.targets[0].replace(/_/g, " ")}.`;
       
-      if (inv.targets.includes("gordura_facial") && diag.gordura_facial === "Alta") {
+      if (inv.targets.includes("gordura_facial") && diag!.gordura_facial === "Alta") {
         justification = "Sua estimativa de gordura facial indica que reduzir o percentual global é o passo mais impactante para definição.";
-      } else if (inv.targets.includes("sinais_inchaco") && diag.sinais_inchaco === "Visíveis") {
+      } else if (inv.targets.includes("sinais_inchaco") && diag!.sinais_inchaco === "Visíveis") {
         justification = "Sinais visíveis de inchaço estão mascarando sua estrutura óssea. Esta intervenção foca em drenar esse líquido.";
-      } else if (inv.targets.includes("alinhamento_cervical") && diag.alinhamento_cervical !== "Neutro") {
-        justification = `Seu alinhamento cervical foi detectado como '${diag.alinhamento_cervical}', o que prejudica a estética do perfil.`;
-      } else if (inv.targets.includes("projecao_mandibular") && diag.projecao_mandibular === "Recuada") {
+      } else if (inv.targets.includes("alinhamento_cervical") && diag!.alinhamento_cervical !== "Neutro" && diag!.alinhamento_cervical !== "Análise não conclusiva (foto frontal)") {
+        justification = `Seu alinhamento cervical foi detectado como '${diag!.alinhamento_cervical}', o que prejudica a estética do perfil.`;
+      } else if (inv.targets.includes("projecao_mandibular") && diag!.projecao_mandibular === "Recuada") {
         justification = "Sua projeção mandibular está abaixo do potencial. Estimular a musculatura e postura pode ajudar a compensar.";
+      } else if (inv.targets.includes("textura_pele") && diag!.textura_pele === "Irregular") {
+        justification = "Irregularidades na textura da pele foram detectadas. Este protocolo é específico para renovação celular.";
+      } else if (inv.targets.includes("regiao_ocular") && diag!.regiao_ocular === "Sinais de fadiga") {
+        justification = "Sinais de fadiga na região ocular reduzem a vitalidade do rosto. Focar na circulação local trará resultados rápidos.";
       }
 
       return {
@@ -383,33 +529,24 @@ export function generatePersonalizedPlan(analysis?: ExtendedAnalysisResult): Per
         areaScore: 50, // Placeholder
         impactEstimate: inv.impact_base,
         duration: `${inv.time_to_results_days} dias`,
-        frequency: "Ver instruções",
+        frequency: inv.frequency || "Ver instruções",
         validation: inv.evidence_level,
         science: inv.science_explanation,
         steps: inv.steps,
         disclaimer: inv.warning || "Consulte um profissional.",
         tags: inv.tags,
-        category: inv.category
+        category: inv.category,
+        common_errors: inv.common_errors,
+        success_signs: inv.success_signs,
+        session_duration: inv.session_duration,
+        benefit_type: inv.benefit_type
       };
     });
 
   } else {
     // ─── LEGACY MODE (Fallback) ───
-    // If no structural diagnosis is present, return empty or minimal plan to avoid crashing
-    // OR we could port the old logic here if we wanted to support old scans.
-    // For now, let's just return a basic message or empty if no diagnosis.
-    // But better to keep the old logic for backward compatibility? 
-    // The user wants to REMOVE generic recommendations.
-    // So if no diagnosis, maybe we just show nothing or a "Re-analyze" prompt.
-    // But for safety, I'll map the old categories if available.
-    
-    // (Simulated legacy logic for safety - stripped down)
-     const areas: Record<string, number> = {};
-     if (analysis.categories) {
-       analysis.categories.forEach(c => areas[c.id] = c.score);
-     }
-     
-     // ... legacy mapping skipped to enforce new system usage ...
+    // This block should theoretically not be reached due to forced generation,
+    // but kept for type safety.
   }
 
   return { 
