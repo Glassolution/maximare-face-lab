@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { findLookAlike, LookAlikeResult } from "@/lib/lookAlikeSystem";
 import { Celebrity } from "@/lib/celebrityDatabase";
 import { Link } from "react-router-dom";
+import { usePaywallGate } from "@/hooks/usePaywallGate";
 
 type InstructionScreenProps = {
   title: string;
@@ -50,6 +51,7 @@ export default function LookAlike() {
   const [result, setResult] = useState<LookAlikeResult | null>(null);
   const [analysisStage, setAnalysisStage] = useState(0); // 0-4 for checklist
   const [consent, setConsent] = useState(false);
+  const { checkGate } = usePaywallGate();
 
   const startWebcam = useCallback(async () => {
     try {
@@ -127,6 +129,10 @@ export default function LookAlike() {
 
     const res = await findLookAlike(frontPhoto!, sidePhoto);
     setResult(res);
+
+    // Soft gate check before showing result
+    await checkGate({ trigger: 'report_view', featureName: 'lookalike_result' });
+
     setStep("result");
   };
 

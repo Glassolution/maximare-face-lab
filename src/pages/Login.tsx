@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,12 +7,19 @@ import { Lock, Mail } from "lucide-react";
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [mode, setMode] = useState<"login" | "signup">("signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (location.state && (location.state as any).mode) {
+      setMode((location.state as any).mode);
+    }
+  }, [location]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +44,7 @@ export default function Login() {
         if (signInError) throw signInError;
       }
 
-      navigate("/analysis", { replace: true });
+      navigate("/analysis", { replace: true, state: { showPaywallOnEntry: true } });
     } catch (err: unknown) {
       if (err && typeof err === "object" && "message" in err) {
         setError(String((err as { message: string }).message));

@@ -16,6 +16,7 @@ import {
   TrendingUp,
   Trash2,
 } from "lucide-react";
+import { usePaywallGate } from "@/hooks/usePaywallGate";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { saveAnalysis, getAnalysisHistory, deleteAnalysis, syncHistoryWithSupabase, type AnalysisResult } from "@/lib/mockData";
@@ -27,6 +28,8 @@ import { supabase } from "@/integrations/supabase/client";
 
 export default function Analysis() {
   const navigate = useNavigate();
+  const { checkGate, PaywallDialog, isPaywallOpen } = usePaywallGate();
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -147,6 +150,16 @@ export default function Analysis() {
     };
     loadUsage();
   }, [user, showCapture]);
+
+  // Handle post-paywall navigation
+  useEffect(() => {
+    if (!isPaywallOpen && pendingNavigation) {
+      navigate(pendingNavigation, {
+        state: { photoUrl: frontPhoto },
+      });
+      setPendingNavigation(null);
+    }
+  }, [isPaywallOpen, pendingNavigation, navigate, frontPhoto]);
 
   const startCooldown = (seconds: number) => {
     if (limitsDisabled) return;
@@ -406,9 +419,17 @@ export default function Analysis() {
         
         await saveAnalysis(result);
         
-        navigate(`/results/${result.id}`, {
-          state: { photoUrl: frontPhoto },
-        });
+        // Check paywall gate
+        const allowed = await checkGate({ trigger: 'analysis_completed' });
+        const targetPath = `/results/${result.id}`;
+
+        if (allowed) {
+          navigate(targetPath, {
+            state: { photoUrl: frontPhoto },
+          });
+        } else {
+          setPendingNavigation(targetPath);
+        }
 
     } catch (error: unknown) {
         console.error("Erro na análise:", error);
@@ -679,17 +700,17 @@ export default function Analysis() {
       <div className="container max-w-lg mx-auto space-y-8">
 
         {/* Header / Top Bar */}
-        <header className="flex items-center justify-between px-6 py-4 sticky top-0 z-50 bg-background-dark/80 backdrop-blur-md border-b border-white/5">
+        <header className="flex items-center justify-between px-6 py-4 sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
           <div className="flex items-center gap-3">
             <div className="size-10 rounded-full bg-gradient-to-br from-primary to-blue-700 flex items-center justify-center border border-white/10 shadow-lg shadow-primary/20">
                <User className="text-white h-5 w-5" />
             </div>
             <div>
-              <p className="text-[10px] text-text-muted font-bold tracking-widest uppercase">Membro Elite</p>
-              <h2 className="text-sm font-bold text-white">{displayName}</h2>
+              <p className="text-[10px] text-muted-foreground font-bold tracking-widest uppercase">Membro Elite</p>
+              <h2 className="text-sm font-bold text-foreground">{displayName}</h2>
             </div>
           </div>
-          <button onClick={() => setShowSettings(true)} className="size-10 rounded-lg flex items-center justify-center bg-graphite border border-slate-custom text-white hover:bg-slate-custom transition-colors">
+          <button onClick={() => setShowSettings(true)} className="size-10 rounded-lg flex items-center justify-center bg-card border border-border text-foreground hover:bg-muted transition-colors">
             <Settings className="h-5 w-5" />
           </button>
         </header>
@@ -702,17 +723,17 @@ export default function Analysis() {
               <div
                 className="relative h-44 w-44 rounded-full flex items-center justify-center"
                 style={{
-                  background: `conic-gradient(${ringColor} ${currentGERPercent}%, rgba(15,23,42,0.9) ${currentGERPercent}% 100%)`,
+                  background: `conic-gradient(${ringColor} ${currentGERPercent}%, var(--muted) ${currentGERPercent}% 100%)`,
                 }}
               >
-                <div className="h-36 w-36 rounded-full bg-black flex flex-col items-center justify-center shadow-[0_0_30px_rgba(37,99,235,0.35)]">
-                  <p className="text-[9px] font-mono tracking-[0.2em] text-white/40 uppercase px-3 text-center">
+                <div className="h-36 w-36 rounded-full bg-card flex flex-col items-center justify-center shadow-[0_0_30px_rgba(37,99,235,0.35)]">
+                  <p className="text-[9px] font-mono tracking-[0.2em] text-muted-foreground uppercase px-3 text-center">
                     Overall Score
                   </p>
-                  <p className="mt-1 text-4xl font-extrabold tracking-tight text-white">
+                  <p className="mt-1 text-4xl font-extrabold tracking-tight text-foreground">
                     {currentGER ? currentGER.toFixed(1) : "0.0"}
                   </p>
-                  <div className="mt-3 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white/5 border border-white/15 text-[10px] font-semibold text-primary">
+                  <div className="mt-3 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-muted border border-border text-[10px] font-semibold text-primary">
                     <TrendingUp className="h-3 w-3" />
                     <span>
                       {weekDelta >= 0 ? "+" : ""}
@@ -864,7 +885,7 @@ export default function Analysis() {
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <p className="text-xl font-bold text-white">
-                        {Math.round(analysis.overallScore * 10) / 10}
+                        {ger.toFixed(2)}
                       </p>
                       <span className="text-[10px] text-text-muted font-bold uppercase">
                         {tierLabel}
@@ -961,6 +982,7 @@ export default function Analysis() {
             </div>
           </DialogContent>
         </Dialog>
+        <PaywallDialog />
       </div>
     </div>
   );

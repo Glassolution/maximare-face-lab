@@ -13,6 +13,7 @@ import { TutorialCarousel } from "@/components/TutorialStepImage";
 import { generatePersonalizedPlan, type SmartTrend, type FacialBottleneck } from "@/lib/smartTrendsEngine";
 import { getAnalysisHistory } from "@/lib/mockData";
 import { ExtendedAnalysisResult } from "@/lib/rankingSystem";
+import { usePaywallGate } from "@/hooks/usePaywallGate";
 
 const iconMap: Record<string, React.ElementType> = {
   Eye, Droplets, Target, Scan, Sparkles, Scissors, Diamond, Zap,
@@ -43,6 +44,7 @@ const benefitConfig: Record<string, { label: string; color: string }> = {
 export default function Trends() {
   const navigate = useNavigate();
   const [expandedTrend, setExpandedTrend] = useState<string | null>(null);
+  const { checkGate, PaywallDialog } = usePaywallGate();
 
   const plan = useMemo(() => {
     const history = getAnalysisHistory();
@@ -142,7 +144,14 @@ export default function Trends() {
                 className={`rounded-2xl glass overflow-hidden border ${isOpen ? pConfig.border : "border-transparent"}`}
               >
                 {/* Card Header */}
-                <button className="w-full p-4 text-left" onClick={() => setExpandedTrend(isOpen ? null : trend.id)}>
+                <button className="w-full p-4 text-left" onClick={async () => {
+                    const next = isOpen ? null : trend.id;
+                    setExpandedTrend(next);
+                    if (next) {
+                        // Check soft gate on expand (don't block, just show if needed)
+                        await checkGate({ trigger: 'report_view' });
+                    }
+                }}>
                   <div className="flex items-start gap-3">
                     <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                       <TrendingUp className="h-5 w-5 text-primary" />
@@ -311,6 +320,7 @@ export default function Trends() {
           </p>
         </motion.div>
       </div>
+      <PaywallDialog />
     </div>
   );
 }

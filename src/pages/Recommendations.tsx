@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getAnalysisHistory } from "@/lib/mockData";
 import { generatePersonalizedPlan, PersonalizedPlan } from "@/lib/smartTrendsEngine";
+import { usePaywallGate } from "@/hooks/usePaywallGate";
 import { Badge } from "@/components/ui/badge";
 import { 
   ChevronDown, 
@@ -48,8 +49,12 @@ const evidenceColors: Record<string, string> = {
 export default function Recommendations() {
   const [plan, setPlan] = useState<PersonalizedPlan | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const { checkGate } = usePaywallGate();
 
   useEffect(() => {
+    // Paywall Check (Hard Gate for Premium Plan)
+    checkGate({ trigger: 'feature_locked', featureName: 'recommendations_plan' });
+
     const history = getAnalysisHistory();
     if (history.length > 0) {
       const latest = history[0];

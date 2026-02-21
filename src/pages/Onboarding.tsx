@@ -710,6 +710,10 @@ export default function Onboarding() {
   const [userData, setUserData] = useState({ age: 20, goal: 0, gender: "male", habits: [] as number[] });
   const navigate = useNavigate();
 
+  useEffect(() => {
+    localStorage.setItem("maximare_quiz_accessed", "true");
+  }, []);
+
   const next = () => setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
 
   const handleAgeNext = (age: number) => {

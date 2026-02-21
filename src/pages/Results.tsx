@@ -2,9 +2,10 @@ import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { getAnalysisHistory } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
-import { Scan } from "lucide-react";
-import { useState } from "react";
-import PaywallModal from "@/components/PaywallModal";
+import { Scan, Lock } from "lucide-react";
+import { useState, useEffect } from "react";
+import { usePaywallGate } from "@/hooks/usePaywallGate";
+import { usePremiumStatus } from "@/hooks/usePremiumStatus";
 import { ExtendedAnalysisResult, getTier, getMindset, getStrategy } from "@/lib/rankingSystem";
 import { getScoreColor } from "@/lib/gerTypes";
 
@@ -12,7 +13,14 @@ export default function Results() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const [showPaywall, setShowPaywall] = useState(false);
+  const { checkGate, PaywallDialog } = usePaywallGate();
+  const { isPremium } = usePremiumStatus();
+  
+  // Soft gate on view
+  useEffect(() => {
+    checkGate({ trigger: 'report_view' });
+  }, [checkGate]);
+
   const history = getAnalysisHistory();
   const result = history.find((a) => a.id === id) as ExtendedAnalysisResult | undefined;
 
@@ -124,6 +132,7 @@ export default function Results() {
           />
 
           <div className="grid grid-cols-2 gap-x-8 gap-y-6 relative z-10">
+            {/* PSL - Visible */}
             <div className="space-y-3">
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
                 Pontuação PSL
@@ -139,6 +148,7 @@ export default function Results() {
               </div>
             </div>
 
+            {/* Mindset - Visible */}
             <div className="space-y-3">
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
                 Mentalidade
@@ -152,71 +162,127 @@ export default function Results() {
               </div>
             </div>
 
-            <div className="space-y-3">
+            {/* Strategy - Locked */}
+            <div 
+              className="space-y-3 relative cursor-pointer"
+              onClick={() => !isPremium && checkGate({ trigger: 'feature_locked' })}
+            >
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
                 Estratégia
               </p>
-              <p className="text-lg font-semibold text-white">{strategy}</p>
-              <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
-                <div
-                  className="h-full rounded-full"
-                  style={{ width: "65%", backgroundColor: classificationColor }}
-                />
+              <div className={!isPremium ? "blur-sm opacity-50" : ""}>
+                <p className="text-lg font-semibold text-white">{strategy}</p>
+                <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
+                  <div
+                    className="h-full rounded-full"
+                    style={{ width: "65%", backgroundColor: classificationColor }}
+                  />
+                </div>
               </div>
+              {!isPremium && (
+                <div className="absolute inset-0 flex items-center justify-center pt-4">
+                  <Lock className="w-4 h-4 text-white/70" />
+                </div>
+              )}
             </div>
 
-            <div className="space-y-3">
+            {/* Jaw - Locked */}
+            <div 
+              className="space-y-3 relative cursor-pointer"
+              onClick={() => !isPremium && checkGate({ trigger: 'feature_locked' })}
+            >
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
                 Tipo de mandíbula
               </p>
-              <p className="text-lg font-semibold text-white">{jawType}</p>
-              <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
-                <div
-                  className="h-full rounded-full"
-                  style={{ width: "92%", backgroundColor: classificationColor }}
-                />
+              <div className={!isPremium ? "blur-sm opacity-50" : ""}>
+                <p className="text-lg font-semibold text-white">{jawType}</p>
+                <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
+                  <div
+                    className="h-full rounded-full"
+                    style={{ width: "92%", backgroundColor: classificationColor }}
+                  />
+                </div>
               </div>
+              {!isPremium && (
+                <div className="absolute inset-0 flex items-center justify-center pt-4">
+                  <Lock className="w-4 h-4 text-white/70" />
+                </div>
+              )}
             </div>
 
-            <div className="space-y-3">
+            {/* Breathing - Locked */}
+            <div 
+              className="space-y-3 relative cursor-pointer"
+              onClick={() => !isPremium && checkGate({ trigger: 'feature_locked' })}
+            >
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
                 Respiração
               </p>
-              <p className="text-lg font-semibold text-white">{breathing}</p>
-              <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
-                <div
-                  className="h-full rounded-full"
-                  style={{ width: `${breathingPercent}%`, backgroundColor: breathingColor }}
-                />
+              <div className={!isPremium ? "blur-sm opacity-50" : ""}>
+                <p className="text-lg font-semibold text-white">{breathing}</p>
+                <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
+                  <div
+                    className="h-full rounded-full"
+                    style={{ width: `${breathingPercent}%`, backgroundColor: breathingColor }}
+                  />
+                </div>
               </div>
+              {!isPremium && (
+                <div className="absolute inset-0 flex items-center justify-center pt-4">
+                  <Lock className="w-4 h-4 text-white/70" />
+                </div>
+              )}
             </div>
 
-            <div className="space-y-3">
+            {/* Harmony - Locked */}
+            <div 
+              className="space-y-3 relative cursor-pointer"
+              onClick={() => !isPremium && checkGate({ trigger: 'feature_locked' })}
+            >
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
                 Harmonia
               </p>
-              <p className="text-xl font-semibold text-white">{harmony}</p>
-              <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
-                <div
-                  className="h-full rounded-full"
-                  style={{ width: `${harmonyPercent}%`, backgroundColor: harmonyColor }}
-                />
+              <div className={!isPremium ? "blur-sm opacity-50" : ""}>
+                <p className="text-xl font-semibold text-white">{harmony}</p>
+                <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
+                  <div
+                    className="h-full rounded-full"
+                    style={{ width: `${harmonyPercent}%`, backgroundColor: harmonyColor }}
+                  />
+                </div>
               </div>
+              {!isPremium && (
+                <div className="absolute inset-0 flex items-center justify-center pt-4">
+                  <Lock className="w-4 h-4 text-white/70" />
+                </div>
+              )}
             </div>
 
-            <div className="space-y-3">
+            {/* Symmetry - Locked */}
+            <div 
+              className="space-y-3 relative cursor-pointer"
+              onClick={() => !isPremium && checkGate({ trigger: 'feature_locked' })}
+            >
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
                 Simetria
               </p>
-              <p className="text-lg font-semibold text-white">{symmetry}</p>
-              <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
-                <div
-                  className="h-full rounded-full"
-                  style={{ width: `${symmetryPercent}%`, backgroundColor: symmetryColor }}
-                />
+              <div className={!isPremium ? "blur-sm opacity-50" : ""}>
+                <p className="text-lg font-semibold text-white">{symmetry}</p>
+                <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
+                  <div
+                    className="h-full rounded-full"
+                    style={{ width: `${symmetryPercent}%`, backgroundColor: symmetryColor }}
+                  />
+                </div>
               </div>
+              {!isPremium && (
+                <div className="absolute inset-0 flex items-center justify-center pt-4">
+                  <Lock className="w-4 h-4 text-white/70" />
+                </div>
+              )}
             </div>
 
+            {/* Appeal - Visible */}
             <div className="space-y-3">
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
                 Nível de apelo
@@ -230,6 +296,8 @@ export default function Results() {
               </div>
             </div>
           </div>
+
+
 
           <div className="mt-6 pt-6 border-t border-white/5 flex justify-between items-center relative z-10">
             <div className="flex gap-1">
@@ -277,7 +345,9 @@ export default function Results() {
 
         {/* Detailed Analysis - Removed per user request */}
 
-      <PaywallModal open={showPaywall} onClose={() => setShowPaywall(false)} onUpgrade={() => navigate("/premium")} />
+        {/* Button removed per user request */}
+
+      <PaywallDialog />
     </div>
   );
 }

@@ -103,6 +103,13 @@ serve(async (req) => {
             .eq('id', purchase.user_id);
             
           console.log(`Premium activated for user ${purchase.user_id}`);
+
+          // Log paywall event
+          await supabaseClient.from('paywall_events').insert({
+            user_id: purchase.user_id,
+            event_type: 'premium_activated',
+            context: { plan: purchase.plan, method: 'mercadopago', amount: purchase.amount }
+          });
         } else if (purchase && (status === 'refunded' || status === 'charged_back')) {
            // Revoke premium
            await supabaseClient

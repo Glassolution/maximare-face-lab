@@ -234,13 +234,26 @@ export async function syncHistoryWithSupabase(): Promise<AnalysisResult[]> {
     if (error) throw error;
 
     if (data && data.length > 0) {
-      const history = data.map(d => d.result_json) as AnalysisResult[];
+      const remoteHistory = data.map(d => d.result_json) as AnalysisResult[];
+      
+      // Merge with local history to prevent data loss of unsynced items
+      const localHistory = getAnalysisHistory();
+      const combined = [...remoteHistory, ...localHistory];
+      
+      // Deduplicate by ID
+      const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
+      
+      // Sort by date descending
+      unique.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
+      const finalHistory = unique.slice(0, 20);
+
       try {
-        localStorage.setItem("maximare_history", JSON.stringify(history));
+        localStorage.setItem("maximare_history", JSON.stringify(finalHistory));
       } catch (e) {
         console.warn("Não foi possível salvar histórico no cache local (quota):", e);
       }
-      return history;
+      return finalHistory;
     }
     return [];
   } catch (err) {

@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, Navigate, useNavigate } from "react-router-dom";
 import BottomNav from "@/components/BottomNav";
 import Landing from "@/pages/Landing";
 import Onboarding from "@/pages/Onboarding";
@@ -20,29 +20,68 @@ import Premium from "@/pages/Premium";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 import { useEffect, useState } from "react";
-import { shouldShowPaywall } from "@/lib/paywall";
-import PaywallModal from "@/components/PaywallModal";
-import { useNavigate } from "react-router-dom";
+import { usePaywallGate } from "@/hooks/usePaywallGate";
+import { syncHistoryWithSupabase } from "@/lib/mockData";
 
 const queryClient = new QueryClient();
 
 function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const hideNav = ["/", "/onboarding", "/login", "/premium"].includes(location.pathname);
+  // ... existing hideNav logic ...
+  const hideNav = ["/", "/onboarding", "/login", "/premium", "/landing"].includes(location.pathname);
   const { user, loading } = useAuth();
-  const [showPaywall, setShowPaywall] = useState(false);
+  
+  const { checkGate, PaywallDialog } = usePaywallGate();
 
   useEffect(() => {
-    const checkPaywall = async () => {
+    if (user) {
+      // Sync history when user is available (merge remote with local)
+      syncHistoryWithSupabase();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const checkPeriodicPaywall = async () => {
       if (!user || loading) return;
       if (location.pathname === "/premium" || location.pathname === "/login" || location.pathname === "/") return;
       
-      const show = await shouldShowPaywall({ trigger: 'periodic' });
-      if (show) setShowPaywall(true);
+      // Only check on main tabs to avoid spamming while navigating sub-pages
+      const mainTabs = ["/analysis", "/profile", "/trends", "/progress"];
+      if (mainTabs.some(path => location.pathname.startsWith(path))) {
+         await checkGate({ trigger: 'app_open' });
+      }
     };
-    checkPaywall();
-  }, [location.pathname, user, loading]);
+    
+    // Small delay to ensure page is loaded and user interaction is likely
+    const timer = setTimeout(checkPeriodicPaywall, 2000);
+    return () => clearTimeout(timer);
+  }, [location.pathname, user, loading, checkGate]);
+
+  // Force Paywall after Login
+  useEffect(() => {
+    if (user && !loading && location.state && (location.state as any).showPaywallOnEntry) {
+       console.log("[App] Triggering login paywall force");
+       checkGate({ trigger: 'periodic_force' });
+       // Clear the state to prevent re-triggering
+       navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [user, loading, location, checkGate, navigate]);
+
+  // Periodic Paywall Force (every 3 minutes)
+  useEffect(() => {
+    if (!user || loading) return;
+
+    const interval = setInterval(() => {
+      // Don't show if already on premium page or login
+      if (location.pathname === "/premium" || location.pathname === "/login") return;
+      
+      console.log("[App] Triggering periodic paywall check");
+      checkGate({ trigger: 'periodic_force' });
+    }, 3 * 60 * 1000); // 3 minutes
+
+    return () => clearInterval(interval);
+  }, [user, loading, location.pathname, checkGate]);
 
   if (loading) {
     return (
@@ -54,6 +93,12 @@ function Layout() {
 
   if (user && location.pathname === "/login") {
     return <Navigate to="/analysis" replace />;
+  }
+
+  // Prevent re-accessing Quiz/Landing if already accessed
+  const hasAccessedQuiz = localStorage.getItem('maximare_quiz_accessed') === 'true';
+  if (hasAccessedQuiz && (location.pathname === "/onboarding" || location.pathname === "/")) {
+    return <Navigate to={user ? "/analysis" : "/login"} replace />;
   }
 
   if (
@@ -83,11 +128,7 @@ function Layout() {
         <Route path="*" element={<NotFound />} />
       </Routes>
       {!hideNav && <BottomNav />}
-      <PaywallModal 
-        open={showPaywall} 
-        onClose={() => setShowPaywall(false)} 
-        onUpgrade={() => { setShowPaywall(false); navigate('/premium'); }} 
-      />
+      <PaywallDialog />
     </>
   );
 }

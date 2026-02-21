@@ -246,7 +246,10 @@ export default function Profile() {
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
           <Button
             variant="ghost"
-            onClick={async () => { await supabase.auth.signOut(); navigate("/login"); }}
+            onClick={async () => { 
+              await supabase.auth.signOut(); 
+              navigate("/login", { state: { mode: "login" } }); 
+            }}
             className="w-full rounded-2xl glass p-4 h-auto flex items-center gap-3 text-destructive hover:text-destructive hover:bg-destructive/10"
           >
             <div className="h-10 w-10 rounded-xl bg-destructive/10 flex items-center justify-center shrink-0">

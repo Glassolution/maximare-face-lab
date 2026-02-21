@@ -28,7 +28,6 @@ export interface SmartTrend {
   steps: { text: string; detail?: string }[];
   common_errors?: string[];
   success_signs?: string[];
-  frequency: string;
   session_duration?: string;
   disclaimer: string;
   tags: string[];
