@@ -53,7 +53,7 @@ export default function Recommendations() {
     const history = getAnalysisHistory();
     if (history.length > 0) {
       const latest = history[0];
-      const generatedPlan = generatePersonalizedPlan(latest);
+      const generatedPlan = generatePersonalizedPlan(latest as any);
       setPlan(generatedPlan);
       // Auto-expand first item if available
       if (generatedPlan.trends.length > 0) {

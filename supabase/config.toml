@@ -1,1 +1,4 @@
 project_id = "ztonufbquasanvqkjrjb"
+
+[functions.generate-tutorial-image]
+verify_jwt = false
