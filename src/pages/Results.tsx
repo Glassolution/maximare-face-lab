@@ -72,8 +72,8 @@ export default function Results() {
   return (
     <div className="min-h-screen bg-background text-white flex flex-col items-center justify-center px-4 py-6">
       <div className="w-full max-w-[390px] mx-auto flex flex-col items-center">
-        <div className="relative mb-8">
-          <div className="w-48 h-48 rounded-full overflow-hidden border-2 border-white/10 ring-4 ring-primary/5">
+        <div className="relative mb-6">
+          <div className="w-32 h-32 rounded-full overflow-hidden border-2 border-white/10 ring-4 ring-primary/5">
             <div className="w-full h-full relative">
               {statePhoto ? (
                 <img
@@ -97,13 +97,13 @@ export default function Results() {
           <div className="absolute inset-0 border-[0.5px] border-primary/20 rounded-full scale-110 pointer-events-none animate-pulse" />
         </div>
 
-        <div className="text-center mb-10">
+        <div className="text-center mb-6">
           <div className="inline-block">
             <div className="flex items-center justify-center gap-2 mb-1">
               <span className="px-2 py-0.5 text-[10px] font-mono tracking-widest text-primary border border-primary/40 rounded bg-primary/5 uppercase">
                 {rankLabel}
               </span>
-              <h1 className="text-2xl font-bold tracking-tight text-white">
+              <h1 className="text-xl font-bold tracking-tight text-white">
                 Análise Estrutural
               </h1>
             </div>
@@ -113,7 +113,7 @@ export default function Results() {
           </div>
         </div>
 
-        <div className="w-full bg-black/40 backdrop-blur-xl border border-white/10 rounded-[24px] p-8 shadow-2xl relative overflow-hidden">
+        <div className="w-full bg-black/40 backdrop-blur-xl border border-white/10 rounded-[24px] p-6 shadow-2xl relative overflow-hidden">
           <div
             className="absolute inset-0 opacity-[0.03] pointer-events-none"
             style={{
@@ -123,12 +123,12 @@ export default function Results() {
             }}
           />
 
-          <div className="grid grid-cols-2 gap-x-8 gap-y-10 relative z-10">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-6 relative z-10">
             <div className="space-y-3">
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
                 Pontuação PSL
               </p>
-              <p className="text-xl font-semibold text-white">
+              <p className="text-lg font-semibold text-white">
                 {pslScore.toFixed(1)}
               </p>
               <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
@@ -143,7 +143,7 @@ export default function Results() {
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
                 Mentalidade
               </p>
-              <p className="text-xl font-semibold text-white">{mindset}</p>
+              <p className="text-lg font-semibold text-white">{mindset}</p>
               <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
                 <div
                   className="h-full rounded-full"
@@ -156,7 +156,7 @@ export default function Results() {
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
                 Estratégia
               </p>
-              <p className="text-xl font-semibold text-white">{strategy}</p>
+              <p className="text-lg font-semibold text-white">{strategy}</p>
               <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
                 <div
                   className="h-full rounded-full"
@@ -169,7 +169,7 @@ export default function Results() {
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
                 Tipo de mandíbula
               </p>
-              <p className="text-xl font-semibold text-white">{jawType}</p>
+              <p className="text-lg font-semibold text-white">{jawType}</p>
               <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
                 <div
                   className="h-full rounded-full"
@@ -182,7 +182,7 @@ export default function Results() {
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
                 Respiração
               </p>
-              <p className="text-xl font-semibold text-white">{breathing}</p>
+              <p className="text-lg font-semibold text-white">{breathing}</p>
               <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
                 <div
                   className="h-full rounded-full"
@@ -208,7 +208,7 @@ export default function Results() {
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
                 Simetria
               </p>
-              <p className="text-xl font-semibold text-white">{symmetry}</p>
+              <p className="text-lg font-semibold text-white">{symmetry}</p>
               <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
                 <div
                   className="h-full rounded-full"
@@ -221,7 +221,7 @@ export default function Results() {
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
                 Nível de apelo
               </p>
-              <p className="text-xl font-semibold text-white">{appealLevel}</p>
+              <p className="text-lg font-semibold text-white">{appealLevel}</p>
               <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
                 <div
                   className="h-full rounded-full"
@@ -231,7 +231,7 @@ export default function Results() {
             </div>
           </div>
 
-          <div className="mt-10 pt-6 border-t border-white/5 flex justify-between items-center relative z-10">
+          <div className="mt-6 pt-6 border-t border-white/5 flex justify-between items-center relative z-10">
             <div className="flex gap-1">
               <div className="w-1.5 h-1.5 rounded-full bg-primary/40" />
               <div className="w-1.5 h-1.5 rounded-full bg-primary/20" />
@@ -243,7 +243,7 @@ export default function Results() {
           </div>
         </div>
 
-        <div className="mt-12 opacity-30 flex flex-col items-center gap-2">
+        <div className="mt-8 opacity-30 flex flex-col items-center gap-2">
           <span className="text-sm">▢▢</span>
           <p className="text-[10px] font-mono tracking-tighter">
             MAXIMARE-IA-0X92-2024
