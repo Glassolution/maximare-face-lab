@@ -90,6 +90,8 @@ serve(async (req) => {
           const now = new Date();
           const until = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
 
+          console.log(`Activating plan: ${purchase.plan}, Duration: ${durationDays} days, Until: ${until.toISOString()}`);
+
           await supabaseClient
             .from('profiles')
             .update({

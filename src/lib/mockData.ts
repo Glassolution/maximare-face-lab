@@ -119,7 +119,9 @@ export function deleteAnalysis(id: string) {
   }
 }
 
-export function saveAnalysis(analysis: AnalysisResult) {
+import { supabase } from "@/integrations/supabase/client";
+
+export async function saveAnalysis(analysis: AnalysisResult) {
   type StoredAnalysis = AnalysisResult & {
     ger?: number;
     tier?: string;
@@ -157,8 +159,6 @@ export function saveAnalysis(analysis: AnalysisResult) {
     appealLevel?: string;
   };
 
-  const history = getAnalysisHistory() as StoredAnalysis[];
-
   const extended = analysis as StoredAnalysis;
 
   const entry: StoredAnalysis = {
@@ -181,16 +181,70 @@ export function saveAnalysis(analysis: AnalysisResult) {
     appealLevel: extended.appealLevel,
   };
 
+  // 1. Tentar salvar no Supabase se houver usuário
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      const { error } = await supabase.from('analysis_history').insert({
+        user_id: session.user.id,
+        result_json: entry,
+        source: 'web'
+      });
+      
+      if (error) {
+        console.error("Erro ao salvar no Supabase:", error);
+        // Não lançar erro para não interromper o fluxo, mas logar
+      }
+    }
+  } catch (err) {
+    console.error("Erro de conexão com Supabase:", err);
+  }
+
+  // 2. Salvar no LocalStorage (como cache/fallback)
+  const history = getAnalysisHistory() as StoredAnalysis[];
   const newHistory = [entry, ...history].slice(0, 20);
 
   try {
     localStorage.setItem("maximare_history", JSON.stringify(newHistory));
-  } catch {
+  } catch (e) {
+    console.error("Erro ao salvar no LocalStorage (quota excedida?):", e);
+    // Tentar salvar menos itens se falhar
     try {
-      const trimmed = newHistory.slice(0, 10) as StoredAnalysis[];
+      const trimmed = newHistory.slice(0, 5);
       localStorage.setItem("maximare_history", JSON.stringify(trimmed));
-    } catch {
-      localStorage.removeItem("maximare_history");
+    } catch (e2) {
+      console.error("Falha crítica ao salvar no LocalStorage. Dados não persistidos localmente.", e2);
+      // NUNCA apagar o histórico existente em caso de erro!
     }
+  }
+}
+
+export async function syncHistoryWithSupabase(): Promise<AnalysisResult[]> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return [];
+
+    const { data, error } = await supabase
+      .from('analysis_history')
+      .select('result_json')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (error) throw error;
+
+    if (data && data.length > 0) {
+      const history = data.map(d => d.result_json) as AnalysisResult[];
+      try {
+        localStorage.setItem("maximare_history", JSON.stringify(history));
+      } catch (e) {
+        console.warn("Não foi possível salvar histórico no cache local (quota):", e);
+      }
+      return history;
+    }
+    return [];
+  } catch (err) {
+    console.error("Erro ao sincronizar histórico:", err);
+    return [];
   }
 }

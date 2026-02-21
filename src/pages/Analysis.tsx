@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { saveAnalysis, getAnalysisHistory, deleteAnalysis, type AnalysisResult } from "@/lib/mockData";
+import { saveAnalysis, getAnalysisHistory, deleteAnalysis, syncHistoryWithSupabase, type AnalysisResult } from "@/lib/mockData";
 import { generateExtendedMockAnalysis, getTier, getMindset, getStrategy, type ExtendedAnalysisResult } from "@/lib/rankingSystem";
 import { generatePersonalizedPlan } from "@/lib/smartTrendsEngine";
 import faceScanHero from "@/assets/clark.png";
@@ -50,6 +50,20 @@ export default function Analysis() {
   const [limitsDisabled, setLimitsDisabled] = useState(DISABLE_LIMITS);
 
   const { user } = useAuth();
+
+  useEffect(() => {
+    const sync = async () => {
+      if (user) {
+        const synced = await syncHistoryWithSupabase();
+        if (synced && synced.length > 0) {
+          setHistory(synced);
+        } else {
+          setHistory(getAnalysisHistory());
+        }
+      }
+    };
+    sync();
+  }, [user]);
 
   useEffect(() => {
     if (searchParams.get("start") === "true") {
@@ -390,7 +404,7 @@ export default function Analysis() {
         if (frontPhoto) result.photoUrl = frontPhoto;
         if (sidePhoto) result.photoSideUrl = sidePhoto;
         
-        saveAnalysis(result);
+        await saveAnalysis(result);
         
         navigate(`/results/${result.id}`, {
           state: { photoUrl: frontPhoto },
