@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Scan } from "lucide-react";
 import { useState } from "react";
 import PaywallModal from "@/components/PaywallModal";
-import { ExtendedAnalysisResult, getTier } from "@/lib/rankingSystem";
+import { ExtendedAnalysisResult, getTier, getMindset, getStrategy } from "@/lib/rankingSystem";
 import { getScoreColor } from "@/lib/gerTypes";
 
 export default function Results() {
@@ -15,6 +15,15 @@ export default function Results() {
   const [showPaywall, setShowPaywall] = useState(false);
   const history = getAnalysisHistory();
   const result = history.find((a) => a.id === id) as ExtendedAnalysisResult | undefined;
+
+  if (!result) return (
+    <div className="min-h-screen pt-24 flex items-center justify-center">
+      <div className="text-center">
+        <p className="text-muted-foreground mb-4">Análise não encontrada.</p>
+        <Link to="/analysis"><Button>Nova análise</Button></Link>
+      </div>
+    </div>
+  );
 
   // Fallback if result is old format
   const isExtended = !!result && "ger" in result;
@@ -30,11 +39,13 @@ export default function Results() {
   const pslScore = ger / 10;
   const pslPercent = Math.max(0, Math.min(100, ger)); // GER is 0-99, so it maps directly to %
   
+  const classificationColor = getScoreColor(ger);
+  const pslColor = getScoreColor(pslPercent);
+
   const baseAppeal = tierInfo.label || tierInfo.name.toUpperCase();
-  const mindset =
-    ger < 55 ? "Em desenvolvimento" : ger < 75 ? "Equilibrada" : "Dominante";
-  const strategy =
-    ger < 60 ? "Maximização intensa" : "Otimização refinada";
+  const mindset = getMindset(ger);
+  const strategy = getStrategy(ger);
+
   const jawType =
     result?.jawType || result?.technicalBreakdown?.jawline || "Não avaliado";
   const breathing = result?.breathing || "Não avaliado";
@@ -55,17 +66,8 @@ export default function Results() {
 
   const appealLevel = baseAppeal;
   const rankLabel = baseAppeal.toUpperCase();
-  const pslColor = getScoreColor(pslPercent);
-  const classificationColor = getScoreColor(ger);
-
-  if (!result) return (
-    <div className="min-h-screen pt-24 flex items-center justify-center">
-      <div className="text-center">
-        <p className="text-muted-foreground mb-4">Análise não encontrada.</p>
-        <Link to="/analysis"><Button>Nova análise</Button></Link>
-      </div>
-    </div>
-  );
+  
+  const mindsetPercent = mindset === "Blackpilled" ? 100 : mindset === "Redpilled" ? 66 : 33;
 
   return (
     <div className="min-h-screen bg-background text-white flex flex-col items-center justify-center px-4 py-6">
