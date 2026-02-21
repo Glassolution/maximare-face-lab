@@ -146,6 +146,7 @@ export function saveAnalysis(analysis: AnalysisResult) {
       eyes: string;
       nose: string;
       fwhr: string;
+      breathing: string;
     };
     pslScore?: number;
     jawType?: string;

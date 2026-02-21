@@ -371,6 +371,8 @@ export default function Analysis() {
                 photoSideUrl: sidePhoto || undefined,
                 nextTier: data.nextTier?.name,
                 pointsToNextTier: data.nextTier?.pointsNeeded ?? 0,
+                technicalBreakdown: data.technicalBreakdown,
+                breathing: data.technicalBreakdown?.breathing,
               };
               return mapped;
             } catch (err) {

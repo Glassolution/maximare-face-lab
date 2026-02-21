@@ -34,6 +34,7 @@ export interface ExtendedAnalysisResult extends Omit<AnalysisResult, "categories
     eyes: string;
     nose: string;
     fwhr: string;
+    breathing: string;
   };
   
   // New Structural Diagnosis
@@ -79,7 +80,8 @@ export const ATTRIBUTES = [
   { id: "eyes", label: "Olhos", weight: 0.15 },
   { id: "cheekbones", label: "Zigomáticos", weight: 0.15 },
   { id: "nose", label: "Nariz", weight: 0.10 },
-  { id: "harmony", label: "Harmonia Geral", weight: 0.05 },
+  { id: "harmony", label: "Harmonia Geral", weight: 0.10 },
+  { id: "breathing", label: "Respiração", weight: 0.10 },
 ];
 
 export function getTier(ger: number) {
@@ -227,9 +229,25 @@ export function generateExtendedMockAnalysis(): ExtendedAnalysisResult {
         technicalData.fwhr = fwhr.toFixed(2);
         if (fwhr < 1.7 || fwhr > 2.0) {
             score -= 10;
-            flaws['harmony'] = [`FWHR ${fwhr.toFixed(2)} fora do ideal (1.8-2.0)`];
+            flaws['harmony'] = [`FWHR ${fwhr.toFixed(2)} fora do ideal (1.8-2.0)`, "Desproporção entre largura e altura facial"];
         } else {
-            strengths['harmony'] = [`FWHR ${fwhr.toFixed(2)} ideal`];
+            strengths['harmony'] = [`FWHR ${fwhr.toFixed(2)} ideal`, "Boas proporções gerais"];
+        }
+    }
+
+    if (id === "breathing") {
+        const breathingType = Math.random();
+        if (breathingType < 0.3) {
+            score -= 15;
+            technicalData.breathing = "Bucal (Mouth Breather)";
+            flaws['breathing'] = ["Sinais de respiração bucal crônica", "Lábios entreabertos em repouso", "Desenvolvimento maxilar verticalizado (Face longa)"];
+        } else if (breathingType > 0.7) {
+            score += 10;
+            technicalData.breathing = "Nasal (Nasal Breather)";
+            strengths['breathing'] = ["Sinais claros de respiração nasal", "Selamento labial correto", "Desenvolvimento facial horizontal adequado"];
+        } else {
+            technicalData.breathing = "Mista/Neutro";
+            flaws['breathing'] = ["Sinais leves de respiração mista", "Tônus labial moderado"];
         }
     }
 
@@ -350,7 +368,7 @@ export function generateExtendedMockAnalysis(): ExtendedAnalysisResult {
 
   const jawType = technicalData.jawline || "Não avaliado";
 
-  const breathing = "Não avaliado";
+  const breathing = technicalData.breathing || "Mista/Neutro";
 
   const appealLevel = tier.label || tier.name.toUpperCase();
 
@@ -373,7 +391,8 @@ export function generateExtendedMockAnalysis(): ExtendedAnalysisResult {
         cheekbones: technicalData.cheekbones || "N/A",
         eyes: technicalData.eyes || "N/A",
         nose: technicalData.nose || "N/A",
-        fwhr: technicalData.fwhr || "N/A"
+        fwhr: technicalData.fwhr || "N/A",
+        breathing: technicalData.breathing || "N/A"
     },
 
     // Campos agregados usados na tela de resultados

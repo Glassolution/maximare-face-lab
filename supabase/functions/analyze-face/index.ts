@@ -507,6 +507,8 @@ FRONTAL:
 - rugas: linhas/rugas (maior score = menos rugas)
 - definicao_facial: quão "defined" o rosto está — jawline aparente, pouca retenção, contorno nítido
 - puffiness_adiposidade_facial: quanto menos inchaço/adiposidade aparente, maior o score
+- respiracao_nasal: sinais de respiração nasal correta (lábios selados, desenvolvimento maxilar) vs respirador bucal (face longa, olheiras, lábios abertos). Maior score = Melhor respiração.
+- harmonia_geral: equilíbrio global das proporções, terços e quintos faciais.
 
 LATERAL (se disponível):
 - projecao_queixo
@@ -546,7 +548,9 @@ Retorne APENAS este JSON (sem markdown):
     "qualidade_pele": <0-99>,
     "rugas": <0-99>,
     "definicao_facial": <0-99>,
-    "puffiness_adiposidade_facial": <0-99>
+    "puffiness_adiposidade_facial": <0-99>,
+    "respiracao_nasal": <0-99>,
+    "harmonia_geral": <0-99>
   },
   "lateral": {
     "available": ${!isPartial},
@@ -783,6 +787,8 @@ Seja realista e preciso. Não infle scores.`,,
       { id: "masculinidade", name: "Masculinidade", score: f.masculinidade_estrutural, icon: "masculinidade" },
       { id: "definicao_facial", name: "Definição Facial", score: f.definicao_facial ?? 50, icon: "definicao" },
       { id: "puffiness", name: "Adiposidade Facial", score: f.puffiness_adiposidade_facial ?? 50, icon: "puffiness" },
+      { id: "respiracao", name: "Respiração Nasal", score: f.respiracao_nasal ?? 50, icon: "respiracao" },
+      { id: "harmonia_geral", name: "Harmonia Geral", score: f.harmonia_geral ?? f.proporcao_tercos ?? 50, icon: "harmonia" },
       { id: "macas", name: "Maçãs do Rosto", score: f.largura_zigomatica, icon: "macas" },
       { id: "hairline", name: "Linha do Cabelo", score: f.linha_cabelo, icon: "hairline" },
       { id: "simetria", name: "Simetria", score: f.simetria, icon: "simetria" },
@@ -800,6 +806,23 @@ Seja realista e preciso. Não infle scores.`,,
       ] : []),
     ];
 
+    const getDesc = (score: number, low: string, high: string, mid: string = "Média") => {
+      if (score < 45) return low;
+      if (score > 75) return high;
+      return mid;
+    };
+
+    const technicalBreakdown = {
+      asymmetry: getDesc(f.simetria, "Alta Assimetria", "Simétrica", "Moderada"),
+      thirds: getDesc(f.proporcao_tercos, "Desproporcional", "Equilibrada"),
+      jawline: hasLateral ? getDesc(l.definicao_mandibula, "Recuada", "Forte/Projetada") : "Não avaliado",
+      cheekbones: getDesc(f.largura_zigomatica, "Baixa projeção", "Proeminente"),
+      eyes: getDesc(f.olheiras, "Cansada/Olheiras", "Vívida", "Neutro"),
+      nose: getDesc(f.harmonia_nariz, "Desarmônico", "Harmônico"),
+      fwhr: getDesc(f.harmonia_geral ?? 50, "Fora do ideal", "Ideal", "Médio"),
+      breathing: getDesc(f.respiracao_nasal ?? 50, "Bucal (Mouth Breather)", "Nasal (Nasal Breather)", "Mista/Neutro"),
+    };
+
     const sorted = [...attributes].sort((a, b) => b.score - a.score);
     const strengths = sorted.slice(0, 3).map((a) => a.name);
     const weaknesses = sorted.slice(-3).map((a) => a.name);
@@ -812,6 +835,7 @@ Seja realista e preciso. Não infle scores.`,,
       tier: tier.name,
       nextTier: nextTier ? { name: nextTier.name, pointsNeeded: nextTier.min - clampedGer } : null,
       attributes,
+      technicalBreakdown,
       strengths,
       weaknesses,
       report: {
