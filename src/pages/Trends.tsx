@@ -10,6 +10,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { generatePersonalizedPlan, type SmartTrend, type FacialBottleneck } from "@/lib/smartTrendsEngine";
+import { getAnalysisHistory } from "@/lib/mockData";
+import { ExtendedAnalysisResult } from "@/lib/rankingSystem";
 
 const iconMap: Record<string, React.ElementType> = {
   Eye, Droplets, Target, Scan, Sparkles, Scissors, Diamond, Zap,
@@ -31,7 +33,12 @@ export default function Trends() {
   const navigate = useNavigate();
   const [expandedTrend, setExpandedTrend] = useState<string | null>(null);
 
-  const plan = useMemo(() => generatePersonalizedPlan(), []);
+  const plan = useMemo(() => {
+    const history = getAnalysisHistory();
+    // Get the most recent analysis
+    const latest = history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+    return generatePersonalizedPlan(latest as unknown as ExtendedAnalysisResult);
+  }, []);
 
   // ─── No Analysis State ───
   if (!plan.hasAnalysis) {
