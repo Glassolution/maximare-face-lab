@@ -38,10 +38,9 @@ export const TIER_LABELS: Record<string, { label: string; emoji: string }> = {
 };
 
 export function getScoreColor(score: number): string {
-  if (score >= 80) return "hsl(142, 76%, 46%)";  // green
-  if (score >= 65) return "hsl(142, 76%, 46%)";  // green
-  if (score >= 50) return "hsl(38, 92%, 55%)";   // yellow/orange
-  return "hsl(0, 84%, 60%)";                     // red
+  const clamped = Math.max(0, Math.min(100, score));
+  const hue = (clamped / 100) * 130;
+  return `hsl(${hue}, 80%, 50%)`;
 }
 
 export function getScoreColorClass(score: number): string {

@@ -1,0 +1,140 @@
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const MP_ACCESS_TOKEN = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN') || '';
+const WEBHOOK_URL = Deno.env.get('MERCADOPAGO_WEBHOOK_URL') || ''; // e.g. https://<project>.supabase.co/functions/v1/mercadopago-webhook
+const BACK_URL_BASE = Deno.env.get('APP_DEEPLINK_SCHEME') || 'maximare://'; // e.g. maximare://payment-result
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    );
+
+    const {
+      data: { user },
+    } = await supabaseClient.auth.getUser();
+
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    const { plan } = await req.json();
+
+    if (!['weekly', 'monthly', 'yearly'].includes(plan)) {
+      throw new Error('Invalid plan');
+    }
+
+    let price = 0;
+    let title = '';
+    let duration_days = 0;
+
+    switch (plan) {
+      case 'weekly':
+        price = 24.90;
+        title = 'Maximare Premium - Semanal';
+        duration_days = 7;
+        break;
+      case 'monthly':
+        price = 49.90;
+        title = 'Maximare Premium - Mensal';
+        duration_days = 30;
+        break;
+      case 'yearly':
+        price = 499.90;
+        title = 'Maximare Premium - Anual';
+        duration_days = 365;
+        break;
+    }
+
+    // Create purchase record
+    const { data: purchase, error: purchaseError } = await supabaseClient
+      .from('purchases')
+      .insert({
+        user_id: user.id,
+        provider: 'mercadopago',
+        plan,
+        amount_cents: Math.round(price * 100),
+        currency: 'BRL',
+        status: 'pending',
+      })
+      .select()
+      .single();
+
+    if (purchaseError) throw purchaseError;
+
+    // Create Mercado Pago Preference
+    const preferenceBody = {
+      items: [
+        {
+          title,
+          quantity: 1,
+          currency_id: 'BRL',
+          unit_price: price,
+        },
+      ],
+      external_reference: purchase.id,
+      notification_url: WEBHOOK_URL,
+      back_urls: {
+        success: `${BACK_URL_BASE}payment-result?status=success&purchase_id=${purchase.id}`,
+        failure: `${BACK_URL_BASE}payment-result?status=failure&purchase_id=${purchase.id}`,
+        pending: `${BACK_URL_BASE}payment-result?status=pending&purchase_id=${purchase.id}`,
+      },
+      auto_return: 'approved',
+      payer: {
+        email: user.email,
+      }
+    };
+
+    const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${MP_ACCESS_TOKEN}`,
+      },
+      body: JSON.stringify(preferenceBody),
+    });
+
+    const mpData = await mpResponse.json();
+
+    if (!mpResponse.ok) {
+      console.error('Mercado Pago Error:', mpData);
+      throw new Error('Failed to create preference');
+    }
+
+    // Update purchase with preference ID
+    await supabaseClient
+      .from('purchases')
+      .update({ mp_preference_id: mpData.id })
+      .eq('id', purchase.id);
+
+    return new Response(
+      JSON.stringify({
+        checkout_url: mpData.init_point, // or sandbox_init_point
+        purchase_id: purchase.id,
+        mp_preference_id: mpData.id,
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      }
+    );
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 400,
+    });
+  }
+});

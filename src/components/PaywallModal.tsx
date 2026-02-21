@@ -12,10 +12,10 @@ const benefits = [
 interface Props {
   open: boolean;
   onClose: () => void;
-  onContinue: () => void;
+  onUpgrade: () => void;
 }
 
-export default function PaywallModal({ open, onClose, onContinue }: Props) {
+export default function PaywallModal({ open, onClose, onUpgrade }: Props) {
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="rounded-2xl border-border/50 bg-card max-w-sm">
@@ -35,8 +35,8 @@ export default function PaywallModal({ open, onClose, onContinue }: Props) {
           ))}
         </ul>
         <div className="flex flex-col gap-2">
-          <Button className="rounded-xl">Ver planos</Button>
-          <Button variant="ghost" className="rounded-xl text-muted-foreground" onClick={onContinue}>
+          <Button className="rounded-xl" onClick={onUpgrade}>Ver planos</Button>
+          <Button variant="ghost" className="rounded-xl text-muted-foreground" onClick={onClose}>
             Continuar com versão gratuita
           </Button>
         </div>

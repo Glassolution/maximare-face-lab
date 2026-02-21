@@ -1,59 +1,75 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, TrendingUp, Flame, Plus, User } from "lucide-react";
-
-const leftItems = [
-  { label: "Home", path: "/analysis", icon: Home },
-  { label: "Progresso", path: "/progress", icon: TrendingUp },
-];
-
-const rightItems = [
-  { label: "Trends", path: "/trends", icon: Flame },
-  { label: "Perfil", path: "/profile", icon: User },
-];
+import { Home, LineChart, Users, User } from "lucide-react";
+import navIcon from "@/assets/nav.png";
 
 export default function BottomNav() {
   const location = useLocation();
 
+  const isActive = (path: string) => location.pathname === path;
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background-dark/80 backdrop-blur-md border-t border-white/5 pb-[env(safe-area-inset-bottom)]">
-      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-4">
-        {leftItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = location.pathname === item.path;
-          return (
-            <Link key={item.label} to={item.path} className="flex flex-col items-center gap-1 min-w-[48px]">
-              <div className={`h-10 w-10 rounded-full flex items-center justify-center transition-all duration-200 ${
-                isActive ? "bg-primary/15 text-primary glow-primary-custom" : "text-text-muted hover:text-white"
-              }`}>
-                <Icon className="h-5 w-5" />
-              </div>
-              <span className={`text-[10px] font-medium transition-colors ${isActive ? "text-primary" : "text-text-muted"}`}>{item.label}</span>
-            </Link>
-          );
-        })}
+    <nav className="fixed bottom-4 left-0 right-0 z-50 flex justify-center pointer-events-none">
+      <div className="pointer-events-auto w-auto mx-auto">
+        <div className="relative">
+          <div className="h-14 rounded-full bg-graphite flex items-center px-6 shadow-[0_10px_40px_rgba(0,0,0,0.7)]">
+            <div className="flex items-center gap-6">
+              {/* Home / Dashboard */}
+              <Link
+                to="/analysis"
+                className="flex items-center justify-center"
+              >
+                <Home
+                  className={`h-6 w-6 ${
+                    isActive("/analysis") ? "text-white" : "text-zinc-400"
+                  }`}
+                />
+              </Link>
 
-        {/* Center + button */}
-        <Link to="/analysis?start=true" className="flex flex-col items-center -mt-7">
-          <div className="h-14 w-14 rounded-full bg-primary flex items-center justify-center shadow-lg glow-primary-custom ring-4 ring-background-dark">
-            <Plus className="h-7 w-7 text-white" strokeWidth={2.5} />
+              {/* Progresso / Analytics */}
+              <Link
+                to="/progress"
+                className="flex items-center justify-center"
+              >
+                <LineChart
+                  className={`h-6 w-6 ${
+                    isActive("/progress") ? "text-primary" : "text-zinc-400"
+                  }`}
+                />
+              </Link>
+
+              <Link
+                to="/analysis?start=true"
+                className="relative flex items-center justify-center -mt-6"
+              >
+                <div className="h-16 w-16 rounded-full flex items-center justify-center overflow-hidden shadow-lg">
+                  <img
+                    src={navIcon}
+                    alt="Iniciar análise"
+                    className="h-full w-full object-cover scale-110"
+                  />
+                </div>
+              </Link>
+
+              {/* Comunidade / Grupo */}
+              <Link to="/trends" className="flex items-center justify-center">
+                <Users
+                  className={`h-6 w-6 ${
+                    isActive("/trends") ? "text-primary" : "text-zinc-400"
+                  }`}
+                />
+              </Link>
+
+              {/* Conta */}
+              <Link to="/profile" className="flex items-center justify-center">
+                <User
+                  className={`h-6 w-6 ${
+                    isActive("/profile") ? "text-primary" : "text-zinc-400"
+                  }`}
+                />
+              </Link>
+            </div>
           </div>
-          <span className="text-[10px] font-semibold text-primary mt-1">Análise</span>
-        </Link>
-
-        {rightItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = location.pathname === item.path;
-          return (
-            <Link key={item.label} to={item.path} className="flex flex-col items-center gap-1 min-w-[48px]">
-              <div className={`h-10 w-10 rounded-full flex items-center justify-center transition-all duration-200 ${
-                isActive ? "bg-primary/15 text-primary glow-primary-custom" : "text-text-muted hover:text-white"
-              }`}>
-                <Icon className="h-5 w-5" />
-              </div>
-              <span className={`text-[10px] font-medium transition-colors ${isActive ? "text-primary" : "text-text-muted"}`}>{item.label}</span>
-            </Link>
-          );
-        })}
+        </div>
       </div>
     </nav>
   );

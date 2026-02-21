@@ -16,14 +16,33 @@ import Profile from "@/pages/Profile";
 import LookAlike from "@/pages/LookAlike";
 import NotFound from "@/pages/NotFound";
 import Login from "@/pages/Login";
+import Premium from "@/pages/Premium";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
+import { ThemeProvider } from "@/theme/ThemeProvider";
+import { useEffect, useState } from "react";
+import { shouldShowPaywall } from "@/lib/paywall";
+import PaywallModal from "@/components/PaywallModal";
+import { useNavigate } from "react-router-dom";
 
 const queryClient = new QueryClient();
 
 function Layout() {
   const location = useLocation();
-  const hideNav = ["/", "/onboarding", "/login"].includes(location.pathname);
+  const navigate = useNavigate();
+  const hideNav = ["/", "/onboarding", "/login", "/premium"].includes(location.pathname);
   const { user, loading } = useAuth();
+  const [showPaywall, setShowPaywall] = useState(false);
+
+  useEffect(() => {
+    const checkPaywall = async () => {
+      if (!user || loading) return;
+      if (location.pathname === "/premium" || location.pathname === "/login" || location.pathname === "/") return;
+      
+      const show = await shouldShowPaywall({ trigger: 'periodic' });
+      if (show) setShowPaywall(true);
+    };
+    checkPaywall();
+  }, [location.pathname, user, loading]);
 
   if (loading) {
     return (
@@ -60,9 +79,15 @@ function Layout() {
         <Route path="/profile" element={<Profile />} />
         <Route path="/look-alike" element={<LookAlike />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/premium" element={<Premium />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {!hideNav && <BottomNav />}
+      <PaywallModal 
+        open={showPaywall} 
+        onClose={() => setShowPaywall(false)} 
+        onUpgrade={() => { setShowPaywall(false); navigate('/premium'); }} 
+      />
     </>
   );
 }
@@ -70,13 +95,15 @@ function Layout() {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <Layout />
-        </AuthProvider>
-      </BrowserRouter>
+      <ThemeProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <Layout />
+          </AuthProvider>
+        </BrowserRouter>
+      </ThemeProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

@@ -247,10 +247,7 @@ export default function GerResults() {
       <PaywallModal
         open={showPaywall}
         onClose={() => setShowPaywall(false)}
-        onContinue={() => {
-          setShowPaywall(false);
-          navigate("/analysis");
-        }}
+        onUpgrade={() => navigate("/premium")}
       />
     </div>
   );

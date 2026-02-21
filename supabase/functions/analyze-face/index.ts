@@ -493,7 +493,7 @@ Regras de qualidade e validade (obrigatórias):
 
 ${isPartial ? "Apenas uma foto FRONTAL foi fornecida. Marque lateral.available=false e todos os scores laterais como null." : "Fotos FRONTAL e LATERAL foram fornecidas. Analise todos os atributos com precisão total."}
 
-O que avaliar:
+O que avaliar (Scores Numéricos 0-99):
 
 FRONTAL:
 - simetria: alinhamento e equivalência dos lados
@@ -508,8 +508,6 @@ FRONTAL:
 - definicao_facial: quão "defined" o rosto está — jawline aparente, pouca retenção, contorno nítido
 - puffiness_adiposidade_facial: quanto menos inchaço/adiposidade aparente, maior o score
 
-Nota: definicao_facial e puffiness_adiposidade_facial podem ser correlacionados, mas NÃO idênticos.
-
 LATERAL (se disponível):
 - projecao_queixo
 - definicao_mandibula
@@ -517,9 +515,20 @@ LATERAL (se disponível):
 - projecao_maxilar
 - harmonia_perfil
 
-Consistência e penalidades:
-- Se puffiness_adiposidade_facial for baixo, deve refletir em definicao_facial e tende a reduzir definicao_mandibula (se lateral existir).
-- Se iluminação/ângulo distorcem contorno, reduza confidence e marque isPartial=true.
+DIAGNÓSTICO ESTRUTURAL (Obrigatório):
+Gere uma avaliação categórica e técnica para alimentar o motor de recomendações.
+Campos obrigatórios:
+- projecao_mandibular: "Recuada" | "Neutra" | "Projetada"
+- alinhamento_cervical: "Forward Posture" | "Neutro" | "Tenso"
+- definicao_terco_inferior: "Baixa" | "Média" | "Alta"
+- gordura_facial: "Baixa" | "Média" | "Alta"
+- simetria_estrutural: "Baixa" | "Média" | "Alta"
+- textura_pele: "Irregular" | "Média" | "Uniforme"
+- regiao_ocular: "Cansada/Escura" | "Neutra" | "Vibrante"
+- sinais_inchaco: "Ausentes" | "Leves" | "Visíveis"
+- prioridades: Array com 3 áreas prioritárias para intervenção (ex: ["mandibula", "pele", "olhos"])
+- severidade: Objeto com a severidade (0-10) para cada área prioritária.
+- impacto_visual: Objeto com o impacto visual estimado (0-10) se a área for corrigida.
 
 Retorne APENAS este JSON (sem markdown):
 {
@@ -547,6 +556,19 @@ Retorne APENAS este JSON (sem markdown):
     "projecao_maxilar": ${isPartial ? "null" : "<0-99>"},
     "harmonia_perfil": ${isPartial ? "null" : "<0-99>"}
   },
+  "structural_diagnosis": {
+    "projecao_mandibular": "...",
+    "alinhamento_cervical": "...",
+    "definicao_terco_inferior": "...",
+    "gordura_facial": "...",
+    "simetria_estrutural": "...",
+    "textura_pele": "...",
+    "regiao_ocular": "...",
+    "sinais_inchaco": "...",
+    "prioridades": ["...", "...", "..."],
+    "severidade": { "area1": 8, "area2": 6 },
+    "impacto_visual": { "area1": 9, "area2": 7 }
+  },
   "notes": {
     "top_strengths": ["até 3 itens curtos em pt-br"],
     "top_weaknesses": ["até 3 itens curtos em pt-br"],
@@ -564,7 +586,7 @@ Diretrizes de score:
 - 50-59: Abaixo da média
 - 0-49: Áreas significativas para melhoria
 
-Seja realista e preciso. Não infle scores.`,
+Seja realista e preciso. Não infle scores.`,,
     });
 
     imageContents.push({

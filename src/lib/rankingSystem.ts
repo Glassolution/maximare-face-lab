@@ -36,6 +36,21 @@ export interface ExtendedAnalysisResult extends Omit<AnalysisResult, "categories
     fwhr: string;
   };
   
+  // New Structural Diagnosis
+  structural_diagnosis?: {
+    projecao_mandibular: string;
+    alinhamento_cervical: string;
+    definicao_terco_inferior: string;
+    gordura_facial: string;
+    simetria_estrutural: string;
+    textura_pele: string;
+    regiao_ocular: string;
+    sinais_inchaco: string;
+    prioridades: string[];
+    severidade: Record<string, number>;
+    impacto_visual: Record<string, number>;
+  };
+
   // Legacy fields for compatibility if needed
   pslScore?: number;
   jawType?: string;

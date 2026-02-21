@@ -6,6 +6,7 @@ import { Scan } from "lucide-react";
 import { useState } from "react";
 import PaywallModal from "@/components/PaywallModal";
 import { ExtendedAnalysisResult, getTier } from "@/lib/rankingSystem";
+import { getScoreColor } from "@/lib/gerTypes";
 
 export default function Results() {
   const { id } = useParams();
@@ -37,6 +38,8 @@ export default function Results() {
   const breathing = result?.breathing || "Não avaliado";
   const appealLevel = baseAppeal;
   const rankLabel = baseAppeal.toUpperCase();
+  const pslColor = getScoreColor(pslPercent);
+  const classificationColor = getScoreColor(ger);
 
   if (!result) return (
     <div className="min-h-screen pt-24 flex items-center justify-center">
@@ -76,17 +79,19 @@ export default function Results() {
         </div>
 
         <div className="text-center mb-10">
-          <div className="flex items-center justify-center gap-2 mb-1">
-            <span className="px-2 py-0.5 text-[10px] font-mono tracking-widest text-primary border border-primary/40 rounded bg-primary/5 uppercase">
-              {rankLabel}
-            </span>
-            <h1 className="text-2xl font-bold tracking-tight text-white">
-              Análise Estrutural
-            </h1>
+          <div className="inline-block">
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <span className="px-2 py-0.5 text-[10px] font-mono tracking-widest text-primary border border-primary/40 rounded bg-primary/5 uppercase">
+                {rankLabel}
+              </span>
+              <h1 className="text-2xl font-bold tracking-tight text-white">
+                Análise Estrutural
+              </h1>
+            </div>
+            <p className="text-white/40 text-xs font-mono uppercase tracking-[0.2em] text-center">
+              Análise Maximare
+            </p>
           </div>
-          <p className="text-white/40 text-xs font-mono uppercase tracking-[0.2em]">
-            Análise Maximare
-          </p>
         </div>
 
         <div className="w-full bg-black/40 backdrop-blur-xl border border-white/10 rounded-[24px] p-8 shadow-2xl relative overflow-hidden">
@@ -109,8 +114,8 @@ export default function Results() {
               </p>
               <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
                 <div
-                  className="h-full bg-primary shadow-[0_0_8px_rgba(0,240,255,0.6)]"
-                  style={{ width: `${pslPercent}%` }}
+                  className="h-full rounded-full"
+                  style={{ width: `${pslPercent}%`, backgroundColor: pslColor }}
                 />
               </div>
             </div>
@@ -121,7 +126,10 @@ export default function Results() {
               </p>
               <p className="text-xl font-semibold text-white">{mindset}</p>
               <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
-                <div className="h-full bg-primary w-[88%] shadow-[0_0_8px_rgba(0,240,255,0.6)]" />
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: "88%", backgroundColor: classificationColor }}
+                />
               </div>
             </div>
 
@@ -131,7 +139,10 @@ export default function Results() {
               </p>
               <p className="text-xl font-semibold text-white">{strategy}</p>
               <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
-                <div className="h-full bg-primary w-[65%] shadow-[0_0_8px_rgba(0,240,255,0.6)]" />
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: "65%", backgroundColor: classificationColor }}
+                />
               </div>
             </div>
 
@@ -141,7 +152,10 @@ export default function Results() {
               </p>
               <p className="text-xl font-semibold text-white">{jawType}</p>
               <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
-                <div className="h-full bg-primary w-[92%] shadow-[0_0_8px_rgba(0,240,255,0.6)]" />
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: "92%", backgroundColor: classificationColor }}
+                />
               </div>
             </div>
 
@@ -151,7 +165,10 @@ export default function Results() {
               </p>
               <p className="text-xl font-semibold text-white">{breathing}</p>
               <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
-                <div className="h-full bg-primary w-[78%] shadow-[0_0_8px_rgba(0,240,255,0.6)]" />
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: "78%", backgroundColor: classificationColor }}
+                />
               </div>
             </div>
 
@@ -161,7 +178,10 @@ export default function Results() {
               </p>
               <p className="text-xl font-semibold text-white">{appealLevel}</p>
               <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
-                <div className="h-full bg-primary w-[95%] shadow-[0_0_8px_rgba(0,240,255,0.6)]" />
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: "95%", backgroundColor: classificationColor }}
+                />
               </div>
             </div>
           </div>
@@ -212,7 +232,7 @@ export default function Results() {
 
         {/* Detailed Analysis - Removed per user request */}
 
-      <PaywallModal open={showPaywall} onClose={() => setShowPaywall(false)} onContinue={() => { setShowPaywall(false); navigate("/recommendations"); }} />
+      <PaywallModal open={showPaywall} onClose={() => setShowPaywall(false)} onUpgrade={() => navigate("/premium")} />
     </div>
   );
 }

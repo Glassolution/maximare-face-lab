@@ -1,11 +1,23 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Crown, ChevronRight, Settings, Shield, Zap, Star, Award, TrendingUp, Info, Search, LogOut } from "lucide-react";
+import { Crown, ChevronRight, Settings, Shield, Zap, Star, TrendingUp, Search, LogOut, Moon, Sun } from "lucide-react";
 import { getAnalysisHistory } from "@/lib/mockData";
 import { Link, useNavigate } from "react-router-dom";
 import { getTier, getNextTier, ExtendedAnalysisResult } from "@/lib/rankingSystem";
 import { useAuth } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { useTheme } from "@/theme/ThemeProvider";
+
+type MenuItem = {
+  label: string;
+  icon: typeof Crown;
+  desc: string;
+  path: string;
+  onClick?: () => void;
+};
 
 const badges = [
   { label: "Primeira Análise", icon: Star, earned: true },
@@ -18,7 +30,9 @@ export default function Profile() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const history = getAnalysisHistory();
-  const lastAnalysis = history.length > 0 ? history[0] as unknown as ExtendedAnalysisResult : null;
+  const lastAnalysis = history.length > 0 ? (history[0] as unknown as ExtendedAnalysisResult) : null;
+  const { theme, setTheme } = useTheme();
+  const [showPreferences, setShowPreferences] = useState(false);
   
   // Calculate stats
   const ger = lastAnalysis?.ger || 0;
@@ -51,12 +65,12 @@ export default function Profile() {
   const displayName =
     (user && (user.user_metadata?.full_name || user.user_metadata?.name || user.email)) || "Usuário MAXIMARE";
 
-  const menuItems = [
-    { label: "Plano Pro", icon: Crown, desc: "Desbloqueie tudo", path: "#" },
+  const menuItems: MenuItem[] = [
+    { label: "Plano Pro", icon: Crown, desc: "Desbloqueie tudo", path: "/premium" },
     { label: "Progresso", icon: TrendingUp, desc: "Seu histórico", path: "/progress" },
-    { label: "Configurações", icon: Settings, desc: "Preferências", path: "#" },
+    { label: "Configurações", icon: Settings, desc: "Preferências", path: "#", onClick: () => setShowPreferences(true) },
     { label: "Privacidade", icon: Shield, desc: "Seus dados", path: "#" },
-  ];
+  ] as const;
 
   return (
     <div className="min-h-screen pt-6 pb-28 px-4">
@@ -185,14 +199,33 @@ export default function Profile() {
           </Link>
         </motion.div>
 
-        {/* Menu */}
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
           <div className="space-y-2">
-            {menuItems.map((item, i) => {
+            {menuItems.map((item) => {
               const Icon = item.icon;
-              const Wrapper = item.path.startsWith("/") ? Link : "div";
+              if (item.path.startsWith("/")) {
+                return (
+                  <Link
+                    key={item.label}
+                    to={item.path}
+                    onClick={item.onClick}
+                    className="flex items-center gap-3 rounded-2xl glass p-4 hover:bg-muted/50 transition-colors cursor-pointer"
+                  >
+                    <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                      <Icon className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">{item.label}</p>
+                      <p className="text-[11px] text-muted-foreground">{item.desc}</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </Link>
+                );
+              }
               return (
-                <Wrapper key={item.label} to={item.path as string}
+                <div
+                  key={item.label}
+                  onClick={item.onClick}
                   className="flex items-center gap-3 rounded-2xl glass p-4 hover:bg-muted/50 transition-colors cursor-pointer"
                 >
                   <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
@@ -203,7 +236,7 @@ export default function Profile() {
                     <p className="text-[11px] text-muted-foreground">{item.desc}</p>
                   </div>
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </Wrapper>
+                </div>
               );
             })}
           </div>
@@ -225,6 +258,40 @@ export default function Profile() {
             </div>
           </Button>
         </motion.div>
+        <Dialog open={showPreferences} onOpenChange={setShowPreferences}>
+          <DialogContent className="max-w-sm rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="font-heading text-lg">Preferências</DialogTitle>
+            </DialogHeader>
+            <div className="mt-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Modo escuro</p>
+                  <p className="text-xs text-muted-foreground">
+                    Altere entre tema claro e escuro.
+                  </p>
+                </div>
+                <Switch
+                  checked={theme === "dark"}
+                  onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+                />
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                {theme === "dark" ? (
+                  <>
+                    <Moon className="h-4 w-4" />
+                    <span>Ativo: modo escuro</span>
+                  </>
+                ) : (
+                  <>
+                    <Sun className="h-4 w-4" />
+                    <span>Ativo: modo claro</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

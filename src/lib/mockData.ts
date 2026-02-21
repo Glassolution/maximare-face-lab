@@ -125,6 +125,19 @@ export function saveAnalysis(analysis: AnalysisResult) {
     badge?: string;
     photoUrl?: string | null;
     secondaryScore?: number;
+    structural_diagnosis?: {
+      projecao_mandibular: string;
+      alinhamento_cervical: string;
+      definicao_terco_inferior: string;
+      gordura_facial: string;
+      simetria_estrutural: string;
+      textura_pele: string;
+      regiao_ocular: string;
+      sinais_inchaco: string;
+      prioridades: string[];
+      severidade: Record<string, number>;
+      impacto_visual: Record<string, number>;
+    };
     technicalBreakdown?: {
       asymmetry: string;
       thirds: string;
@@ -156,6 +169,7 @@ export function saveAnalysis(analysis: AnalysisResult) {
     badge: extended.badge,
     photoUrl: extended.photoUrl ?? null,
     secondaryScore: extended.secondaryScore,
+    structural_diagnosis: extended.structural_diagnosis,
     technicalBreakdown: extended.technicalBreakdown,
     pslScore: extended.pslScore,
     jawType: extended.jawType,

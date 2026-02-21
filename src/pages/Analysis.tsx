@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, type ComponentType } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo, type ComponentType } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { saveAnalysis, getAnalysisHistory, deleteAnalysis, type AnalysisResult } from "@/lib/mockData";
 import { generateExtendedMockAnalysis, getTier, type ExtendedAnalysisResult } from "@/lib/rankingSystem";
+import { generatePersonalizedPlan } from "@/lib/smartTrendsEngine";
 import faceScanHero from "@/assets/clark.png";
 import { useAuth } from "@/auth/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
@@ -76,9 +77,19 @@ export default function Analysis() {
   const currentGER = lastAnalysis
     ? (lastAnalysis as ExtendedAnalysisResult).ger ?? Math.round(lastAnalysis.overallScore * 10)
     : 0;
-  
+  const currentGERPercent = Math.max(0, Math.min(100, currentGER));
   const streak = Math.max(history.length, 1);
   const weekDelta = history.length > 1 ? +(history[0].overallScore - history[1].overallScore).toFixed(1) : 0;
+  const ringColor =
+    currentGER < 55
+      ? "rgb(248,113,113)"  // vermelho - zona crítica
+      : currentGER < 75
+      ? "rgb(250,204,21)"   // amarelo - intermediário
+      : "rgb(59,130,246)";  // azul - bom/ótimo
+
+  const plan = useMemo(() => generatePersonalizedPlan(), [history.length]);
+  const primaryTrend = plan.hasAnalysis && plan.trends.length > 0 ? plan.trends[0] : null;
+  const primaryBottleneck = plan.hasAnalysis && plan.bottlenecks.length > 0 ? plan.bottlenecks[0] : null;
 
   const handleDeleteHistory = (id: string) => {
     deleteAnalysis(id);
@@ -667,25 +678,92 @@ export default function Analysis() {
 
         {/* Main Content */}
         <main className="flex-1 px-6 pt-4 pb-24 space-y-8">
-          {/* Hero Score Section */}
-          <section className="text-center py-8">
-            <div className="relative inline-block">
-              <div className="absolute inset-0 rounded-full border-2 border-primary/20 scale-150 blur-sm animate-pulse"></div>
-              <div className="absolute inset-0 rounded-full border border-primary/10 scale-125"></div>
-              <h1 className="text-[84px] font-extrabold tracking-tighter leading-none text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
-                {currentGER ? currentGER.toFixed(1) : "0.0"}
-              </h1>
-            </div>
-            <p className="mt-6 text-[11px] font-bold tracking-[0.2em] text-text-muted uppercase">Índice Facial Geral</p>
-            <div className="mt-4 flex justify-center gap-2">
-              <span className="px-2 py-1 rounded bg-green-500/10 text-green-500 text-[10px] font-bold border border-green-500/20 flex items-center gap-1">
-                <TrendingUp className="h-3 w-3 fill-current" /> +{weekDelta}% ESTE MÊS
-              </span>
+          {/* Hero Score Section - circular score + delta */}
+          <section className="pt-4 pb-2 flex flex-col items-center gap-6">
+            <div className="relative">
+              <div
+                className="relative h-44 w-44 rounded-full flex items-center justify-center"
+                style={{
+                  background: `conic-gradient(${ringColor} ${currentGERPercent}%, rgba(15,23,42,0.9) ${currentGERPercent}% 100%)`,
+                }}
+              >
+                <div className="h-36 w-36 rounded-full bg-black flex flex-col items-center justify-center shadow-[0_0_30px_rgba(37,99,235,0.35)]">
+                  <p className="text-[9px] font-mono tracking-[0.2em] text-white/40 uppercase px-3 text-center">
+                    Overall Score
+                  </p>
+                  <p className="mt-1 text-4xl font-extrabold tracking-tight text-white">
+                    {currentGER ? currentGER.toFixed(1) : "0.0"}
+                  </p>
+                  <div className="mt-3 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white/5 border border-white/15 text-[10px] font-semibold text-primary">
+                    <TrendingUp className="h-3 w-3" />
+                    <span>
+                      {weekDelta >= 0 ? "+" : ""}
+                      {weekDelta.toFixed(1)} pts
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
 
-          {/* CTA Button */}
-          <section>
+          {/* IA Insights - Foco Atual / Trends */}
+          {primaryTrend && (
+            <section className="space-y-3">
+              <div className="flex items-center justify-between px-0.5">
+                <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-text-muted">
+                  Foco atual da IA
+                </p>
+                <button
+                  onClick={() => navigate("/trends")}
+                  className="text-[11px] font-semibold text-primary hover:text-primary/80 transition-colors"
+                >
+                  Ver plano
+                </button>
+              </div>
+              <div className="rounded-2xl bg-graphite border border-slate-custom px-4 py-4 flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+                    <Zap className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold text-primary uppercase tracking-wide">
+                      {primaryBottleneck ? primaryBottleneck.area : "Plano de Evolução"}
+                    </p>
+                    <h3 className="text-sm font-bold text-white mt-1">{primaryTrend.title}</h3>
+                    <p className="text-xs text-text-muted mt-1 line-clamp-2">
+                      {primaryTrend.subtitle}
+                    </p>
+                    {weekDelta !== 0 && (
+                      <p className="mt-2 text-[10px] text-text-muted">
+                        Progresso recente:{" "}
+                        <span className={weekDelta >= 0 ? "text-green-400" : "text-red-400"}>
+                          {weekDelta >= 0 ? "+" : ""}
+                          {weekDelta.toFixed(1)} pts na Aura
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {primaryBottleneck && (
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-white/5 text-text-muted">
+                      {primaryBottleneck.priority === "critica"
+                        ? "Crítico"
+                        : primaryBottleneck.priority === "alta"
+                        ? "Alta"
+                        : "Média"}
+                    </span>
+                    <span className="text-[11px] text-text-muted">
+                      {Math.round(primaryBottleneck.score)}/99
+                    </span>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* CTA Card */}
+          <section className="space-y-4">
             <button
               onClick={() => {
                 if (!limitsDisabled && isCooldownActive) {
@@ -696,14 +774,41 @@ export default function Analysis() {
                 setCaptureStep("intro-hero");
               }}
               disabled={!limitsDisabled && isCooldownActive}
-              className={`w-full ${!limitsDisabled && isCooldownActive ? "bg-muted text-muted-foreground cursor-not-allowed" : "bg-primary hover:bg-primary/90 text-white"} rounded-xl py-4 px-6 flex items-center justify-center gap-3 font-bold tracking-wide transition-all active:scale-[0.98] glow-primary-custom border border-white/10 shadow-xl`}
+              className={`w-full rounded-2xl px-5 py-4 flex items-center justify-between shadow-[0_18px_40px_rgba(0,0,0,0.75)] border ${
+                !limitsDisabled && isCooldownActive
+                  ? "bg-zinc-900 border-zinc-800 text-zinc-500 cursor-not-allowed"
+                  : "bg-white border-white/10 text-black hover:bg-zinc-50"
+              } transition-colors`}
             >
-              <Scan className="h-6 w-6" />
-              <span>{!limitsDisabled && isCooldownActive ? `Aguarde ${cooldownRemaining}s` : "NOVA ANÁLISE"}</span>
+              <div className="flex items-center gap-3">
+                <div
+                  className={`h-10 w-10 rounded-2xl flex items-center justify-center ${
+                    !limitsDisabled && isCooldownActive ? "bg-zinc-800" : "bg-black"
+                  }`}
+                >
+                  <Scan className={`h-5 w-5 ${!limitsDisabled && isCooldownActive ? "text-zinc-500" : "text-white"}`} />
+                </div>
+                <div className="text-left">
+                  <p className="text-xs font-semibold">
+                    {!limitsDisabled && isCooldownActive ? "Cooldown ativo" : "Nova Análise"}
+                  </p>
+                  <p className="text-[11px] text-black/60">
+                    {!limitsDisabled && isCooldownActive
+                      ? `Aguarde ${cooldownRemaining}s para nova captura`
+                      : "Capturar métricas faciais de alta precisão"}
+                  </p>
+                </div>
+              </div>
+              <div
+                className={`h-7 w-7 rounded-full flex items-center justify-center border ${
+                  !limitsDisabled && isCooldownActive
+                    ? "border-zinc-700 text-zinc-500"
+                    : "border-black/10 text-black"
+                }`}
+              >
+                <ArrowUp className="h-3 w-3 -rotate-45" />
+              </div>
             </button>
-            {!limitsDisabled && isCooldownActive && (
-              <p className="mt-2 text-[11px] text-text-muted text-center">Protegendo o sistema contra uso excessivo.</p>
-            )}
           </section>
 
           {/* Recent Analyses List */}
