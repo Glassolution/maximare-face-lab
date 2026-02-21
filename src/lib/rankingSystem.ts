@@ -123,12 +123,22 @@ function randomGaussian(mean: number, stdev: number): number {
   return z * stdev + mean;
 }
 
-export function generateExtendedMockAnalysis(): ExtendedAnalysisResult {
-  const baseScore = Math.min(99, Math.max(30, randomGaussian(62, 10)));
+export function getMindset(ger: number) {
+  if (ger < 55) return "Bluepilled";
+  if (ger < 75) return "Redpilled";
+  return "Blackpilled";
+}
 
+export function getStrategy(ger: number) {
+  return ger < 60 ? "Maximização intensa" : "Otimização refinada";
+}
+
+export function generateExtendedMockAnalysis(overrideGer?: number): ExtendedAnalysisResult {
+  const baseScore = overrideGer ?? Math.floor(Math.random() * (95 - 45 + 1)) + 45;
+
+  const technicalData: Record<string, string> = {};
   const flaws: Record<string, string[]> = {};
   const strengths: Record<string, string[]> = {};
-  const technicalData: Record<string, string> = {};
 
   let hasHighAsymmetry = false;
   let hasWeakJaw = false;
@@ -361,10 +371,9 @@ export function generateExtendedMockAnalysis(): ExtendedAnalysisResult {
   const secondaryScore = +(ger / 10).toFixed(1);
   const pslScore = secondaryScore;
 
-  const mindset =
-    ger < 55 ? "Em desenvolvimento" : ger < 75 ? "Equilibrada" : "Dominante";
+  const mindset = getMindset(ger);
 
-  const strategy = ger < 60 ? "Maximização intensa" : "Otimização refinada";
+  const strategy = getStrategy(ger);
 
   const jawType = technicalData.jawline || "Não avaliado";
 

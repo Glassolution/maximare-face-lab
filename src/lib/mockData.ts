@@ -26,12 +26,13 @@ export interface Recommendation {
 
 export function generateMockAnalysis(): AnalysisResult {
   const categories: AnalysisCategory[] = [
-    { id: "simetria", name: "Simetria Facial", score: +(6 + Math.random() * 3).toFixed(1), icon: "Scan" },
-    { id: "estrutura", name: "Estrutura Óssea", score: +(5.5 + Math.random() * 3.5).toFixed(1), icon: "Diamond" },
-    { id: "harmonia", name: "Harmonia Facial", score: +(6 + Math.random() * 3).toFixed(1), icon: "Sparkles" },
-    { id: "pele", name: "Qualidade da Pele", score: +(5 + Math.random() * 4).toFixed(1), icon: "Droplets" },
-    { id: "cabelo", name: "Cabelo & Styling", score: +(5 + Math.random() * 4).toFixed(1), icon: "Scissors" },
-    { id: "olhos", name: "Área dos Olhos", score: +(6 + Math.random() * 3).toFixed(1), icon: "Eye" },
+    { id: "symmetry", name: "Simetria Facial", score: +(6 + Math.random() * 3).toFixed(1), icon: "Scan" },
+    { id: "jawline", name: "Estrutura Óssea", score: +(5.5 + Math.random() * 3.5).toFixed(1), icon: "Diamond" },
+    { id: "harmony", name: "Harmonia Facial", score: +(6 + Math.random() * 3).toFixed(1), icon: "Sparkles" },
+    { id: "skin", name: "Qualidade da Pele", score: +(5 + Math.random() * 4).toFixed(1), icon: "Droplets" },
+    { id: "hairline", name: "Cabelo & Styling", score: +(5 + Math.random() * 4).toFixed(1), icon: "Scissors" },
+    { id: "eyes", name: "Área dos Olhos", score: +(6 + Math.random() * 3).toFixed(1), icon: "Eye" },
+    { id: "breathing", name: "Respiração", score: +(5 + Math.random() * 4).toFixed(1), icon: "Lungs" },
   ];
   const overall = +(categories.reduce((s, c) => s + c.score, 0) / categories.length).toFixed(1);
   return {

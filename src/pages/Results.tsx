@@ -38,6 +38,21 @@ export default function Results() {
   const jawType =
     result?.jawType || result?.technicalBreakdown?.jawline || "Não avaliado";
   const breathing = result?.breathing || "Não avaliado";
+  const harmony = result?.technicalBreakdown?.fwhr || "Não avaliado";
+  const symmetry = result?.technicalBreakdown?.asymmetry || "Não avaliado";
+
+  const harmonyCat = result?.categories?.find(c => c.id === "harmony");
+  const symmetryCat = result?.categories?.find(c => c.id === "symmetry");
+  const breathingCat = result?.categories?.find(c => c.id === "breathing");
+
+  const harmonyPercent = harmonyCat ? harmonyCat.score : 85;
+  const symmetryPercent = symmetryCat ? symmetryCat.score : 82;
+  const breathingPercent = breathingCat ? breathingCat.score : 78;
+
+  const harmonyColor = harmonyCat ? getScoreColor(harmonyCat.score) : classificationColor;
+  const symmetryColor = symmetryCat ? getScoreColor(symmetryCat.score) : classificationColor;
+  const breathingColor = breathingCat ? getScoreColor(breathingCat.score) : classificationColor;
+
   const appealLevel = baseAppeal;
   const rankLabel = baseAppeal.toUpperCase();
   const pslColor = getScoreColor(pslPercent);
@@ -130,7 +145,7 @@ export default function Results() {
               <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
                 <div
                   className="h-full rounded-full"
-                  style={{ width: "88%", backgroundColor: classificationColor }}
+                  style={{ width: `${mindsetPercent}%`, backgroundColor: classificationColor }}
                 />
               </div>
             </div>
@@ -169,7 +184,33 @@ export default function Results() {
               <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
                 <div
                   className="h-full rounded-full"
-                  style={{ width: "78%", backgroundColor: classificationColor }}
+                  style={{ width: `${breathingPercent}%`, backgroundColor: breathingColor }}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
+                Harmonia
+              </p>
+              <p className="text-xl font-semibold text-white">{harmony}</p>
+              <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${harmonyPercent}%`, backgroundColor: harmonyColor }}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
+                Simetria
+              </p>
+              <p className="text-xl font-semibold text-white">{symmetry}</p>
+              <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${symmetryPercent}%`, backgroundColor: symmetryColor }}
                 />
               </div>
             </div>

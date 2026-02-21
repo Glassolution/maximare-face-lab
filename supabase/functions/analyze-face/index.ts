@@ -10,14 +10,15 @@ const corsHeaders = {
 const DISABLE_LIMITS = Deno.env.get("DISABLE_LIMITS") === "1";
 
 const TIERS = [
-  { min: 0, max: 39, name: "sub3" },
-  { min: 40, max: 54, name: "sub5" },
+  { min: 0, max: 44, name: "sub3" },
+  { min: 45, max: 54, name: "sub5" },
   { min: 55, max: 64, name: "ltn" },
-  { min: 65, max: 72, name: "mtn" },
-  { min: 73, max: 79, name: "htn" },
-  { min: 80, max: 84, name: "chadlite" },
-  { min: 85, max: 89, name: "chad" },
-  { min: 90, max: 99, name: "true adam" },
+  { min: 65, max: 74, name: "mtn" },
+  { min: 75, max: 82, name: "htn" },
+  { min: 83, max: 88, name: "chadlite" },
+  { min: 89, max: 93, name: "chad" },
+  { min: 94, max: 97, name: "high chad" },
+  { min: 98, max: 99, name: "true adam" },
 ];
 
 const COOLDOWN_SECONDS = 15;
@@ -784,25 +785,25 @@ Seja realista e preciso. Não infle scores.`,,
     const secondaryScore = +(clampedGer / 10).toFixed(1);
 
     const attributes = [
-      { id: "masculinidade", name: "Masculinidade", score: f.masculinidade_estrutural, icon: "masculinidade" },
-      { id: "definicao_facial", name: "Definição Facial", score: f.definicao_facial ?? 50, icon: "definicao" },
+      { id: "masculinity", name: "Masculinidade", score: f.masculinidade_estrutural, icon: "masculinidade" },
+      { id: "definition", name: "Definição Facial", score: f.definicao_facial ?? 50, icon: "definicao" },
       { id: "puffiness", name: "Adiposidade Facial", score: f.puffiness_adiposidade_facial ?? 50, icon: "puffiness" },
-      { id: "respiracao", name: "Respiração Nasal", score: f.respiracao_nasal ?? 50, icon: "respiracao" },
-      { id: "harmonia_geral", name: "Harmonia Geral", score: f.harmonia_geral ?? f.proporcao_tercos ?? 50, icon: "harmonia" },
-      { id: "macas", name: "Maçãs do Rosto", score: f.largura_zigomatica, icon: "macas" },
+      { id: "breathing", name: "Respiração Nasal", score: f.respiracao_nasal ?? 50, icon: "respiracao" },
+      { id: "harmony", name: "Harmonia Geral", score: f.harmonia_geral ?? f.proporcao_tercos ?? 50, icon: "harmonia" },
+      { id: "cheekbones", name: "Maçãs do Rosto", score: f.largura_zigomatica, icon: "macas" },
       { id: "hairline", name: "Linha do Cabelo", score: f.linha_cabelo, icon: "hairline" },
-      { id: "simetria", name: "Simetria", score: f.simetria, icon: "simetria" },
-      { id: "olheiras", name: "Olheiras", score: f.olheiras, icon: "olheiras" },
-      { id: "rugas", name: "Rugas", score: f.rugas, icon: "rugas" },
-      { id: "pele", name: "Qualidade da Pele", score: f.qualidade_pele, icon: "pele" },
-      { id: "proporcao", name: "Proporção Facial", score: f.proporcao_tercos, icon: "proporcao" },
-      { id: "nariz", name: "Harmonia do Nariz", score: f.harmonia_nariz, icon: "nariz" },
+      { id: "symmetry", name: "Simetria", score: f.simetria, icon: "simetria" },
+      { id: "eyes", name: "Olhos (Olheiras)", score: f.olheiras, icon: "olheiras" },
+      { id: "wrinkles", name: "Rugas", score: f.rugas, icon: "rugas" },
+      { id: "skin", name: "Qualidade da Pele", score: f.qualidade_pele, icon: "pele" },
+      { id: "thirds", name: "Proporção Facial", score: f.proporcao_tercos, icon: "proporcao" },
+      { id: "nose", name: "Harmonia do Nariz", score: f.harmonia_nariz, icon: "nariz" },
       ...(hasLateral ? [
-        { id: "mandibula", name: "Linha da Mandíbula", score: l.definicao_mandibula, icon: "mandibula" },
-        { id: "queixo", name: "Projeção do Queixo", score: l.projecao_queixo, icon: "queixo" },
-        { id: "maxilar", name: "Projeção Maxilar", score: l.projecao_maxilar, icon: "maxilar" },
-        { id: "perfil", name: "Harmonia do Perfil", score: l.harmonia_perfil, icon: "perfil" },
-        { id: "goniaco", name: "Ângulo Goníaco", score: l.angulo_goniaco, icon: "goniaco" },
+        { id: "jawline", name: "Linha da Mandíbula", score: l.definicao_mandibula, icon: "mandibula" },
+        { id: "chin", name: "Projeção do Queixo", score: l.projecao_queixo, icon: "queixo" },
+        { id: "maxilla", name: "Projeção Maxilar", score: l.projecao_maxilar, icon: "maxilar" },
+        { id: "profile", name: "Harmonia do Perfil", score: l.harmonia_perfil, icon: "perfil" },
+        { id: "gonial", name: "Ângulo Goníaco", score: l.angulo_goniaco, icon: "goniaco" },
       ] : []),
     ];
 

@@ -367,6 +367,8 @@ export default function Analysis() {
                 overallScore: secondary,
                 ger: data.ger,
                 tier: data.tier,
+                mindset: getMindset(data.ger),
+                strategy: getStrategy(data.ger),
                 secondaryScore: secondary,
                 photoSideUrl: sidePhoto || undefined,
                 nextTier: data.nextTier?.name,
