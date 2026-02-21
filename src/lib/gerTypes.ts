@@ -34,6 +34,7 @@ export const TIER_LABELS: Record<string, { label: string; emoji: string }> = {
   "htn": { label: "HTN", emoji: "🔥" },
   "chadlite": { label: "CHADLITE", emoji: "💪" },
   "chad": { label: "CHAD", emoji: "👑" },
+  "high chad": { label: "HIGH CHAD", emoji: "👑" },
   "true adam": { label: "TRUE ADAM", emoji: "⭐" },
 };
 

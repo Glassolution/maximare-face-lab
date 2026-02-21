@@ -23,16 +23,18 @@ export default function Results() {
   const badge = isExtended ? result.badge || "" : "";
   const statePhoto = (location.state as { photoUrl?: string } | null)?.photoUrl;
 
-  const pslScore = typeof result?.pslScore === "number" ? result.pslScore : Math.floor(ger / 10);
-  const pslPercent = Math.max(0, Math.min(100, (pslScore / 10) * 100));
+  // Force recalculation based on GER to ensure consistency across the app
   const tierInfo = getTier(ger);
-  const baseAppeal = result?.appealLevel || tierInfo.label || tierInfo.name.toUpperCase();
+  
+  // Calculate PSL from GER to avoid inconsistencies
+  const pslScore = ger / 10;
+  const pslPercent = Math.max(0, Math.min(100, ger)); // GER is 0-99, so it maps directly to %
+  
+  const baseAppeal = tierInfo.label || tierInfo.name.toUpperCase();
   const mindset =
-    result?.mindset ||
-    (ger < 55 ? "Em desenvolvimento" : ger < 75 ? "Equilibrada" : "Dominante");
+    ger < 55 ? "Em desenvolvimento" : ger < 75 ? "Equilibrada" : "Dominante";
   const strategy =
-    result?.strategy ||
-    (ger < 60 ? "Maximização intensa" : "Otimização refinada");
+    ger < 60 ? "Maximização intensa" : "Otimização refinada";
   const jawType =
     result?.jawType || result?.technicalBreakdown?.jawline || "Não avaliado";
   const breathing = result?.breathing || "Não avaliado";

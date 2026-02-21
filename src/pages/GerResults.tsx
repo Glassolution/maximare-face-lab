@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { ArrowLeft, Share2, Lock, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getGerHistory, GerResult, GerAttribute, TIER_LABELS, getScoreColor } from "@/lib/gerTypes";
+import { getTier } from "@/lib/rankingSystem";
 import PaywallModal from "@/components/PaywallModal";
 
 const FREE_ATTRIBUTES_COUNT = 4;
@@ -62,7 +63,8 @@ export default function GerResults() {
     );
   }
 
-  const tier = TIER_LABELS[result.tier] || { label: result.tier.toUpperCase(), emoji: "⭐" };
+  const tierInfo = getTier(result.ger);
+  const tier = TIER_LABELS[tierInfo.name] || { label: tierInfo.name.toUpperCase(), emoji: "⭐" };
   const totalPages = Math.ceil(result.attributes.length / ATTRS_PER_PAGE);
   const paginatedAttrs = result.attributes.slice(
     currentPage * ATTRS_PER_PAGE,
