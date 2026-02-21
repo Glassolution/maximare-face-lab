@@ -41,6 +41,48 @@ export type Database = {
         }
         Relationships: []
       }
+      tutorial_assets: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          intervention_type: string
+          key: string
+          locale: string
+          prompt_hash: string
+          step_index: number
+          style: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          intervention_type: string
+          key: string
+          locale?: string
+          prompt_hash: string
+          step_index: number
+          style?: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          intervention_type?: string
+          key?: string
+          locale?: string
+          prompt_hash?: string
+          step_index?: number
+          style?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
       user_data: {
         Row: {
           analysis_history: Json | null

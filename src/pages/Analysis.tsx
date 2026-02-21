@@ -19,7 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { saveAnalysis, getAnalysisHistory, deleteAnalysis, type AnalysisResult } from "@/lib/mockData";
-import { generateExtendedMockAnalysis, getTier, type ExtendedAnalysisResult } from "@/lib/rankingSystem";
+import { generateExtendedMockAnalysis, getTier, getMindset, getStrategy, type ExtendedAnalysisResult } from "@/lib/rankingSystem";
 import { generatePersonalizedPlan } from "@/lib/smartTrendsEngine";
 import faceScanHero from "@/assets/clark.png";
 import { useAuth } from "@/auth/AuthProvider";
