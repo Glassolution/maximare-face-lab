@@ -5,10 +5,11 @@ import {
   Zap, Clock, TrendingUp, ChevronDown, AlertTriangle,
   Eye, Droplets, Target, Scan, Sparkles, Scissors, Diamond,
   ShieldCheck, Smartphone, FlaskConical, RotateCcw, Camera,
-  BookOpen, CheckCircle2, XCircle, ThumbsUp
+  BookOpen, CheckCircle2, XCircle, ThumbsUp, ImageIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { TutorialCarousel } from "@/components/TutorialStepImage";
 import { generatePersonalizedPlan, type SmartTrend, type FacialBottleneck } from "@/lib/smartTrendsEngine";
 import { getAnalysisHistory } from "@/lib/mockData";
 import { ExtendedAnalysisResult } from "@/lib/rankingSystem";
@@ -196,6 +197,18 @@ export default function Trends() {
                             <VIcon className={`h-3 w-3 ${vConfig.color}`} />
                             <span className={`text-[10px] font-semibold ${vConfig.color}`}>{vConfig.label}</span>
                           </div>
+                        </div>
+
+                        {/* Visual Tutorial */}
+                        <div className="rounded-xl overflow-hidden">
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <ImageIcon className="h-3 w-3 text-primary" />
+                            <h4 className="text-xs font-bold text-foreground">Tutorial Visual</h4>
+                          </div>
+                          <TutorialCarousel
+                            interventionType={trend.id}
+                            steps={trend.steps}
+                          />
                         </div>
 
                         {/* Steps */}

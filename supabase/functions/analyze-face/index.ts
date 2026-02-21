@@ -595,7 +595,7 @@ Diretrizes de score (Seja EXTREMAMENTE RÍGIDO - Escala Logarítmica de Dificuld
 
 REGRA DE OURO: A maioria das pessoas comuns DEVE receber scores entre 45 e 55.
 Só atribua >65 se houver definição de mandíbula (jawline) clara, olhos positivos e harmonia evidente.
-Não inflacione notas. Ser "normal" é 50, não 70.`,,
+Não inflacione notas. Ser "normal" é 50, não 70.`,
     });
 
     imageContents.push({
