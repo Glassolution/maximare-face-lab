@@ -22,7 +22,7 @@ export function usePremiumStatus() {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('subscription_status, subscription_expires_at, plan_type, premium_status, premium_until') // Fetch old cols too for fallback
+          .select('subscription_status, subscription_expires_at, plan_type, premium_status, premium_until, premium_plan') // Fetch old cols too for fallback
           .eq('id', user.id)
           .single();
 
@@ -41,7 +41,14 @@ export function usePremiumStatus() {
              else status = 'free';
           }
           if (!expires) expires = data.premium_until;
-          if (!plan) plan = 'free';
+          if (!plan) {
+            // Map old plan names to new plan types
+            const oldPlan = data.premium_plan;
+            if (oldPlan === 'monthly') plan = 'premium_monthly';
+            else if (oldPlan === 'yearly') plan = 'premium_yearly';
+            else if (oldPlan === 'weekly') plan = 'premium_weekly';
+            else plan = 'free';
+          }
 
           // Auto-expire logic
           const now = new Date();
