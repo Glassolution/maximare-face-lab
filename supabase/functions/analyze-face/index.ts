@@ -583,15 +583,19 @@ Retorne APENAS este JSON (sem markdown):
 
 Se não for um rosto válido: {"isValidFace": false, "reason": "explicação breve em português"}
 
-Diretrizes de score:
-- 90-99: Excepcional, nível modelo
-- 80-89: Muito atrativo
-- 70-79: Atrativo, boas features
-- 60-69: Médio
-- 50-59: Abaixo da média
-- 0-49: Áreas significativas para melhoria
+Diretrizes de score (Seja EXTREMAMENTE RÍGIDO - Escala Logarítmica de Dificuldade):
+- 50 é a média absoluta da população comum. Scores acima de 60 são difíceis.
+- 90-99: Top Model / Divino (Raridade absoluta, <0.1% da população)
+- 80-89: Modelo / Chad (Muito atrativo, traços marcantes, <5%)
+- 70-79: HTN / Atrativo (Exige ótima estrutura óssea e harmonia, <15%)
+- 60-69: MTN / Acima da Média (Exige alguma definição facial/jawline visível e pouca gordura)
+- 50-59: LTN / Média Comum (Rosto normal, sem definição óssea clara, soft features)
+- 40-49: Sub5 / Abaixo da Média (Desarmonia leve, recessão ou falta de definição)
+- 0-39: Sub3 / Deficiências estruturais visíveis
 
-Seja realista e preciso. Não infle scores.`,,
+REGRA DE OURO: A maioria das pessoas comuns DEVE receber scores entre 45 e 55.
+Só atribua >65 se houver definição de mandíbula (jawline) clara, olhos positivos e harmonia evidente.
+Não inflacione notas. Ser "normal" é 50, não 70.`,,
     });
 
     imageContents.push({
