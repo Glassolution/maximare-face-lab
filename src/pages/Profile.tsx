@@ -374,6 +374,47 @@ export default function Profile() {
             </div>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={showSubscription} onOpenChange={setShowSubscription}>
+          <DialogContent className="max-w-sm rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="font-heading text-lg flex items-center gap-2">
+                <Crown className="h-5 w-5 text-amber-400" />
+                Sua Assinatura
+              </DialogTitle>
+            </DialogHeader>
+            <div className="mt-4 space-y-4">
+              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-foreground">Status</span>
+                  <span className="text-xs font-bold text-amber-500 bg-amber-500/10 px-2 py-1 rounded-full uppercase">Ativo</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-foreground">Plano</span>
+                  <span className="text-sm text-muted-foreground capitalize">
+                    {planType === 'premium_monthly' ? 'Mensal' : (planType === 'premium_yearly' ? 'Anual' : 'Semanal')}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-foreground">Expira em</span>
+                  <span className="text-sm text-muted-foreground">{formatDate(expiresAt)}</span>
+                </div>
+              </div>
+              
+              <div className="text-xs text-muted-foreground text-center px-4">
+                <p>Para gerenciar ou cancelar sua assinatura, utilize a plataforma do Mercado Pago ou entre em contato com o suporte.</p>
+              </div>
+
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => window.open('https://www.mercadopago.com.br/subscriptions', '_blank')}
+              >
+                Ir para Mercado Pago
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

@@ -1,0 +1,5 @@
+[33mcommit 16e305db255bd5ab05a069653298112d73a9d976[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m
+Author: MaximareAI <ai@maximare.com>
+Date:   Sat Feb 21 18:41:05 2026 -0300
+
+    feat: complete premium system with supabase integration
