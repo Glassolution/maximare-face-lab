@@ -2,13 +2,14 @@ import { useState, useRef, useCallback, useEffect, type ComponentType } from "re
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Camera, Upload, Loader2, X, Scan, ChevronRight, ArrowUp, Crown, Info, CheckCircle2,
-  Image as ImageIcon, Zap, PersonStanding, Search
+  Image as ImageIcon, Zap, PersonStanding, Search, Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { findLookAlike, LookAlikeResult } from "@/lib/lookAlikeSystem";
 import { Celebrity } from "@/lib/celebrityDatabase";
 import { Link } from "react-router-dom";
 import { usePaywallGate } from "@/hooks/usePaywallGate";
+import { usePremiumStatus } from "@/hooks/usePremiumStatus";
 
 type InstructionScreenProps = {
   title: string;
@@ -52,6 +53,7 @@ export default function LookAlike() {
   const [analysisStage, setAnalysisStage] = useState(0); // 0-4 for checklist
   const [consent, setConsent] = useState(false);
   const { checkGate } = usePaywallGate();
+  const { isPremium } = usePremiumStatus();
 
   const startWebcam = useCallback(async () => {
     try {
@@ -129,9 +131,6 @@ export default function LookAlike() {
 
     const res = await findLookAlike(frontPhoto!, sidePhoto);
     setResult(res);
-
-    // Soft gate check before showing result
-    await checkGate({ trigger: 'report_view', featureName: 'lookalike_result' });
 
     setStep("result");
   };
@@ -353,34 +352,59 @@ export default function LookAlike() {
                 animate={{ opacity: 1, scale: 1 }}
                 className="relative rounded-[2rem] overflow-hidden bg-card border border-border/50 shadow-2xl"
             >
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-background" />
-                
-                <div className="relative p-6 flex flex-col items-center text-center">
-                    <p className="text-sm font-bold text-primary mb-2 tracking-wider uppercase">Match Principal</p>
-                    <h2 className="font-heading text-3xl font-bold mb-4">{result.topMatch.name}</h2>
+                <div className={`transition-all duration-500 ${!isPremium ? "blur-xl select-none pointer-events-none opacity-50" : ""}`}>
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-background" />
                     
-                    <div className="relative w-48 h-48 mb-6">
-                        <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-primary to-accent animate-pulse opacity-50 blur-xl" />
-                        <img src={result.topMatch.photoUrl} alt={result.topMatch.name} className="relative w-full h-full object-cover rounded-full border-4 border-background shadow-xl" />
-                        <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-foreground text-background px-4 py-1.5 rounded-full font-bold shadow-lg text-sm">
-                            {result.similarity}% Similar
+                    <div className="relative p-6 flex flex-col items-center text-center">
+                        <p className="text-sm font-bold text-primary mb-2 tracking-wider uppercase">Match Principal</p>
+                        <h2 className="font-heading text-3xl font-bold mb-4">{result.topMatch.name}</h2>
+                        
+                        <div className="relative w-48 h-48 mb-6">
+                            <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-primary to-accent animate-pulse opacity-50 blur-xl" />
+                            <img src={result.topMatch.photoUrl} alt={result.topMatch.name} className="relative w-full h-full object-cover rounded-full border-4 border-background shadow-xl" />
+                            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-foreground text-background px-4 py-1.5 rounded-full font-bold shadow-lg text-sm">
+                                {result.similarity}% Similar
+                            </div>
+                        </div>
+
+                        <div className="bg-secondary/50 rounded-xl p-4 w-full text-left space-y-2">
+                            <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Por que deu match?</p>
+                            {result.top5[0].reasons.map((reason, i) => (
+                                <div key={i} className="flex items-center gap-2 text-sm">
+                                    <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                                    <span>{reason}</span>
+                                </div>
+                            ))}
                         </div>
                     </div>
-
-                    <div className="bg-secondary/50 rounded-xl p-4 w-full text-left space-y-2">
-                        <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Por que deu match?</p>
-                        {result.top5[0].reasons.map((reason, i) => (
-                            <div key={i} className="flex items-center gap-2 text-sm">
-                                <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-                                <span>{reason}</span>
-                            </div>
-                        ))}
-                    </div>
                 </div>
+
+                {/* PREMIUM LOCK OVERLAY */}
+                {!isPremium && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center z-10 p-6 text-center bg-background/10 backdrop-blur-sm">
+                        <div className="h-20 w-20 bg-background/80 backdrop-blur-md rounded-full flex items-center justify-center mb-6 shadow-2xl border border-white/10">
+                            <Lock className="h-10 w-10 text-primary drop-shadow-glow" />
+                        </div>
+                        <h3 className="font-heading text-2xl font-bold mb-3 drop-shadow-md">Resultado Pronto!</h3>
+                        <p className="text-muted-foreground font-medium mb-8 max-w-[240px] leading-relaxed">
+                            Você teve um match de <span className="text-primary font-bold text-lg">{result.similarity}%</span> com uma celebridade Top Tier!
+                        </p>
+                        <Button 
+                            onClick={() => checkGate({ trigger: 'feature_locked', featureName: 'lookalike_reveal' })} 
+                            className="w-full rounded-xl py-7 text-base font-bold shadow-xl glow-primary animate-pulse hover:scale-105 transition-transform"
+                        >
+                            <Crown className="h-5 w-5 mr-2" />
+                            Desbloquear Agora
+                        </Button>
+                        <p className="text-xs text-muted-foreground mt-4 opacity-70">
+                            Descubra quem é e veja a análise completa.
+                        </p>
+                    </div>
+                )}
             </motion.div>
 
-            {/* TOP 5 LIST */}
-            <div className="space-y-4">
+            {/* TOP 5 LIST - BLURRED IF NOT PREMIUM */}
+            <div className={`space-y-4 transition-all duration-500 ${!isPremium ? "blur-sm select-none pointer-events-none opacity-50 grayscale" : ""}`}>
                 <h3 className="font-bold text-lg px-2">Outros Matches</h3>
                 {result.top5.slice(1).map((match, i) => (
                     <motion.div 
@@ -402,20 +426,23 @@ export default function LookAlike() {
                 ))}
             </div>
 
-            {/* CTA */}
-            <div className="bg-gradient-to-r from-primary/20 to-accent/20 rounded-2xl p-6 text-center space-y-4 border border-primary/20">
-                <Crown className="h-8 w-8 text-primary mx-auto" />
-                <div>
-                    <h3 className="font-bold text-lg">Quer aumentar seu score?</h3>
-                    <p className="text-sm text-muted-foreground">Veja o plano de looksmaxing para melhorar sua similaridade com os Top Tiers.</p>
+            {/* CTA - Only show if Premium (otherwise the lock overlay is the CTA) */}
+            {isPremium && (
+                <div className="bg-gradient-to-r from-primary/20 to-accent/20 rounded-2xl p-6 text-center space-y-4 border border-primary/20">
+                    <Crown className="h-8 w-8 text-primary mx-auto" />
+                    <div>
+                        <h3 className="font-bold text-lg">Quer aumentar seu score?</h3>
+                        <p className="text-sm text-muted-foreground">Veja o plano de looksmaxing para melhorar sua similaridade com os Top Tiers.</p>
+                    </div>
+                    <Link to="/analysis">
+                        <Button className="w-full rounded-xl font-bold shadow-lg">
+                            Ver Plano Looksmaxing
+                        </Button>
+                    </Link>
                 </div>
-                <Link to="/analysis">
-                    <Button className="w-full rounded-xl font-bold shadow-lg">
-                        Ver Plano Looksmaxing
-                    </Button>
-                </Link>
-            </div>
+            )}
             
+
             <p className="text-xs text-center text-muted-foreground">
                 *Resultados estimados baseados em IA. A similaridade pode variar conforme a iluminação e ângulo.
             </p>
