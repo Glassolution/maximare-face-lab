@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo, type ComponentType } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion";
 import {
   Camera,
   Upload,
@@ -25,6 +25,76 @@ import { generatePersonalizedPlan } from "@/lib/smartTrendsEngine";
 import faceScanHero from "@/assets/clark.png";
 import { useAuth } from "@/auth/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
+
+function CircularScore({ score, delta, ringColor }: { score: number; delta: number; ringColor: string }) {
+  const springValue = useSpring(0, { stiffness: 40, damping: 20 });
+  
+  useEffect(() => {
+    springValue.set(score);
+  }, [score, springValue]);
+
+  const displayValue = useTransform(springValue, (latest) => latest.toFixed(1));
+  
+  const radius = 70;
+  const circumference = 2 * Math.PI * radius;
+  
+  const strokeDashoffset = useTransform(springValue, (latest) => {
+    const progress = Math.max(0, Math.min(100, latest)) / 100;
+    return circumference - (progress * circumference);
+  });
+
+  return (
+    <div className="relative h-44 w-44 flex items-center justify-center">
+      {/* Background Circle */}
+      <svg className="absolute inset-0 w-full h-full -rotate-90">
+        <circle
+          cx="88"
+          cy="88"
+          r={radius}
+          stroke="currentColor"
+          strokeWidth="6"
+          fill="transparent"
+          className="text-muted/30"
+        />
+        {/* Progress Circle */}
+        <motion.circle
+          cx="88"
+          cy="88"
+          r={radius}
+          stroke={ringColor}
+          strokeWidth="6"
+          fill="transparent"
+          strokeDasharray={circumference}
+          style={{ strokeDashoffset }}
+          strokeLinecap="round"
+        />
+      </svg>
+      
+      {/* Inner Content */}
+      <div className="flex flex-col items-center justify-center z-10 relative">
+        <p className="text-[9px] font-mono tracking-[0.2em] text-muted-foreground uppercase px-3 text-center mb-1">
+          Overall Score
+        </p>
+        <motion.p className="text-4xl font-extrabold tracking-tight text-foreground tabular-nums">
+          {displayValue}
+        </motion.p>
+        <div className="mt-3 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-muted border border-border text-[10px] font-semibold text-primary">
+          <TrendingUp className="h-3 w-3" />
+          <span>
+            {delta >= 0 ? "+" : ""}
+            {delta.toFixed(1)} pts
+          </span>
+        </div>
+      </div>
+      
+      {/* Glow Effect */}
+      <div 
+        className="absolute inset-0 rounded-full blur-3xl opacity-20 pointer-events-none"
+        style={{ backgroundColor: ringColor }}
+      />
+    </div>
+  );
+}
 
 export default function Analysis() {
   const navigate = useNavigate();
@@ -94,7 +164,6 @@ export default function Analysis() {
   const currentGER = lastAnalysis
     ? (lastAnalysis as ExtendedAnalysisResult).ger ?? Math.round(lastAnalysis.overallScore * 10)
     : 0;
-  const currentGERPercent = Math.max(0, Math.min(100, currentGER));
   const streak = Math.max(history.length, 1);
   const weekDelta = history.length > 1 ? +(history[0].overallScore - history[1].overallScore).toFixed(1) : 0;
   const ringColor =
@@ -719,30 +788,11 @@ export default function Analysis() {
         <main className="flex-1 px-6 pt-4 pb-24 space-y-8">
           {/* Hero Score Section - circular score + delta */}
           <section className="pt-4 pb-2 flex flex-col items-center gap-6">
-            <div className="relative">
-              <div
-                className="relative h-44 w-44 rounded-full flex items-center justify-center"
-                style={{
-                  background: `conic-gradient(${ringColor} ${currentGERPercent}%, var(--muted) ${currentGERPercent}% 100%)`,
-                }}
-              >
-                <div className="h-36 w-36 rounded-full bg-card flex flex-col items-center justify-center shadow-[0_0_30px_rgba(37,99,235,0.35)]">
-                  <p className="text-[9px] font-mono tracking-[0.2em] text-muted-foreground uppercase px-3 text-center">
-                    Overall Score
-                  </p>
-                  <p className="mt-1 text-4xl font-extrabold tracking-tight text-foreground">
-                    {currentGER ? currentGER.toFixed(1) : "0.0"}
-                  </p>
-                  <div className="mt-3 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-muted border border-border text-[10px] font-semibold text-primary">
-                    <TrendingUp className="h-3 w-3" />
-                    <span>
-                      {weekDelta >= 0 ? "+" : ""}
-                      {weekDelta.toFixed(1)} pts
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <CircularScore 
+              score={currentGER} 
+              delta={weekDelta} 
+              ringColor={ringColor} 
+            />
           </section>
 
           {/* IA Insights - Foco Atual / Trends */}

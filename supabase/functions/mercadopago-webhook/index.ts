@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -12,18 +11,17 @@ serve(async (req) => {
     );
 
     const url = new URL(req.url);
-    const eventType = url.searchParams.get('topic') || url.searchParams.get('type');
-    const resourceId = url.searchParams.get('id') || url.searchParams.get('data.id');
+    // Support both query param and body for topic/type
+    let eventType = url.searchParams.get('topic') || url.searchParams.get('type');
+    let resourceId = url.searchParams.get('id') || url.searchParams.get('data.id');
 
-    // Mercado Pago sends events in query params or body depending on version.
-    // We'll check body too.
     const body = await req.json().catch(() => ({}));
-    const finalEventType = body.type || body.topic || eventType;
-    const finalResourceId = body.data?.id || body.id || resourceId;
+    eventType = body.type || body.topic || eventType;
+    resourceId = body.data?.id || body.id || resourceId;
 
-    console.log('Webhook received:', { finalEventType, finalResourceId, body });
+    console.log('Webhook received:', { eventType, resourceId, body });
 
-    if (!finalEventType || !finalResourceId) {
+    if (!eventType || !resourceId) {
         return new Response(JSON.stringify({ received: true }), { status: 200 });
     }
 
@@ -32,8 +30,8 @@ serve(async (req) => {
       .from('webhook_events')
       .select('id')
       .eq('provider', 'mercadopago')
-      .eq('event_type', finalEventType)
-      .eq('resource_id', finalResourceId)
+      .eq('event_type', eventType)
+      .eq('resource_id', resourceId)
       .single();
 
     if (existingEvent) {
@@ -41,17 +39,17 @@ serve(async (req) => {
       return new Response(JSON.stringify({ received: true }), { status: 200 });
     }
 
-    // Register event
+    // Register event immediately to prevent race conditions
     await supabaseClient.from('webhook_events').insert({
       provider: 'mercadopago',
-      event_type: finalEventType,
-      resource_id: finalResourceId,
+      event_type: eventType,
+      resource_id: resourceId,
       request_id: req.headers.get('x-request-id'),
     });
 
-    if (finalEventType === 'payment') {
-      // Fetch payment details
-      const paymentRes = await fetch(`https://api.mercadopago.com/v1/payments/${finalResourceId}`, {
+    if (eventType === 'payment') {
+      // Fetch payment details from Mercado Pago
+      const paymentRes = await fetch(`https://api.mercadopago.com/v1/payments/${resourceId}`, {
         headers: {
           'Authorization': `Bearer ${MP_ACCESS_TOKEN}`,
         },
@@ -64,71 +62,98 @@ serve(async (req) => {
 
       const payment = await paymentRes.json();
       const externalReference = payment.external_reference;
-      const status = payment.status;
+      const status = payment.status; // approved, pending, rejected, cancelled, refunded, charged_back
 
-      console.log('Payment details:', { externalReference, status });
+      console.log('Payment details:', { externalReference, status, plan: payment.metadata?.plan_type });
 
       if (externalReference) {
-        // Update purchase
+        // Fetch purchase to identify user and plan
         const { data: purchase } = await supabaseClient
           .from('purchases')
-          .update({ 
-            status: status, 
-            mp_payment_id: finalResourceId 
-          })
+          .select('*')
           .eq('id', externalReference)
-          .select()
           .single();
 
-        if (purchase && status === 'approved') {
-          // Activate premium
-          let durationDays = 0;
-          if (purchase.plan === 'weekly') durationDays = 7;
-          if (purchase.plan === 'monthly') durationDays = 30;
-          if (purchase.plan === 'yearly') durationDays = 365;
+        if (purchase) {
+            // Update purchase status
+            await supabaseClient
+            .from('purchases')
+            .update({ 
+                status: status, 
+                mp_payment_id: resourceId,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', externalReference);
 
-          const now = new Date();
-          const until = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+            // Handle Profile Subscription Status
+            let subscriptionStatus = 'expired';
+            let planType = 'free';
+            let expiresAt = new Date().toISOString();
+            
+            // Map purchase plan to profile plan_type
+            if (purchase.plan === 'weekly') planType = 'premium_weekly';
+            else if (purchase.plan === 'monthly') planType = 'premium_monthly';
+            else if (purchase.plan === 'yearly') planType = 'premium_yearly';
 
-          console.log(`Activating plan: ${purchase.plan}, Duration: ${durationDays} days, Until: ${until.toISOString()}`);
+            if (status === 'approved') {
+                subscriptionStatus = 'active';
+                
+                // Calculate expiration
+                let durationDays = 0;
+                if (purchase.plan === 'weekly') durationDays = 7;
+                if (purchase.plan === 'monthly') durationDays = 30;
+                if (purchase.plan === 'yearly') durationDays = 365;
 
-          await supabaseClient
+                const now = new Date();
+                const until = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+                expiresAt = until.toISOString();
+
+                // Log activation
+                 await supabaseClient.from('paywall_events').insert({
+                    user_id: purchase.user_id,
+                    event_type: 'premium_activated',
+                    context: { plan: purchase.plan, method: 'mercadopago', amount: purchase.amount_cents, payment_id: resourceId }
+                 });
+
+            } else if (status === 'refunded') {
+                subscriptionStatus = 'refunded';
+                expiresAt = new Date().toISOString(); // Expire immediately
+            } else if (status === 'charged_back') {
+                subscriptionStatus = 'past_due'; // Or refunded/canceled
+                expiresAt = new Date().toISOString();
+            } else if (status === 'cancelled') {
+                 // If it's a subscription cancellation, we might keep access until expiresAt.
+                 // But for one-time payments (which MP usually is unless configured as sub), cancelled usually means voided.
+                 // If this is a recurring sub cancellation event, we should check `date_of_expiration`.
+                 // Assuming standard payment flow here: cancelled payment = no access.
+                 subscriptionStatus = 'canceled';
+                 expiresAt = new Date().toISOString();
+            } else {
+                // pending, rejected, etc. - do not activate
+                // If previously active, we should be careful not to overwrite valid sub with pending?
+                // But external_reference links to a specific purchase attempt.
+                // We only update if it's a terminal state or approval.
+                if (status === 'pending') {
+                     // Do nothing to profile yet, or set to 'trialing' if applicable
+                     // For safety, we just log and return.
+                     console.log(`Payment pending for user ${purchase.user_id}`);
+                     return new Response(JSON.stringify({ received: true }), { status: 200 });
+                }
+            }
+
+            // Update Profile - Single Source of Truth
+            // We STOP updating legacy columns to enforce migration.
+            await supabaseClient
             .from('profiles')
             .update({
-              premium_status: 'premium',
-              premium_plan: purchase.plan,
-              premium_since: now.toISOString(),
-              premium_until: until.toISOString(),
-              // New subscription columns
-              subscription_status: 'premium_active',
-              plan_type: purchase.plan === 'monthly' ? 'premium_monthly' : (purchase.plan === 'yearly' ? 'premium_yearly' : 'premium_weekly'),
-              subscription_expires_at: until.toISOString(),
+                subscription_status: subscriptionStatus,
+                plan_type: planType,
+                subscription_expires_at: expiresAt,
+                updated_at: new Date().toISOString()
             })
             .eq('id', purchase.user_id);
             
-          console.log(`Premium activated for user ${purchase.user_id}`);
-
-          // Log paywall event
-          await supabaseClient.from('paywall_events').insert({
-            user_id: purchase.user_id,
-            event_type: 'premium_activated',
-            context: { plan: purchase.plan, method: 'mercadopago', amount: purchase.amount }
-          });
-        } else if (purchase && (status === 'refunded' || status === 'charged_back')) {
-           // Revoke premium
-           await supabaseClient
-            .from('profiles')
-            .update({
-              premium_status: 'free',
-              premium_plan: null,
-              premium_until: new Date().toISOString(), // Expire immediately
-              // New subscription columns
-              subscription_status: 'premium_expired',
-              plan_type: 'free',
-              subscription_expires_at: new Date().toISOString(),
-            })
-            .eq('id', purchase.user_id);
-            console.log(`Premium revoked for user ${purchase.user_id}`);
+            console.log(`Profile updated for user ${purchase.user_id}: ${subscriptionStatus}`);
         }
       }
     }
@@ -141,7 +166,7 @@ serve(async (req) => {
     console.error('Webhook error:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { 'Content-Type': 'application/json' },
-      status: 200, // Return 200 to avoid retries on logic errors
+      status: 200, // Return 200 to avoid retries on logic errors if handled
     });
   }
 });

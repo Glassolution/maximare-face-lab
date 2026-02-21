@@ -53,8 +53,9 @@ export async function shouldShowPaywall(context: PaywallContext): Promise<boolea
   }
 
   // 1. Check if user is actively premium
+  const status = profile.subscription_status;
   const isPremium = 
-    profile.subscription_status === 'premium_active' && 
+    (status === 'active' || status === 'trialing' || status === 'premium_active') && 
     profile.subscription_expires_at && 
     new Date(profile.subscription_expires_at) > new Date();
 

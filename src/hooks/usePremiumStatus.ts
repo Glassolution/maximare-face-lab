@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/auth/AuthProvider';
+import { useAuth } from '@/components/AuthProvider';
+
+export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'refunded' | 'expired' | 'trialing' | 'free';
 
 export function usePremiumStatus() {
   const { user } = useAuth();
   const [isPremium, setIsPremium] = useState(false);
-  const [subscriptionStatus, setSubscriptionStatus] = useState<'free' | 'premium_active' | 'premium_expired'>('free');
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>('free');
   const [expiresAt, setExpiresAt] = useState<Date | null>(null);
   const [planType, setPlanType] = useState<string>('free');
   const [loading, setLoading] = useState(true);
@@ -22,64 +24,32 @@ export function usePremiumStatus() {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('subscription_status, subscription_expires_at, plan_type, premium_status, premium_until, premium_plan') // Fetch old cols too for fallback
+          .select('subscription_status, subscription_expires_at, plan_type')
           .eq('id', user.id)
           .single();
 
         if (error || !data) {
+          console.error('Error fetching profile for premium status:', error);
           setIsPremium(false);
           setSubscriptionStatus('free');
         } else {
-          // Priority: New columns > Old columns
-          let status = data.subscription_status as 'free' | 'premium_active' | 'premium_expired' | null;
-          let expires = data.subscription_expires_at;
-          let plan = data.plan_type;
+          const status = (data.subscription_status as SubscriptionStatus) || 'free';
+          const expires = data.subscription_expires_at ? new Date(data.subscription_expires_at) : null;
+          const plan = data.plan_type || 'free';
 
-          // Fallback migration logic in frontend if DB migration hasn't run yet or for old data
-          if (!status) {
-             if (data.premium_status === 'premium') status = 'premium_active';
-             else status = 'free';
-          }
-          if (!expires) expires = data.premium_until;
-          if (!plan) {
-            // Map old plan names to new plan types
-            const oldPlan = data.premium_plan;
-            if (oldPlan === 'monthly') plan = 'premium_monthly';
-            else if (oldPlan === 'yearly') plan = 'premium_yearly';
-            else if (oldPlan === 'weekly') plan = 'premium_weekly';
-            else plan = 'free';
-          }
-
-          // Auto-expire logic
+          // Server-side validation principle:
+          // Access is granted ONLY if status is 'active' (or 'trialing') AND expiration date is valid.
+          // We do NOT write to the DB here. The backend is the source of truth.
           const now = new Date();
-          const expirationDate = expires ? new Date(expires) : null;
-          const isExpired = expirationDate ? expirationDate < now : true;
+          const isValid = (status === 'active' || status === 'trialing') && (expires ? expires > now : false);
 
-          if (status === 'premium_active' && isExpired) {
-             status = 'premium_expired';
-             // Update DB to reflect expiration
-             try {
-               await supabase
-                 .from('profiles')
-                 .update({ 
-                   subscription_status: 'premium_expired',
-                   plan_type: 'free' // Reset plan type on expiration? User said "Atualizar automaticamente para premium_expired". keeping plan_type might be useful for history, but typically free users have 'free' plan. Let's set to 'free' as per webhook logic.
-                 })
-                 .eq('id', user.id);
-             } catch (updateErr) {
-               console.error('Error auto-expiring subscription:', updateErr);
-             }
-          }
-
-          const isActive = status === 'premium_active' && !isExpired;
-          
-          setIsPremium(isActive);
-          setSubscriptionStatus(status || 'free');
-          setExpiresAt(expirationDate);
-          setPlanType(plan || 'free');
+          setIsPremium(isValid);
+          setSubscriptionStatus(status);
+          setExpiresAt(expires);
+          setPlanType(plan);
         }
       } catch (err) {
-        console.error('Error checking premium status:', err);
+        console.error('Unexpected error checking premium status:', err);
         setIsPremium(false);
       } finally {
         setLoading(false);
@@ -90,7 +60,7 @@ export function usePremiumStatus() {
     
     // Subscribe to realtime changes on profiles table for this user
     const channel = supabase
-      .channel('profile-subscription-changes')
+      .channel(`profile-subscription-${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -99,7 +69,8 @@ export function usePremiumStatus() {
           table: 'profiles',
           filter: `id=eq.${user.id}`,
         },
-        () => {
+        (payload) => {
+          console.log('Realtime subscription update:', payload);
           checkStatus();
         }
       )
