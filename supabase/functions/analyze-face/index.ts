@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { crypto } from "https://deno.land/std@0.177.0/crypto/mod.ts";
@@ -263,7 +262,6 @@ serve(async (req: Request) => {
     const analysisId: string = body.analysisId || crypto.randomUUID();
     const checkOnly = body.checkOnly === true;
 
-    // ... (CheckOnly Logic skipped for brevity, assumed same as original) ...
     if (checkOnly) {
        // Minimal implementation for checkOnly to keep it valid
        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -334,9 +332,6 @@ serve(async (req: Request) => {
 
     // 2. Check for exact duplicate analysis in history
     if (supabase && user_id) {
-        // We look for a record that matches both hashes in image_meta
-        // The json structure in DB: image_meta: { front: { hash: "..." }, side: { hash: "..." } }
-        
         let query = supabase
             .from("analysis_history")
             .select("id, created_at, result_json")
@@ -346,7 +341,6 @@ serve(async (req: Request) => {
         if (sideHash) {
             query = query.eq("image_meta->side->>hash", sideHash);
         } else {
-            // Ensure no side image was present in the cached version either
             query = query.is("image_meta->side", null); 
         }
         
@@ -354,7 +348,6 @@ serve(async (req: Request) => {
 
         if (duplicates) {
             console.log("CACHE HIT: Found duplicate image analysis.");
-            // Return cached result immediately
             const guardRo = await getGuardInfo(supabase, user_id, plan);
             const responseBody = {
                 ...duplicates.result_json,
@@ -364,7 +357,7 @@ serve(async (req: Request) => {
                 limits_disabled: limitsDisabled,
                 history_id: duplicates.id,
                 created_at: duplicates.created_at,
-                cooldown_seconds: 0, // No cooldown for cache hits
+                cooldown_seconds: 0, 
                 cached: true
             };
             return new Response(JSON.stringify(responseBody), {
@@ -512,12 +505,28 @@ Diretrizes de score (Seja Rigoroso, mas Justo - Escala de Atratividade):
 - 40-49: Sub5 / Abaixo da Média (Desarmonia leve, recessão de queixo, assimetria visível)
 - 0-39: Sub3 / Deficiências estruturais claras
 
-CRITÉRIOS DE CORREÇÃO (MANDATÓRIOS):
-1. Se o rosto for do ator TOM WELLING (Clark Kent/Superman), o score DEVE ser > 85 (Chadlite/Chad). Ele é um arquétipo de alta estética. JAMAIS dê Sub5 ou LTN para ele.
-2. Se o sujeito tem mandíbula definida (jawline visível) e boa área ocular, o score MÍNIMO ABSOLUTO é 70 (HTN).
-3. Se o sujeito parece um "galã de novela" ou modelo, o score DEVE ser > 80.
-4. LTN (50-59) e Sub5 (40-49) são APENAS para rostos com falhas estruturais óbvias.
-5. ERRO PROIBIDO: Dar score < 60 para alguém com "Warrior Skull" ou dimorfismo sexual alto. Na dúvida, dê nota mais alta.`,
+CRITÉRIOS DE CORREÇÃO ABSOLUTA (WARRIOR SKULL / CHAD ARCHETYPE):
+ATENÇÃO MÁXIMA: Você tem falhado em reconhecer arquétipos masculinos robustos de alta estética, classificando-os erroneamente como LTN ou Sub5. ISSO É INACEITÁVEL.
+Siga estas regras de proteção contra alucinação negativa:
+
+1. **ARQUÉTIPO "WARRIOR SKULL" (MANDATÓRIO):**
+   - Se o rosto apresentar mandíbula larga e angular (bigonial width similar à bizygomatic width), queixo projetado e dimorfismo sexual alto, o score de "masculinidade_estrutural" DEVE ser > 90.
+   - O score GERAL (harmonia_geral) para este arquétipo NUNCA deve ser menor que 80 (Chad/Modelo), a menos que haja deformidade óbvia.
+   - **Exemplo Específico:** Rostos como o do ator TOM WELLING (Superman/Smallville) representam o pico deste arquétipo. Se a imagem se assemelhar a ele (maxilar quadrado, olhos claros/hunter eyes, estrutura óssea densa), a nota DEVE ser > 85. Classificá-lo como Sub5 ou LTN é um ERRO CRÍTICO.
+
+2. **HUNTER EYES (OLHOS DE CAÇADOR):**
+   - Se os olhos forem compactos, com inclinação cantal positiva ou neutra, e sobrancelha baixa/reta (low set eyebrows), isso é um traço de alta atratividade. Aumente o score de "regiao_ocular" e "harmonia_geral".
+   - Não confunda "olhos semicerrados de modelo" com "olhos cansados".
+
+3. **NÃO CONFUNDA MASCULINIDADE COM VELHICE:**
+   - Traços fortes, linhas de expressão masculinas ou pele com textura normal de homem NÃO devem reduzir drasticamente a nota. Diferencie "rugas de envelhecimento precoce" de "linhas de expressão masculinas".
+
+4. **REGRA DE OURO:**
+   - Se o sujeito parece um modelo de passarela, ator de Hollywood ou galã, a nota É ALTA (>80).
+   - Se o sujeito tem falhas claras (queixo retraído, obesidade, assimetria severa), a nota é baixa (<50).
+   - NÃO DÊ NOTAS MEDÍOCRES (50-60) PARA ROSTOS DE ELITE.
+
+Seja preciso. Reconheça a beleza masculina robusta.`,
     });
 
     imageContents.push({
@@ -557,7 +566,6 @@ CRITÉRIOS DE CORREÇÃO (MANDATÓRIOS):
     const latencyMs = Math.round(performance.now() - startedAt);
 
     if (!response.ok) {
-       // ... Error handling same as before ...
        const error_text = await response.text();
        throw new Error(`Provider error: ${response.status} - ${error_text}`);
     }
@@ -587,7 +595,6 @@ CRITÉRIOS DE CORREÇÃO (MANDATÓRIOS):
       });
     }
 
-    // ... Calculation Logic Same as Before ...
     const f = parsed.frontal;
     const l = parsed.lateral;
     const hasLateral = l?.available !== false && l?.projecao_queixo != null;
@@ -621,7 +628,6 @@ CRITÉRIOS DE CORREÇÃO (MANDATÓRIOS):
     const nextTier = getNextTier(clampedGer);
     const secondaryScore = +(clampedGer / 10).toFixed(1);
 
-    // ... Attributes & Desc Helpers ...
     const attributes = [
       { id: "masculinity", name: "Masculinidade", score: f.masculinidade_estrutural, icon: "masculinidade" },
       { id: "definition", name: "Definição Facial", score: f.definicao_facial ?? 50, icon: "definicao" },
@@ -695,7 +701,6 @@ CRITÉRIOS DE CORREÇÃO (MANDATÓRIOS):
       request_id: response.headers.get("x-request-id") || response.headers.get("x-amzn-requestid") || null,
     };
 
-    // Construct imageMeta with hashes
     const imageMeta = (() => {
       const meta: Record<string, unknown> = {};
       const extract = (dataUrl: string | null, hash: string | null, key: "front" | "side") => {
@@ -705,14 +710,13 @@ CRITÉRIOS DE CORREÇÃO (MANDATÓRIOS):
         const mimeMatch = header.match(/^data:(.*?);base64$/);
         const mime = mimeMatch ? mimeMatch[1] : null;
         const bytes = base64 ? Math.floor((base64.length * 3) / 4) : null;
-        meta[key] = { mime, bytes, hash }; // Added Hash
+        meta[key] = { mime, bytes, hash };
       };
       extract(frontalImage, frontHash, "front");
       extract(lateralImage, sideHash, "side");
       return Object.keys(meta).length > 0 ? meta : null;
     })();
 
-    // ... Song Match Logic ...
     const pickMood = (score: number) => {
       if (score >= 86) return ["cinematic", "luxury"];
       if (score >= 76) return ["aura", "cinematic"];
@@ -721,15 +725,11 @@ CRITÉRIOS DE CORREÇÃO (MANDATÓRIOS):
       return ["dark", "sigma"];
     };
 
-    // ... (Simplified for brevity, assuming existing logic) ...
     let songMatch = null;
-    // ...
-
     let historyRow: { id: number; created_at: string } | null = null;
 
     if (supabase && user_id) {
         const source = isPartial ? "front" : "front_lateral";
-        // Insert into history
         const { data: history, error: historyError } = await supabase
           .from("analysis_history")
           .upsert(
@@ -741,7 +741,7 @@ CRITÉRIOS DE CORREÇÃO (MANDATÓRIOS):
               score: clampedGer,
               rank: tier.name,
               provider_meta: providerMeta,
-              image_meta: imageMeta, // Includes Hashes now
+              image_meta: imageMeta,
             },
             { onConflict: "user_id,analysis_id" },
           )
