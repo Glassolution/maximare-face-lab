@@ -17,6 +17,7 @@ import LookAlike from "@/pages/LookAlike";
 import NotFound from "@/pages/NotFound";
 import Login from "@/pages/Login";
 import Premium from "@/pages/Premium";
+import Admin from "@/pages/Admin";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 import { useEffect, useState } from "react";
@@ -125,7 +126,8 @@ function Layout() {
         <Route path="/look-alike" element={<LookAlike />} />
         <Route path="/login" element={<Login />} />
         <Route path="/premium" element={<Premium />} />
-        <Route path="*" element={<NotFound />} />
+          <Route path="/admin-tools" element={<Admin />} />
+          <Route path="*" element={<NotFound />} />
       </Routes>
       {!hideNav && <BottomNav />}
       <PaywallDialog />
