@@ -14,12 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      paywall_events: {
+        Row: {
+          context: Json | null
+          created_at: string
+          event_type: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          context?: Json | null
+          created_at?: string
+          event_type: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          context?: Json | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
           created_at: string
           display_name: string | null
           id: string
+          last_paywall_dismissed_at: string | null
+          last_paywall_shown_at: string | null
+          paywall_dismiss_count_7d: number
+          paywall_show_count_7d: number
+          plan_type: string
+          subscription_expires_at: string | null
+          subscription_status: string
+          updated_at: string | null
           user_id: string
           username: string
         }
@@ -28,6 +60,14 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          last_paywall_dismissed_at?: string | null
+          last_paywall_shown_at?: string | null
+          paywall_dismiss_count_7d?: number
+          paywall_show_count_7d?: number
+          plan_type?: string
+          subscription_expires_at?: string | null
+          subscription_status?: string
+          updated_at?: string | null
           user_id: string
           username: string
         }
@@ -36,8 +76,58 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          last_paywall_dismissed_at?: string | null
+          last_paywall_shown_at?: string | null
+          paywall_dismiss_count_7d?: number
+          paywall_show_count_7d?: number
+          plan_type?: string
+          subscription_expires_at?: string | null
+          subscription_status?: string
+          updated_at?: string | null
           user_id?: string
           username?: string
+        }
+        Relationships: []
+      }
+      purchases: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          currency: string
+          id: string
+          mp_payment_id: string | null
+          mp_preference_id: string | null
+          plan: string
+          provider: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          currency?: string
+          id?: string
+          mp_payment_id?: string | null
+          mp_preference_id?: string | null
+          plan: string
+          provider?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          mp_payment_id?: string | null
+          mp_preference_id?: string | null
+          plan?: string
+          provider?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -110,6 +200,33 @@ export type Database = {
           preferences?: Json | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      webhook_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          provider: string
+          request_id: string | null
+          resource_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          provider: string
+          request_id?: string | null
+          resource_id: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          provider?: string
+          request_id?: string | null
+          resource_id?: string
         }
         Relationships: []
       }
