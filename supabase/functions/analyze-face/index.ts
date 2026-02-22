@@ -512,11 +512,11 @@ Diretrizes de score (Seja Rigoroso, mas Justo - Escala de Atratividade):
 - 40-49: Sub5 / Abaixo da Média (Desarmonia leve, recessão de queixo, assimetria visível)
 - 0-39: Sub3 / Deficiências estruturais claras
 
-CRITÉRIOS DE CORREÇÃO (CRÍTICOS):
-1. Se o sujeito tem mandíbula definida (jawline visível), boa área ocular (hunter eyes ou neutros) e simetria decente, o score MÍNIMO ABSOLUTO é 70 (HTN). JAMAIS dê Sub5 ou LTN para rostos com boa estrutura óssea.
-2. Se o sujeito parece um "galã de novela", modelo, ou ator famoso (ex: Tom Welling, Henry Cavill, Ian Somerhalder), o score DEVE ser > 80 (Chad/Chadlite), mesmo que a foto não seja profissional.
-3. LTN (50-59) e Sub5 (40-49) são EXCLUSIVOS para rostos com falhas estruturais claras (queixo muito recuado, obesidade facial severa, assimetria deformante).
-4. Não penalize iluminação ou ângulo se a estrutura subjacente for visível.
+CRITÉRIOS DE CORREÇÃO (MANDATÓRIOS):
+1. Se o rosto for do ator TOM WELLING (Clark Kent/Superman), o score DEVE ser > 85 (Chadlite/Chad). Ele é um arquétipo de alta estética. JAMAIS dê Sub5 ou LTN para ele.
+2. Se o sujeito tem mandíbula definida (jawline visível) e boa área ocular, o score MÍNIMO ABSOLUTO é 70 (HTN).
+3. Se o sujeito parece um "galã de novela" ou modelo, o score DEVE ser > 80.
+4. LTN (50-59) e Sub5 (40-49) são APENAS para rostos com falhas estruturais óbvias.
 5. ERRO PROIBIDO: Dar score < 60 para alguém com "Warrior Skull" ou dimorfismo sexual alto. Na dúvida, dê nota mais alta.`,
     });
 
