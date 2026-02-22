@@ -1,15 +1,63 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { crypto } from "https://deno.land/std@0.177.0/crypto/mod.ts";
 
 const MP_ACCESS_TOKEN = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN');
+const MP_WEBHOOK_SECRET = Deno.env.get('MERCADOPAGO_WEBHOOK_SECRET'); // NOVO
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-signature, x-request-id",
 };
+
+// Helper: Verify Signature (HMAC SHA-256)
+async function verifySignature(req: Request, bodyText: string): Promise<boolean> {
+    if (!MP_WEBHOOK_SECRET) return true; // Se não tiver secret configurado, ignora (dev mode)
+
+    const xSignature = req.headers.get("x-signature");
+    const xRequestId = req.headers.get("x-request-id");
+
+    if (!xSignature || !xRequestId) {
+        console.warn("Missing signature headers");
+        return false;
+    }
+
+    // Parse x-signature (ts=...,v1=...)
+    const parts = xSignature.split(',');
+    let ts = '';
+    let v1 = '';
+    
+    parts.forEach(part => {
+        const [key, value] = part.split('=');
+        if (key === 'ts') ts = value;
+        if (key === 'v1') v1 = value;
+    });
+
+    const manifest = `id:${xRequestId};request-timestamp:${ts};requestId:${xRequestId};signed_payload:${bodyText}`;
+
+    const key = await crypto.subtle.importKey(
+        "raw",
+        new TextEncoder().encode(MP_WEBHOOK_SECRET),
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["sign"]
+    );
+
+    const signatureBuffer = await crypto.subtle.sign(
+        "HMAC",
+        key,
+        new TextEncoder().encode(manifest)
+    );
+
+    const hexSignature = Array.from(new Uint8Array(signatureBuffer))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+
+    return hexSignature === v1;
+}
 
 // Robust Event Parser Helper
 async function parseEvent(req: Request) {
@@ -18,21 +66,19 @@ async function parseEvent(req: Request) {
   const queryId = url.searchParams.get('id') || url.searchParams.get('data.id');
 
   let body: any = {};
+  let bodyText = "";
   try {
-    const text = await req.text();
-    if (text) body = JSON.parse(text);
+    bodyText = await req.text();
+    if (bodyText) body = JSON.parse(bodyText);
   } catch (e) {
     console.error("Error parsing body:", e);
   }
 
   // PRIORITIZE QUERY PARAMS (Fix for wrong eventType interpretation)
-  // If query params exist, they are the source of truth for the notification type.
-  // Body is often just { id, live_mode, ... } without type, or type inside action.
-  
   const eventType = queryType || body.type || body.topic || body.action;
   const resourceId = queryId || body.data?.id || body.id;
 
-  return { eventType, resourceId, body, query: Object.fromEntries(url.searchParams) };
+  return { eventType, resourceId, body, bodyText, query: Object.fromEntries(url.searchParams) };
 }
 
 serve(async (req) => {
@@ -50,8 +96,20 @@ serve(async (req) => {
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // 1. Parse Event
-    const { eventType, resourceId, body, query } = await parseEvent(req);
-    console.log('Webhook received:', { eventType, resourceId, query, bodyKeys: Object.keys(body) });
+    const { eventType, resourceId, body, bodyText, query } = await parseEvent(req);
+    console.log('Webhook received:', { eventType, resourceId });
+
+    // 2. Validate Signature (Optional but recommended)
+    // Se falhar, retornamos 401 ou 200 com erro logado (para evitar retries infinitos do MP)
+    // A decisão segura é retornar 200 e ignorar.
+    const isSignatureValid = await verifySignature(req, bodyText);
+    if (!isSignatureValid && MP_WEBHOOK_SECRET) {
+        console.error("Signature Validation Failed!");
+        // return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+        // Melhor retornar 200 para parar o MP, mas não processar nada.
+        return new Response(JSON.stringify({ received: true, status: "ignored_invalid_signature" }), { status: 200, headers: corsHeaders });
+    }
+    console.log("Signature OK");
 
     if (!eventType || !resourceId) {
       return new Response(JSON.stringify({ received: true, message: 'Missing event details (type or id)' }), { 
@@ -59,19 +117,14 @@ serve(async (req) => {
       });
     }
 
-    // 2. Idempotency Check (Check ONLY, do not insert yet)
-    // We insert AFTER success or marking as 'processing' to allow retries on failure, 
-    // BUT common practice is to record receipt first. 
-    // Prompt says: "NÃO marcar como processed antes de finalizar com sucesso".
-    // So we check if *completed* event exists.
-    
+    // 3. Idempotency Check
     const { data: existingEvent } = await supabaseAdmin
       .from('webhook_events')
       .select('id, status')
       .eq('provider', 'mercadopago')
       .eq('event_type', eventType)
       .eq('resource_id', resourceId)
-      .eq('status', 'success') // Only block if successfully processed
+      .eq('status', 'success')
       .maybeSingle();
 
     if (existingEvent) {
@@ -81,16 +134,14 @@ serve(async (req) => {
       });
     }
 
-    // Log attempt (optional, or insert as 'pending')
     console.log(`Processing case: ${eventType} ID: ${resourceId}`);
 
-    // 3. Process Logic
+    // 4. Process Logic
     let processed = false;
     let details = {};
 
     // --- CASE A: Subscription Authorized Payment (Recurring Payment Success) ---
     if (eventType === 'subscription_authorized_payment') {
-        // resourceId is PAYMENT_ID
         console.log(`Fetching Payment details for subscription payment: ${resourceId}`);
         const payRes = await fetch(`https://api.mercadopago.com/v1/payments/${resourceId}`, {
             headers: { 'Authorization': `Bearer ${MP_ACCESS_TOKEN}` }
@@ -101,9 +152,7 @@ serve(async (req) => {
             details = { status: payment.status, external_reference: payment.external_reference };
             
             if (payment.status === 'approved' && payment.external_reference) {
-                // Update Profile
-                // external_reference should be User ID or Purchase ID
-                await resolveAndUpdateUser(supabaseAdmin, payment.external_reference, 'active', null); // null = auto 30 days
+                await resolveAndUpdateUser(supabaseAdmin, payment.external_reference, 'active', null);
                 processed = true;
             } else {
                 console.log("Payment not approved or missing ref:", payment.status);
@@ -115,7 +164,6 @@ serve(async (req) => {
 
     // --- CASE B: Preapproval (Subscription Status Change) ---
     else if (eventType === 'subscription_preapproval' || eventType === 'preapproval') {
-        // resourceId is PREAPPROVAL_ID
         console.log(`Fetching Preapproval details: ${resourceId}`);
         const preRes = await fetch(`https://api.mercadopago.com/preapproval/${resourceId}`, {
             headers: { 'Authorization': `Bearer ${MP_ACCESS_TOKEN}` }
@@ -132,7 +180,6 @@ serve(async (req) => {
 
                 if (sub.status === 'authorized') {
                     status = 'active';
-                    // Use next_payment_date or fallback to +30 days
                     const nextDate = sub.next_payment_date ? new Date(sub.next_payment_date) : new Date(Date.now() + 30*24*60*60*1000);
                     expiresAt = nextDate.toISOString();
                 }
@@ -145,7 +192,6 @@ serve(async (req) => {
 
     // --- CASE C: Standard Payment (One-off) ---
     else if (eventType === 'payment') {
-        // resourceId is PAYMENT_ID
         console.log(`Fetching Payment details: ${resourceId}`);
         const payRes = await fetch(`https://api.mercadopago.com/v1/payments/${resourceId}`, {
             headers: { 'Authorization': `Bearer ${MP_ACCESS_TOKEN}` }
@@ -157,16 +203,13 @@ serve(async (req) => {
             details = { status: payment.status, ref: externalRef };
 
             if (externalRef && payment.status === 'approved') {
-                // For one-off, we might need to find the purchase first to know the duration?
-                // Or we just default to 30 days if not found.
-                // Assuming resolveAndUpdateUser handles purchase lookup if ref is a purchase ID.
                 await resolveAndUpdateUser(supabaseAdmin, externalRef, 'active', null);
                 processed = true;
             }
         }
     }
 
-    // 4. Finalize & Record Event
+    // 5. Finalize & Record Event
     if (processed) {
         await supabaseAdmin.from('webhook_events').insert({
             provider: 'mercadopago',
@@ -194,7 +237,7 @@ async function resolveAndUpdateUser(supabase: any, ref: string, status: string, 
     let planType = 'premium_monthly'; // Default
 
     // 1. Try as Purchase ID
-    if (ref.includes('-')) { // Simple UUID check
+    if (ref.includes('-') && ref.length > 30) { // Simple UUID check heuristic
         const { data: purchase } = await supabase
             .from('purchases')
             .select('*')
@@ -206,11 +249,9 @@ async function resolveAndUpdateUser(supabase: any, ref: string, status: string, 
             if (purchase.plan === 'weekly') planType = 'premium_weekly';
             if (purchase.plan === 'yearly') planType = 'premium_yearly';
         } else {
-            // 2. Try as User ID directly
             userId = ref;
         }
     } else {
-        // Legacy or numeric ref? assume user ID if matches format, else ignore
         userId = ref; 
     }
 
@@ -221,7 +262,6 @@ async function resolveAndUpdateUser(supabase: any, ref: string, status: string, 
 
     // Default expiration if null (Renew)
     if (!expiresAt) {
-        // Fetch current to see if we should extend
         const { data: profile } = await supabase.from('profiles').select('subscription_expires_at').eq('id', userId).single();
         const currentExp = profile?.subscription_expires_at ? new Date(profile.subscription_expires_at) : new Date();
         const now = new Date();
