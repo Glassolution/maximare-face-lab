@@ -24,7 +24,7 @@ export function usePremiumStatus() {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('subscription_status, subscription_expires_at, plan_type')
+          .select('subscription_status, subscription_expires_at, plan_type, premium_status, premium_until')
           .eq('id', user.id)
           .single();
 
@@ -36,14 +36,18 @@ export function usePremiumStatus() {
           const status = (data.subscription_status as SubscriptionStatus) || 'free';
           const expires = data.subscription_expires_at ? new Date(data.subscription_expires_at) : null;
           const plan = data.plan_type || 'free';
+          const legacyStatus = data.premium_status;
+          const legacyExpires = data.premium_until ? new Date(data.premium_until) : null;
 
-          // Server-side validation principle:
-          // Access is granted ONLY if status is 'active' (or 'trialing') AND expiration date is valid.
-          // We do NOT write to the DB here. The backend is the source of truth.
           const now = new Date();
-          const isValid = (status === 'active' || status === 'trialing') && (expires ? expires > now : false);
+          
+          // Check new system
+          const isNewValid = (status === 'active' || status === 'trialing') && (expires ? expires > now : false);
+          
+          // Check legacy system (fallback) - if legacy status is true, grant access
+          const isLegacyValid = legacyStatus === true && (legacyExpires ? legacyExpires > now : true);
 
-          setIsPremium(isValid);
+          setIsPremium(isNewValid || isLegacyValid);
           setSubscriptionStatus(status);
           setExpiresAt(expires);
           setPlanType(plan);

@@ -40,10 +40,10 @@ export async function shouldShowPaywall(context: PaywallContext): Promise<boolea
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) return false;
 
-  // Fetch profile with all paywall fields
+  // Fetch profile with all paywall fields (including legacy)
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('subscription_status, subscription_expires_at, last_paywall_shown_at, paywall_show_count_7d, last_paywall_dismissed_at, paywall_dismiss_count_7d')
+    .select('subscription_status, subscription_expires_at, last_paywall_shown_at, paywall_show_count_7d, last_paywall_dismissed_at, paywall_dismiss_count_7d, premium_status, premium_until')
     .eq('id', session.user.id)
     .single();
 
@@ -52,14 +52,22 @@ export async function shouldShowPaywall(context: PaywallContext): Promise<boolea
     return false;
   }
 
-  // 1. Check if user is actively premium
+  // 1. Check if user is actively premium (New + Legacy fallback)
+  const now = new Date();
+  
+  // Check new system
   const status = profile.subscription_status;
-  const isPremium = 
+  const isNewPremium = 
     (status === 'active' || status === 'trialing' || status === 'premium_active') && 
     profile.subscription_expires_at && 
-    new Date(profile.subscription_expires_at) > new Date();
+    new Date(profile.subscription_expires_at) > now;
 
-  if (isPremium) {
+  // Check legacy system
+  const legacyStatus = profile.premium_status;
+  const legacyExpires = profile.premium_until ? new Date(profile.premium_until) : null;
+  const isLegacyPremium = legacyStatus === true && (legacyExpires ? legacyExpires > now : true);
+
+  if (isNewPremium || isLegacyPremium) {
     console.log('User is premium, not showing paywall');
     return false;
   }
