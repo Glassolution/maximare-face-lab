@@ -81,11 +81,11 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
 
       const success = openCheckout(paymentLink, selectedPlan);
 
-      if (success) {
-        // Show confirmation modal
-        setShowConfirmModal(true);
-      } else {
+      if (!success) {
         await logPaywallEvent(session.user.id, 'checkout_failed', { plan: selectedPlan, reason: 'open_checkout_failed' });
+      } else {
+        // Just log success, no modal needed as user is redirected
+        await logPaywallEvent(session.user.id, 'checkout_success', { plan: selectedPlan });
       }
 
     } catch (error) {
@@ -248,43 +248,6 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
         </button>
 
       </div>
-      {/* Confirmation Modal */}
-      <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
-        <DialogContent className="bg-zinc-900 border-zinc-800 text-white w-[90%] rounded-xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-center">Pagamento iniciado</DialogTitle>
-            <DialogDescription className="text-center text-zinc-400">
-              Complete o pagamento no Mercado Pago e clique abaixo para confirmar.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-3 py-4">
-            <div className="flex items-center justify-center">
-              <div className="w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center animate-pulse">
-                <ShieldCheck className="w-8 h-8 text-blue-500" />
-              </div>
-            </div>
-            <p className="text-xs text-center text-zinc-500">
-              Seu acesso Premium será liberado automaticamente assim que o pagamento for confirmado.
-            </p>
-          </div>
-          <DialogFooter className="flex-col sm:justify-center gap-2">
-            <Button 
-              onClick={handlePaymentConfirm} 
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold"
-            >
-              Já paguei
-            </Button>
-            <Button 
-              variant="ghost" 
-              onClick={() => setShowConfirmModal(false)}
-              className="w-full text-zinc-400 hover:text-white"
-            >
-              Fechar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
     </div>
   );
 }
