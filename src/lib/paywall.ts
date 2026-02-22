@@ -86,7 +86,6 @@ export async function shouldShowPaywall(context: PaywallContext): Promise<boolea
     return false;
   }
 
-  const now = new Date();
   const lastShown = profile.last_paywall_shown_at ? new Date(profile.last_paywall_shown_at) : new Date(0);
   const hoursSinceLastShow = (now.getTime() - lastShown.getTime()) / (1000 * 60 * 60);
 
