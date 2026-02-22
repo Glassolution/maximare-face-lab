@@ -66,8 +66,88 @@ serve(async (req) => {
       request_id: req.headers.get('x-request-id'),
     });
 
-    // 2. Process Payment Events Only
-    if (eventType === 'payment') {
+    // 2. Process Events
+    console.log('Processing event:', eventType);
+
+    // Handle Subscriptions (Preapproval)
+    if (eventType === 'subscription_preapproval' || eventType === 'preapproval') {
+        const preapprovalId = resourceId;
+        const preapprovalRes = await fetch(`https://api.mercadopago.com/preapproval/${preapprovalId}`, {
+            headers: {
+                'Authorization': `Bearer ${MP_ACCESS_TOKEN}`,
+            },
+        });
+
+        if (!preapprovalRes.ok) {
+            throw new Error(`Failed to fetch preapproval: ${preapprovalRes.statusText}`);
+        }
+
+        const preapproval = await preapprovalRes.json();
+        console.log('Preapproval fetched:', preapproval.id, preapproval.status);
+
+        const externalReference = preapproval.external_reference;
+        const status = preapproval.status; // authorized, paused, cancelled
+        
+        // In subscriptions, external_reference usually holds user_id directly or a purchase_id
+        // Let's assume it holds user_id for direct subscription linkage, OR we look up purchase
+        
+        // If external_reference is a UUID, it might be a purchase ID or User ID.
+        // Let's try to find a purchase first.
+        let userId = null;
+        let planType = 'premium_monthly'; // Default fallback
+
+        // Try to find purchase
+        const { data: purchase } = await supabaseAdmin
+            .from('purchases')
+            .select('*')
+            .eq('id', externalReference)
+            .maybeSingle();
+
+        if (purchase) {
+            userId = purchase.user_id;
+            // Map plan
+            if (purchase.plan === 'weekly') planType = 'premium_weekly';
+            else if (purchase.plan === 'yearly') planType = 'premium_yearly';
+        } else {
+            // Maybe external_reference is the user_id itself?
+            // Verify if it's a valid UUID
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (uuidRegex.test(externalReference)) {
+                userId = externalReference;
+            }
+        }
+
+        if (userId) {
+            console.log('User resolved for subscription:', userId);
+            
+            let subscriptionStatus = 'free';
+            let expiresAt = new Date().toISOString();
+
+            if (status === 'authorized') {
+                subscriptionStatus = 'active';
+                // For subscriptions, we extend based on next_payment_date if available, or just set to future
+                const nextPayment = preapproval.next_payment_date ? new Date(preapproval.next_payment_date) : new Date(Date.now() + 30*24*60*60*1000);
+                expiresAt = nextPayment.toISOString();
+            } else {
+                subscriptionStatus = 'expired'; // paused or cancelled
+            }
+
+            // Update Profile
+            await supabaseAdmin.from('profiles').update({
+                subscription_status: subscriptionStatus,
+                plan_type: planType,
+                subscription_expires_at: expiresAt,
+                updated_at: new Date().toISOString()
+            }).eq('id', userId);
+
+            console.log('Premium activated/updated for subscription user:', userId);
+        } else {
+            console.warn('Could not resolve user for preapproval:', externalReference);
+        }
+    }
+
+    // Handle One-time Payments
+    else if (eventType === 'payment') {
       const paymentRes = await fetch(`https://api.mercadopago.com/v1/payments/${resourceId}`, {
         headers: {
           'Authorization': `Bearer ${MP_ACCESS_TOKEN}`,
