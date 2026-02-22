@@ -510,23 +510,27 @@ ATENÇÃO MÁXIMA: Você tem falhado em reconhecer arquétipos masculinos robust
 Siga estas regras de proteção contra alucinação negativa:
 
 1. **ARQUÉTIPO "WARRIOR SKULL" (MANDATÓRIO):**
-   - Se o rosto apresentar mandíbula larga e angular (bigonial width similar à bizygomatic width), queixo projetado e dimorfismo sexual alto, o score de "masculinidade_estrutural" DEVE ser > 90.
-   - O score GERAL (harmonia_geral) para este arquétipo NUNCA deve ser menor que 80 (Chad/Modelo), a menos que haja deformidade óbvia.
-   - **Exemplo Específico:** Rostos como o do ator TOM WELLING (Superman/Smallville) representam o pico deste arquétipo. Se a imagem se assemelhar a ele (maxilar quadrado, olhos claros/hunter eyes, estrutura óssea densa), a nota DEVE ser > 85. Classificá-lo como Sub5 ou LTN é um ERRO CRÍTICO.
+   - Se o rosto apresentar mandíbula larga e angular (bigonial width similar à bizygomatic width), queixo projetado e dimorfismo sexual alto, o score de "masculinidade_estrutural" DEVE ser > 95.
+   - O score GERAL (harmonia_geral) para este arquétipo NUNCA deve ser menor que 90 (Chad/High Chad), a menos que haja deformidade óbvia.
+   - **Exemplo Específico:** Rostos como o do ator TOM WELLING (Superman/Smallville) representam o pico deste arquétipo. Se a imagem se assemelhar a ele (maxilar quadrado, olhos claros/hunter eyes, estrutura óssea densa), a nota DEVE ser > 90. Classificá-lo como MTN, LTN ou Sub5 é um ERRO CRÍTICO.
 
-2. **HUNTER EYES (OLHOS DE CAÇADOR):**
+2. **PROJEÇÃO MANDIBULAR E RESPIRAÇÃO (ANTI-ALUCINAÇÃO):**
+   - Se a mandíbula for larga e angular (quadrada), a projeção mandibular é "Projetada" ou "Forte". JAMAIS classifique como "Média" ou "Recuada".
+   - Se a mandíbula é forte e desenvolvida, o sujeito é quase certamente um RESPIRADOR NASAL. Se você classificar um rosto de mandíbula quadrada como "Respirador Bucal" (Mouth Breather), você está ALUCINANDO. Corrija para "Nasal" e dê score > 90 em respiração.
+
+3. **HUNTER EYES (OLHOS DE CAÇADOR):**
    - Se os olhos forem compactos, com inclinação cantal positiva ou neutra, e sobrancelha baixa/reta (low set eyebrows), isso é um traço de alta atratividade. Aumente o score de "regiao_ocular" e "harmonia_geral".
    - Não confunda "olhos semicerrados de modelo" com "olhos cansados".
 
-3. **NÃO CONFUNDA MASCULINIDADE COM VELHICE:**
+4. **NÃO CONFUNDA MASCULINIDADE COM VELHICE:**
    - Traços fortes, linhas de expressão masculinas ou pele com textura normal de homem NÃO devem reduzir drasticamente a nota. Diferencie "rugas de envelhecimento precoce" de "linhas de expressão masculinas".
 
-4. **REGRA DE OURO:**
-   - Se o sujeito parece um modelo de passarela, ator de Hollywood ou galã, a nota É ALTA (>80).
+5. **REGRA DE OURO:**
+   - Se o sujeito parece um modelo de passarela, ator de Hollywood ou galã, a nota É ALTA (>85).
    - Se o sujeito tem falhas claras (queixo retraído, obesidade, assimetria severa), a nota é baixa (<50).
-   - NÃO DÊ NOTAS MEDÍOCRES (50-60) PARA ROSTOS DE ELITE.
+   - NÃO DÊ NOTAS MEDÍOCRES (50-70) PARA ROSTOS DE ELITE.
 
-Seja preciso. Reconheça a beleza masculina robusta.`,
+Seja preciso. Reconheça a beleza masculina robusta e dê a nota CHAD que ela merece.`,
     });
 
     imageContents.push({
