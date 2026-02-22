@@ -124,9 +124,9 @@ function randomGaussian(mean: number, stdev: number): number {
 }
 
 export function getMindset(ger: number) {
-  if (ger < 55) return "Bluepilled";
-  if (ger < 75) return "Redpilled";
-  return "Blackpilled";
+  if (ger < 55) return "Em Desenvolvimento";
+  if (ger < 75) return "Focado";
+  return "Ascensionado";
 }
 
 export function getStrategy(ger: number) {

@@ -109,13 +109,36 @@ export function getAnalysisHistory(): AnalysisResult[] {
   }
 }
 
-export function deleteAnalysis(id: string) {
+export async function deleteAnalysis(id: string) {
+  // 1. Remove localmente
   const history = getAnalysisHistory();
   const filtered = history.filter((item) => item.id !== id);
-  if (filtered.length === 0) {
-    localStorage.removeItem("maximare_history");
-  } else {
-    localStorage.setItem("maximare_history", JSON.stringify(filtered));
+  
+  try {
+    if (filtered.length === 0) {
+      localStorage.removeItem("maximare_history");
+    } else {
+      localStorage.setItem("maximare_history", JSON.stringify(filtered));
+    }
+  } catch (e) {
+    console.error("Erro ao atualizar localStorage:", e);
+  }
+
+  // 2. Remove do Supabase
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      // Deletar usando analysis_id
+      const { error } = await supabase
+        .from('analysis_history')
+        .delete()
+        .eq('user_id', session.user.id)
+        .eq('analysis_id', id);
+
+      if (error) console.error("Erro ao deletar do Supabase:", error);
+    }
+  } catch (err) {
+    console.error("Erro de conexão ao deletar:", err);
   }
 }
 

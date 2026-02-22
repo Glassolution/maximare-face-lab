@@ -177,8 +177,8 @@ export default function Analysis() {
   const primaryTrend = plan.hasAnalysis && plan.trends.length > 0 ? plan.trends[0] : null;
   const primaryBottleneck = plan.hasAnalysis && plan.bottlenecks.length > 0 ? plan.bottlenecks[0] : null;
 
-  const handleDeleteHistory = (id: string) => {
-    deleteAnalysis(id);
+  const handleDeleteHistory = async (id: string) => {
+    await deleteAnalysis(id);
     setHistory(getAnalysisHistory());
   };
 

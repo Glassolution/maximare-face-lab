@@ -512,12 +512,12 @@ Diretrizes de score (Seja Rigoroso, mas Justo - Escala de Atratividade):
 - 40-49: Sub5 / Abaixo da Média (Desarmonia leve, recessão de queixo, assimetria visível)
 - 0-39: Sub3 / Deficiências estruturais claras
 
-CRITÉRIOS DE CORREÇÃO:
-1. Se o sujeito tem mandíbula definida (jawline visível) e boa área ocular, o score MÍNIMO deve ser 70 (HTN).
-2. Se o sujeito parece um "galã de novela/filme" ou modelo, o score deve ser > 80 (Chad).
-3. LTN (50-59) é reservado para rostos "bolachudos", sem definição, ou com queixo recuado. Não dê LTN para rostos com boa estrutura óssea.
-4. Não penalize severamente iluminação caseira se a estrutura for visível.
-5. Se for o "Tom Welling" ou arquétipo similar (Superman), o score deve ser 85+.`,
+CRITÉRIOS DE CORREÇÃO (CRÍTICOS):
+1. Se o sujeito tem mandíbula definida (jawline visível), boa área ocular (hunter eyes ou neutros) e simetria decente, o score MÍNIMO ABSOLUTO é 70 (HTN). JAMAIS dê Sub5 ou LTN para rostos com boa estrutura óssea.
+2. Se o sujeito parece um "galã de novela", modelo, ou ator famoso (ex: Tom Welling, Henry Cavill, Ian Somerhalder), o score DEVE ser > 80 (Chad/Chadlite), mesmo que a foto não seja profissional.
+3. LTN (50-59) e Sub5 (40-49) são EXCLUSIVOS para rostos com falhas estruturais claras (queixo muito recuado, obesidade facial severa, assimetria deformante).
+4. Não penalize iluminação ou ângulo se a estrutura subjacente for visível.
+5. ERRO PROIBIDO: Dar score < 60 para alguém com "Warrior Skull" ou dimorfismo sexual alto. Na dúvida, dê nota mais alta.`,
     });
 
     imageContents.push({
