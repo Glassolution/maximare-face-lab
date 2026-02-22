@@ -12,17 +12,20 @@ import GerResults from "@/pages/GerResults";
 import Recommendations from "@/pages/Recommendations";
 import ProgressPage from "@/pages/Progress";
 import Trends from "@/pages/Trends";
+import Friends from "@/pages/Friends";
+import Battles from "@/pages/Battles";
 import Profile from "@/pages/Profile";
 import LookAlike from "@/pages/LookAlike";
 import NotFound from "@/pages/NotFound";
 import Login from "@/pages/Login";
 import Premium from "@/pages/Premium";
 import Admin from "@/pages/Admin";
-import { AuthProvider, useAuth } from "@/auth/AuthProvider";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 import { useEffect, useState } from "react";
 import { usePaywallGate } from "@/hooks/usePaywallGate";
 import { syncHistoryWithSupabase } from "@/lib/mockData";
+import PaymentResult from "@/pages/PaymentResult";
 
 const queryClient = new QueryClient();
 
@@ -30,7 +33,7 @@ function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   // ... existing hideNav logic ...
-  const hideNav = ["/", "/onboarding", "/login", "/premium", "/landing"].includes(location.pathname);
+  const hideNav = ["/", "/onboarding", "/login", "/premium", "/landing", "/payment-result"].includes(location.pathname);
   const { user, loading } = useAuth();
   
   const { checkGate, PaywallDialog } = usePaywallGate();
@@ -45,7 +48,7 @@ function Layout() {
   useEffect(() => {
     const checkPeriodicPaywall = async () => {
       if (!user || loading) return;
-      if (location.pathname === "/premium" || location.pathname === "/login" || location.pathname === "/") return;
+      if (location.pathname === "/premium" || location.pathname === "/login" || location.pathname === "/" || location.pathname === "/payment-result") return;
       
       // Only check on main tabs to avoid spamming while navigating sub-pages
       const mainTabs = ["/analysis", "/profile", "/trends", "/progress"];
@@ -75,7 +78,7 @@ function Layout() {
 
     const interval = setInterval(() => {
       // Don't show if already on premium page or login
-      if (location.pathname === "/premium" || location.pathname === "/login") return;
+      if (location.pathname === "/premium" || location.pathname === "/login" || location.pathname === "/payment-result") return;
       
       console.log("[App] Triggering periodic paywall check");
       checkGate({ trigger: 'periodic_force' });
@@ -122,12 +125,15 @@ function Layout() {
         <Route path="/recommendations" element={<Recommendations />} />
         <Route path="/progress" element={<ProgressPage />} />
         <Route path="/trends" element={<Trends />} />
+        <Route path="/friends" element={<Friends />} />
+        <Route path="/battles" element={<Battles />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/look-alike" element={<LookAlike />} />
         <Route path="/login" element={<Login />} />
         <Route path="/premium" element={<Premium />} />
-          <Route path="/admin-tools" element={<Admin />} />
-          <Route path="*" element={<NotFound />} />
+        <Route path="/admin-tools" element={<Admin />} />
+        <Route path="/payment-result" element={<PaymentResult />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
       {!hideNav && <BottomNav />}
       <PaywallDialog />

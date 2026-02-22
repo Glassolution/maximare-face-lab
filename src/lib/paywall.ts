@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { PLAN_CONFIG } from "@/config/plans";
 import { toast } from "sonner";
@@ -40,10 +41,10 @@ export async function shouldShowPaywall(context: PaywallContext): Promise<boolea
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) return false;
 
-  // Fetch profile with all paywall fields (including legacy)
+  // Fetch profile with only new paywall fields
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('subscription_status, subscription_expires_at, last_paywall_shown_at, paywall_show_count_7d, last_paywall_dismissed_at, paywall_dismiss_count_7d, premium_status, premium_until')
+    .select('subscription_status, subscription_expires_at, last_paywall_shown_at, paywall_show_count_7d, last_paywall_dismissed_at, paywall_dismiss_count_7d')
     .eq('id', session.user.id)
     .single();
 
@@ -52,23 +53,15 @@ export async function shouldShowPaywall(context: PaywallContext): Promise<boolea
     return false;
   }
 
-  // 1. Check if user is actively premium (New + Legacy fallback)
+  // 1. Check if user is actively premium (STRICT NEW SYSTEM)
   const now = new Date();
-  
-  // Check new system
   const status = profile.subscription_status;
-  const isNewPremium = 
+  const isPremium = 
     (status === 'active' || status === 'trialing' || status === 'premium_active') && 
     profile.subscription_expires_at && 
     new Date(profile.subscription_expires_at) > now;
 
-  // Check legacy system
-  // Cast to any to access legacy columns not in generated types
-  const legacyStatus = (profile as any).premium_status;
-  const legacyExpires = (profile as any).premium_until ? new Date((profile as any).premium_until) : null;
-  const isLegacyPremium = legacyStatus === true && (legacyExpires ? legacyExpires > now : true);
-
-  if (isNewPremium || isLegacyPremium) {
+  if (isPremium) {
     console.log('User is premium, not showing paywall');
     return false;
   }

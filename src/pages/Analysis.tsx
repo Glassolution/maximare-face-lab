@@ -23,7 +23,7 @@ import { saveAnalysis, getAnalysisHistory, deleteAnalysis, syncHistoryWithSupaba
 import { generateExtendedMockAnalysis, getTier, getMindset, getStrategy, type ExtendedAnalysisResult } from "@/lib/rankingSystem";
 import { generatePersonalizedPlan } from "@/lib/smartTrendsEngine";
 import faceScanHero from "@/assets/clark.png";
-import { useAuth } from "@/auth/AuthProvider";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
 function CircularScore({ score, delta, ringColor }: { score: number; delta: number; ringColor: string }) {
@@ -471,6 +471,18 @@ export default function Analysis() {
                 pointsToNextTier: data.nextTier?.pointsNeeded ?? 0,
                 technicalBreakdown: data.technicalBreakdown,
                 breathing: data.technicalBreakdown?.breathing,
+                // MAP BACKEND ATTRIBUTES TO CATEGORIES
+                categories: data.attributes ? data.attributes.map((attr: any) => ({
+                    id: attr.id,
+                    name: attr.name,
+                    score: attr.score,
+                    icon: attr.icon,
+                    // Derive color/desc from score if not provided by backend, or use defaults
+                    color: attr.score >= 80 ? "green" : attr.score >= 60 ? "yellow" : "red",
+                    description: attr.score >= 80 ? "Ponto forte" : attr.score >= 60 ? "Média" : "Ponto de atenção",
+                    flaws: [],
+                    strengths: []
+                })) : localResult.categories
               };
               return mapped;
             } catch (err) {
@@ -488,6 +500,59 @@ export default function Analysis() {
         
         await saveAnalysis(result);
         
+        // Handle Battle Context
+        const battleId = searchParams.get("battleId");
+        if (battleId && user) {
+            try {
+                // 1. Upload Photo
+                let publicUrl = null;
+                if (frontPhoto) {
+                    const res = await fetch(frontPhoto);
+                    const blob = await res.blob();
+                    const fileName = `${battleId}/${user.id}.jpg`;
+                    
+                    // Attempt upload to 'battle-images' bucket
+                    const { error: uploadError } = await supabase.storage
+                        .from('battle-images')
+                        .upload(fileName, blob, { upsert: true });
+                    
+                    if (!uploadError) {
+                        const { data: urlData } = supabase.storage
+                            .from('battle-images')
+                            .getPublicUrl(fileName);
+                        publicUrl = urlData.publicUrl;
+                    } else {
+                        console.warn("Could not upload battle image:", uploadError);
+                    }
+                }
+
+                // 2. Update Battle Photo URL if successful
+                if (publicUrl) {
+                    await supabase.rpc('update_battle_photo', { 
+                        battle_id: battleId, 
+                        photo_url: publicUrl 
+                    });
+                }
+
+                // 3. Submit Move
+                const { data: battleData, error: battleError } = await supabase.rpc('submit_battle_move', { 
+                    battle_id: battleId, 
+                    analysis_id: result.id 
+                });
+                
+                if (battleError) throw battleError;
+                if (battleData && !battleData.success) throw new Error(battleData.error);
+                
+                navigate("/battles");
+                return;
+            } catch (err: any) {
+                console.error("Error submitting battle move:", err);
+                setErrorMsg(err.message || "Erro ao enviar resultado para o duelo.");
+                setCaptureStep("intro");
+                return;
+            }
+        }
+
         // Check paywall gate
         const allowed = await checkGate({ trigger: 'analysis_completed' });
         const targetPath = `/results/${result.id}`;

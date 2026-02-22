@@ -1,6 +1,7 @@
+
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/auth/AuthProvider';
+import { useAuth } from "@/hooks/useAuth";
 
 export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'refunded' | 'expired' | 'trialing' | 'free';
 
@@ -24,31 +25,25 @@ export function usePremiumStatus() {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('subscription_status, subscription_expires_at, plan_type, premium_status, premium_until')
+          .select('subscription_status, subscription_expires_at, plan_type')
           .eq('id', user.id)
           .single();
 
-        if (error || !data) {
+        if (error) {
           console.error('Error fetching profile for premium status:', error);
           setIsPremium(false);
           setSubscriptionStatus('free');
-        } else {
+        } else if (data) {
           const status = (data.subscription_status as SubscriptionStatus) || 'free';
           const expires = data.subscription_expires_at ? new Date(data.subscription_expires_at) : null;
           const plan = data.plan_type || 'free';
-          // Cast to any to access legacy columns not in generated types
-          const legacyStatus = (data as any).premium_status;
-          const legacyExpires = (data as any).premium_until ? new Date((data as any).premium_until) : null;
-
+          
           const now = new Date();
           
-          // Check new system
-          const isNewValid = (status === 'active' || status === 'trialing') && (expires ? expires > now : false);
+          // STRICT CHECK: Only active/trialing AND future expiration date are valid.
+          const isValid = (status === 'active' || status === 'trialing') && (expires ? expires > now : false);
           
-          // Check legacy system (fallback) - if legacy status is true, grant access
-          const isLegacyValid = legacyStatus === true && (legacyExpires ? legacyExpires > now : true);
-
-          setIsPremium(isNewValid || isLegacyValid);
+          setIsPremium(isValid);
           setSubscriptionStatus(status);
           setExpiresAt(expires);
           setPlanType(plan);

@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Crown, ChevronRight, Settings, Shield, Zap, Star, TrendingUp, Search, LogOut, Moon, Sun, CreditCard } from "lucide-react";
 import { getAnalysisHistory } from "@/lib/mockData";
 import { Link, useNavigate } from "react-router-dom";
 import { getTier, getNextTier, ExtendedAnalysisResult } from "@/lib/rankingSystem";
-import { useAuth } from "@/auth/AuthProvider";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -20,13 +20,6 @@ type MenuItem = {
   onClick?: () => void;
 };
 
-const badges = [
-  { label: "Primeira Análise", icon: Star, earned: true },
-  { label: "Streak 7 dias", icon: Zap, earned: false },
-  { label: "Score 7+", icon: TrendingUp, earned: false },
-  { label: "Nível Elite", icon: Crown, earned: false },
-];
-
 export default function Profile() {
   const { user } = useAuth();
   const { isPremium, subscriptionStatus, expiresAt, planType } = usePremiumStatus();
@@ -36,6 +29,58 @@ export default function Profile() {
   const { theme, setTheme } = useTheme();
   const [showPreferences, setShowPreferences] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
+  const [earnedBadges, setEarnedBadges] = useState<string[]>([]);
+  
+  // Fetch badges
+  useEffect(() => {
+    const fetchBadges = async () => {
+        if (!user) return;
+        
+        try {
+            // 1. Get existing badges first for instant load
+            const { data: currentBadges } = await supabase
+                .from('user_badges')
+                .select('badge_id')
+                .eq('user_id', user.id);
+                
+            if (currentBadges) {
+                setEarnedBadges(currentBadges.map(b => b.badge_id));
+            }
+
+            // 2. Run evaluation in background to check for new ones
+            // We use a small delay or check less frequently if needed, but for now on mount is fine
+            const { data, error } = await supabase.functions.invoke('check-achievements');
+            
+            if (!error && data?.badges_awarded && data.badges_awarded.length > 0) {
+                 // Refresh if new badges awarded
+                 const { data: updatedBadges } = await supabase
+                    .from('user_badges')
+                    .select('badge_id')
+                    .eq('user_id', user.id);
+                    
+                 if (updatedBadges) {
+                    setEarnedBadges(updatedBadges.map(b => b.badge_id));
+                 }
+            }
+        } catch (e) {
+            console.error("Error checking achievements", e);
+        }
+    };
+    
+    fetchBadges();
+  }, [user]);
+
+  const badgesList = [
+    { id: 'first_analysis', label: "Primeira Análise", icon: Star },
+    { id: 'streak_7', label: "Streak 7 dias", icon: Zap },
+    { id: 'score_7', label: "Score 7+", icon: TrendingUp },
+    { id: 'elite_level', label: "Nível Elite", icon: Crown },
+  ];
+
+  const displayBadges = badgesList.map(badge => ({
+    ...badge,
+    earned: earnedBadges.includes(badge.id)
+  }));
   
   // Calculate stats
   const ger = lastAnalysis?.ger || 0;
@@ -46,7 +91,7 @@ export default function Profile() {
   let strongest = "geral";
   let weakest = "geral";
   
-  if (lastAnalysis && lastAnalysis.categories) {
+  if (lastAnalysis && Array.isArray(lastAnalysis.categories) && lastAnalysis.categories.length > 0) {
       const sorted = [...lastAnalysis.categories].sort((a, b) => b.score - a.score);
       if (sorted.length > 0) strongest = sorted[0].name.toLowerCase();
       if (sorted.length > 1) weakest = sorted[sorted.length - 1].name.toLowerCase();
@@ -72,12 +117,14 @@ export default function Profile() {
     { label: "Plano Pro", icon: Crown, desc: isPremium ? "Gerenciar assinatura" : "Desbloqueie tudo", path: isPremium ? "#" : "/premium", onClick: isPremium ? () => setShowSubscription(true) : undefined },
     { label: "Progresso", icon: TrendingUp, desc: "Seu histórico", path: "/progress" },
     { label: "Configurações", icon: Settings, desc: "Preferências", path: "#", onClick: () => setShowPreferences(true) },
-    { label: "Privacidade", icon: Shield, desc: "Seus dados", path: "#" },
-  ] as const;
+    { label: "Privacidade", icon: Shield, desc: "Seus dados", path: "/privacy" },
+  ];
 
-  const formatDate = (date: Date | null) => {
+  const formatDate = (date: Date | string | null) => {
     if (!date) return "N/A";
-    return new Intl.DateTimeFormat('pt-BR').format(date);
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return "N/A";
+    return new Intl.DateTimeFormat('pt-BR').format(d);
   };
 
   return (
@@ -165,73 +212,6 @@ export default function Profile() {
                         </Button>
                     </Link>
                  </div>
-                 <div className="mt-2 text-center">
-                    <Button 
-                        variant="link" 
-                        size="sm" 
-                        className="text-[10px] text-muted-foreground h-auto p-0 hover:text-primary"
-                        onClick={async () => {
-                            try {
-                                const { data: purchases, error } = await supabase
-                                    .from('purchases')
-                                    .select('*')
-                                    .eq('user_id', user?.id)
-                                    .order('created_at', { ascending: false })
-                                    .limit(1);
-                                
-                                if (error) throw error;
-
-                                const { data: profile } = await supabase
-                                    .from('profiles')
-                                    .select('*')
-                                    .eq('id', user?.id)
-                                    .single();
-
-                                const lastPurchase = purchases?.[0];
-                                let msg = '';
-
-                                if (!lastPurchase) {
-                                    msg = 'Nenhuma compra encontrada no sistema.';
-                                    alert(msg);
-                                    return;
-                                }
-
-                                const date = new Date(lastPurchase.created_at).toLocaleString();
-                                msg = `DIAGNÓSTICO:\nCompra em: ${date}\nStatus Compra: ${lastPurchase.status}\nStatus Perfil: ${profile?.subscription_status || 'null'}\nPlano: ${profile?.plan_type}\nExpira: ${profile?.subscription_expires_at}`;
-                                
-                                if (lastPurchase.status === 'approved') {
-                                    msg += '\n\n✅ Pagamento APROVADO encontrado!\nTentando sincronizar...';
-                                    alert(msg);
-                                    
-                                    // Tentar forçar sincronização via Edge Function (se existir) ou Webhook trigger
-                                    // Como não podemos chamar Edge Function sem deploy, vamos tentar um update dummy no profile para ver se o trigger dispara
-                                    
-                                    try {
-                                        const { error: updateError } = await supabase
-                                            .from('profiles')
-                                            .update({ 
-                                                updated_at: new Date().toISOString() 
-                                            })
-                                            .eq('id', user?.id);
-                                            
-                                        if (updateError) throw updateError;
-                                        alert('Sincronização enviada. Recarregue a página em 10 segundos.');
-                                    } catch (e) {
-                                        alert('Erro ao tentar sincronizar. Contate suporte.');
-                                    }
-
-                                } else {
-                                    msg += '\n\n❌ Pagamento não aprovado ou pendente.';
-                                    alert(msg);
-                                }
-                            } catch (e) {
-                                alert('Erro ao verificar: ' + e.message);
-                            }
-                        }}
-                    >
-                        Já paguei, mas continua Free? (Diagnóstico)
-                    </Button>
-                 </div>
               </div>
             )}
           </div>
@@ -314,7 +294,7 @@ export default function Profile() {
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
           <h3 className="font-heading text-sm font-bold text-foreground mb-3">Medalhas</h3>
           <div className="grid grid-cols-4 gap-2">
-            {badges.map((badge, i) => {
+            {displayBadges.map((badge, i) => {
               const Icon = badge.icon;
               return (
                 <div key={badge.label} className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl glass ${!badge.earned ? "opacity-30" : ""}`}>

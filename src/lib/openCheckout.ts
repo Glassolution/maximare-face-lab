@@ -22,15 +22,8 @@ export const openCheckout = (url: string, plan: string): boolean => {
       // or just use window.location if the native app intercepts it
       window.location.href = url;
     } else {
-      // Standard Web behavior
-      const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
-      
-      if (newWindow) {
-        newWindow.opener = null;
-      } else {
-        // Fallback for pop-up blockers: navigate in same tab
-        window.location.href = url;
-      }
+      // Standard Web behavior: Always open in same tab to avoid popup blockers and multiple tabs
+      window.location.href = url;
     }
 
     return true;

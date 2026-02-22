@@ -108,23 +108,26 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
   };
 
   const features = [
-    { name: "Análise Jaw Max", icon: "🗿" },
-    { name: "Análise Gym Max", icon: "💪" },
-    { name: "Análise de Cores", icon: "🎨" },
-    { name: "Análise Capilar", icon: "✂️" },
+    { name: "Análises Ilimitadas", icon: "⚡", free: false, pro: true },
+    { name: "Análise Jaw Max", icon: "🗿", free: false, pro: true },
+    { name: "Análise Gym Max", icon: "💪", free: false, pro: true },
+    { name: "Análise de Cores", icon: "🎨", free: false, pro: true },
+    { name: "Análise Capilar", icon: "✂️", free: false, pro: true },
+    { name: "Plano Glow Up", icon: "✨", free: false, pro: true },
+    { name: "Sem Anúncios", icon: "🚫", free: false, pro: true },
   ];
 
   return (
-    <div className={`bg-black text-white flex flex-col relative overflow-hidden ${isModal ? 'h-full w-full' : 'min-h-screen'}`}>
+    <div className={`bg-black text-white flex flex-col relative overflow-y-auto ${isModal ? 'h-full w-full' : 'h-[100dvh]'}`}>
       
       {/* Background Image */}
-      <div className="absolute inset-0 z-0">
+      <div className="absolute inset-0 z-0 h-[60vh]">
         <img 
           src={faceScanHero} 
           alt="Face Scan" 
-          className="w-full h-[60vh] object-cover opacity-60 mask-image-gradient"
+          className="w-full h-full object-cover opacity-60 mask-image-gradient"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/80 to-black" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/0 via-black/60 to-black" />
       </div>
 
       {/* Header */}
@@ -138,9 +141,9 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
       </div>
 
       {/* Content */}
-      <div className="relative z-10 flex-1 flex flex-col px-5 pt-4 pb-8">
+      <div className="relative z-10 flex-1 flex flex-col px-5 pb-8">
         
-        <div className="flex-1" />
+        <div className="flex-1 min-h-[35dvh]" />
 
         {/* Hero Text */}
         <div className="text-center mb-4">
@@ -165,10 +168,18 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
                   <span className="text-zinc-200 text-xs">{feature.name}</span>
                 </div>
                 <div className="flex justify-center">
-                  <X className="w-4 h-4 text-red-500/50" />
+                  {feature.free ? (
+                    <Check className="w-4 h-4 text-green-500" />
+                  ) : (
+                    <X className="w-4 h-4 text-red-500/50" />
+                  )}
                 </div>
                 <div className="flex justify-center">
-                  <Check className="w-4 h-4 text-blue-500" />
+                  {feature.pro ? (
+                    <Check className="w-4 h-4 text-blue-500" />
+                  ) : (
+                    <X className="w-4 h-4 text-red-500/50" />
+                  )}
                 </div>
               </div>
             ))}

@@ -95,7 +95,13 @@ serve(async (req) => {
       auto_return: 'approved',
       payer: {
         email: user.email,
-      }
+      },
+      payment_methods: {
+          excluded_payment_methods: [],
+          excluded_payment_types: [],
+          installments: 1
+      },
+      binary_mode: true // Impede status "pending" demorados, aprova ou recusa na hora
     };
 
     const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {

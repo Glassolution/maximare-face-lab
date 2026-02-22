@@ -8,6 +8,9 @@ const navItems = [
   { label: "Home", path: "/" },
   { label: "Análise", path: "/analysis" },
   { label: "Progresso", path: "/progress" },
+  { label: "Trends", path: "/trends" },
+  { label: "Duelos", path: "/battles" },
+  { label: "Amigos", path: "/friends" },
 ];
 
 export default function Header() {
