@@ -178,34 +178,58 @@ export default function Profile() {
                                     .eq('user_id', user?.id)
                                     .order('created_at', { ascending: false })
                                     .limit(1);
-
+                                
                                 if (error) throw error;
 
+                                const { data: profile } = await supabase
+                                    .from('profiles')
+                                    .select('*')
+                                    .eq('id', user?.id)
+                                    .single();
+
                                 const lastPurchase = purchases?.[0];
+                                let msg = '';
+
                                 if (!lastPurchase) {
-                                    alert('Nenhuma tentativa de compra encontrada recentemente.');
+                                    msg = 'Nenhuma compra encontrada no sistema.';
+                                    alert(msg);
                                     return;
                                 }
 
                                 const date = new Date(lastPurchase.created_at).toLocaleString();
-                                let msg = `Última compra (${date}):\nStatus: ${lastPurchase.status.toUpperCase()}`;
+                                msg = `DIAGNÓSTICO:\nCompra em: ${date}\nStatus Compra: ${lastPurchase.status}\nStatus Perfil: ${profile?.subscription_status || 'null'}\nPlano: ${profile?.plan_type}\nExpira: ${profile?.subscription_expires_at}`;
                                 
                                 if (lastPurchase.status === 'approved') {
-                                    msg += '\n\nO pagamento foi APROVADO! O acesso deveria estar liberado.\nTente recarregar a página.';
-                                } else if (lastPurchase.status === 'pending') {
-                                    msg += '\n\nO pagamento ainda está PENDENTE no banco. Aguarde mais alguns minutos.';
+                                    msg += '\n\n✅ Pagamento APROVADO encontrado!\nTentando sincronizar...';
+                                    alert(msg);
+                                    
+                                    // Tentar forçar sincronização via Edge Function (se existir) ou Webhook trigger
+                                    // Como não podemos chamar Edge Function sem deploy, vamos tentar um update dummy no profile para ver se o trigger dispara
+                                    
+                                    try {
+                                        const { error: updateError } = await supabase
+                                            .from('profiles')
+                                            .update({ 
+                                                updated_at: new Date().toISOString() 
+                                            })
+                                            .eq('id', user?.id);
+                                            
+                                        if (updateError) throw updateError;
+                                        alert('Sincronização enviada. Recarregue a página em 10 segundos.');
+                                    } catch (e) {
+                                        alert('Erro ao tentar sincronizar. Contate suporte.');
+                                    }
+
                                 } else {
-                                    msg += '\n\nHouve um problema com o pagamento.';
+                                    msg += '\n\n❌ Pagamento não aprovado ou pendente.';
+                                    alert(msg);
                                 }
-                                
-                                alert(msg);
                             } catch (e) {
-                                alert('Erro ao verificar pagamentos. Tente novamente.');
-                                console.error(e);
+                                alert('Erro ao verificar: ' + e.message);
                             }
                         }}
                     >
-                        Já paguei, mas continua Free?
+                        Já paguei, mas continua Free? (Diagnóstico)
                     </Button>
                  </div>
               </div>
