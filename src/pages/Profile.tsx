@@ -165,6 +165,49 @@ export default function Profile() {
                         </Button>
                     </Link>
                  </div>
+                 <div className="mt-2 text-center">
+                    <Button 
+                        variant="link" 
+                        size="sm" 
+                        className="text-[10px] text-muted-foreground h-auto p-0 hover:text-primary"
+                        onClick={async () => {
+                            try {
+                                const { data: purchases, error } = await supabase
+                                    .from('purchases')
+                                    .select('*')
+                                    .eq('user_id', user?.id)
+                                    .order('created_at', { ascending: false })
+                                    .limit(1);
+
+                                if (error) throw error;
+
+                                const lastPurchase = purchases?.[0];
+                                if (!lastPurchase) {
+                                    alert('Nenhuma tentativa de compra encontrada recentemente.');
+                                    return;
+                                }
+
+                                const date = new Date(lastPurchase.created_at).toLocaleString();
+                                let msg = `Última compra (${date}):\nStatus: ${lastPurchase.status.toUpperCase()}`;
+                                
+                                if (lastPurchase.status === 'approved') {
+                                    msg += '\n\nO pagamento foi APROVADO! O acesso deveria estar liberado.\nTente recarregar a página.';
+                                } else if (lastPurchase.status === 'pending') {
+                                    msg += '\n\nO pagamento ainda está PENDENTE no banco. Aguarde mais alguns minutos.';
+                                } else {
+                                    msg += '\n\nHouve um problema com o pagamento.';
+                                }
+                                
+                                alert(msg);
+                            } catch (e) {
+                                alert('Erro ao verificar pagamentos. Tente novamente.');
+                                console.error(e);
+                            }
+                        }}
+                    >
+                        Já paguei, mas continua Free?
+                    </Button>
+                 </div>
               </div>
             )}
           </div>
