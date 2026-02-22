@@ -63,8 +63,9 @@ export async function shouldShowPaywall(context: PaywallContext): Promise<boolea
     new Date(profile.subscription_expires_at) > now;
 
   // Check legacy system
-  const legacyStatus = profile.premium_status;
-  const legacyExpires = profile.premium_until ? new Date(profile.premium_until) : null;
+  // Cast to any to access legacy columns not in generated types
+  const legacyStatus = (profile as any).premium_status;
+  const legacyExpires = (profile as any).premium_until ? new Date((profile as any).premium_until) : null;
   const isLegacyPremium = legacyStatus === true && (legacyExpires ? legacyExpires > now : true);
 
   if (isNewPremium || isLegacyPremium) {

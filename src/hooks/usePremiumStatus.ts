@@ -36,8 +36,9 @@ export function usePremiumStatus() {
           const status = (data.subscription_status as SubscriptionStatus) || 'free';
           const expires = data.subscription_expires_at ? new Date(data.subscription_expires_at) : null;
           const plan = data.plan_type || 'free';
-          const legacyStatus = data.premium_status;
-          const legacyExpires = data.premium_until ? new Date(data.premium_until) : null;
+          // Cast to any to access legacy columns not in generated types
+          const legacyStatus = (data as any).premium_status;
+          const legacyExpires = (data as any).premium_until ? new Date((data as any).premium_until) : null;
 
           const now = new Date();
           
