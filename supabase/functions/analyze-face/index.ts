@@ -502,19 +502,22 @@ Retorne APENAS este JSON (sem markdown):
 
 Se não for um rosto válido: {"isValidFace": false, "reason": "explicação breve em português"}
 
-Diretrizes de score (Seja EXTREMAMENTE RÍGIDO - Escala Logarítmica de Dificuldade):
-- 50 é a média absoluta da população comum. Scores acima de 60 são difíceis.
-- 90-99: Top Model / Divino (Raridade absoluta, <0.1% da população)
-- 80-89: Modelo / Chad (Muito atrativo, traços marcantes, <5%)
-- 70-79: HTN / Atrativo (Exige ótima estrutura óssea e harmonia, <15%)
-- 60-69: MTN / Acima da Média (Exige alguma definição facial/jawline visível e pouca gordura)
-- 50-59: LTN / Média Comum (Rosto normal, sem definição óssea clara, soft features)
-- 40-49: Sub5 / Abaixo da Média (Desarmonia leve, recessão ou falta de definição)
-- 0-39: Sub3 / Deficiências estruturais visíveis
+Diretrizes de score (Seja Rigoroso, mas Justo - Escala de Atratividade):
+- 50 é a média populacional.
+- 90-99: Top Model / Divino (Raridade absoluta, rosto perfeito, harmonia impecável)
+- 80-89: Modelo / Chad (Extremamente atrativo, mandíbula forte, olhos caçadores/positivos, dimorfismo sexual alto)
+- 70-79: HTN / Atrativo (Boa estrutura óssea, rosto definido, acima da grande maioria)
+- 60-69: MTN / Acima da Média (Alguma definição, harmonia decente, sem falhas graves)
+- 50-59: LTN / Média Comum (Rosto comum, pouca definição óssea, traços suaves/arredondados)
+- 40-49: Sub5 / Abaixo da Média (Desarmonia leve, recessão de queixo, assimetria visível)
+- 0-39: Sub3 / Deficiências estruturais claras
 
-REGRA DE OURO: A maioria das pessoas comuns DEVE receber scores entre 45 e 55.
-Só atribua >65 se houver definição de mandíbula (jawline) clara, olhos positivos e harmonia evidente.
-Não inflacione notas. Ser "normal" é 50, não 70.`,
+CRITÉRIOS DE CORREÇÃO:
+1. Se o sujeito tem mandíbula definida (jawline visível) e boa área ocular, o score MÍNIMO deve ser 70 (HTN).
+2. Se o sujeito parece um "galã de novela/filme" ou modelo, o score deve ser > 80 (Chad).
+3. LTN (50-59) é reservado para rostos "bolachudos", sem definição, ou com queixo recuado. Não dê LTN para rostos com boa estrutura óssea.
+4. Não penalize severamente iluminação caseira se a estrutura for visível.
+5. Se for o "Tom Welling" ou arquétipo similar (Superman), o score deve ser 85+.`,
     });
 
     imageContents.push({
