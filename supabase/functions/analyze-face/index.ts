@@ -107,6 +107,23 @@ type CanAnalyzeError = {
   body: CanAnalyzeErrorBody;
 };
 
+// ── Server-side premium check (Single Source of Truth) ──
+async function checkPremiumServer(supabase: any, user_id: string): Promise<boolean> {
+  try {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("subscription_status, subscription_expires_at")
+      .eq("user_id", user_id)
+      .maybeSingle();
+    if (!profile) return false;
+    const status = profile.subscription_status;
+    const expiresAt = profile.subscription_expires_at ? new Date(profile.subscription_expires_at) : null;
+    return (status === 'active' || status === 'trialing') && !!expiresAt && expiresAt > new Date();
+  } catch {
+    return false;
+  }
+}
+
 async function canAnalyze(
   supabase: any,
   user_id: string | null,
@@ -124,29 +141,8 @@ async function canAnalyze(
   const today = isoDateOnly(now);
   const nowMs = now.getTime();
 
-  let isPremium = planHint === "premium";
-  let plan = planHint;
-  let premiumUntil: string | null = null;
-
-  try {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("is_premium, plan, premium_until")
-      .eq("user_id", user_id)
-      .maybeSingle();
-    if (profile) {
-      isPremium = !!profile.is_premium;
-      if (profile.plan) plan = profile.plan.toLowerCase() === "premium" ? "premium" : "free";
-      premiumUntil = profile.premium_until || null;
-    }
-  } catch (err) {
-    logEvent({ type: "profiles_fetch_error", error: String(err) });
-  }
-
-  const premiumActive =
-    isPremium ||
-    plan === "premium" ||
-    (premiumUntil && Date.parse(premiumUntil) > nowMs);
+  // Server-side premium: subscription_status + subscription_expires_at
+  const premiumActive = await checkPremiumServer(supabase, user_id);
 
   // Cooldown using last analysis timestamp
   try {
@@ -265,29 +261,7 @@ async function getGuardInfo(
   if (DISABLE_LIMITS) return { isPremium: true, remaining: null, limit: null, limitsDisabled: true };
   if (!supabase || !user_id) return { isPremium: false, remaining: null, limit: null };
 
-  let isPremium = planHint === "premium";
-  let plan = planHint;
-  let premiumUntil: string | null = null;
-
-  try {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("is_premium, plan, premium_until")
-      .eq("user_id", user_id)
-      .maybeSingle();
-    if (profile) {
-      isPremium = !!profile.is_premium;
-      if (profile.plan) plan = profile.plan.toLowerCase() === "premium" ? "premium" : "free";
-      premiumUntil = profile.premium_until || null;
-    }
-  } catch {
-    // silent
-  }
-
-  const premiumActive =
-    isPremium ||
-    plan === "premium" ||
-    (premiumUntil && Date.parse(premiumUntil) > Date.now());
+  const premiumActive = await checkPremiumServer(supabase, user_id);
 
   if (premiumActive) {
     return { isPremium: true, remaining: null, limit: null };
