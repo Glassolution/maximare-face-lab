@@ -35,6 +35,12 @@ serve(async (req) => {
       throw new Error('Server Configuration Error: Missing Payment Token');
     }
     
+    const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!SERVICE_ROLE_KEY) {
+      console.error('Missing SUPABASE_SERVICE_ROLE_KEY');
+      throw new Error('Server Config Error: Missing Service Role Key');
+    }
+    
     // 2. Validate User
     const {
       data: { user },
@@ -157,9 +163,11 @@ serve(async (req) => {
     );
   } catch (error: any) {
     console.error('Create Checkout Error:', error);
+    // Return 200 with error details so the client can read the message easily
+    // instead of getting a generic "FunctionsHttpError"
     return new Response(JSON.stringify({ error: error.message, details: error }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400,
+      status: 200, 
     });
   }
 });

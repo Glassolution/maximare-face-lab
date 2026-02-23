@@ -72,12 +72,19 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
         body: { plan: selectedPlan }
       });
 
+      // Handle custom error response from Edge Function (returned as 200 OK with error field)
+      if (data?.error) {
+        console.error('Server returned error:', data.error);
+        toast.error(`Erro no servidor: ${data.error}`); 
+        await logPaywallEvent(session.user.id, 'checkout_failed', { plan: selectedPlan, reason: data.error });
+        return;
+      }
+
       if (error || !data?.checkout_url) {
         console.error('Checkout creation error:', error);
         // Show clearer error message to user/dev
         if (error?.message) {
             console.error('Detailed Error:', error.message);
-            // Optionally show toast with more info if needed, but keeping it simple for user
         }
         toast.error("Erro ao iniciar pagamento. Verifique sua conexão ou tente mais tarde.");
         await logPaywallEvent(session.user.id, 'checkout_failed', { plan: selectedPlan, reason: error?.message || 'function_error' });
