@@ -128,14 +128,33 @@ export async function deleteAnalysis(id: string) {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
-      // Deletar usando analysis_id
-      const { error } = await supabase
-        .from('analysis_history')
-        .delete()
-        .eq('user_id', session.user.id)
-        .eq('analysis_id', id);
+        // Tentar todas as estratégias possíveis para deletar
+        
+        // 1. Pela PK 'id' da tabela analysis_history (se o ID passado for um UUID válido)
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+        
+        if (isUuid) {
+            const { error: errorPK, count: countPK } = await supabase
+                .from('analysis_history')
+                .delete({ count: 'exact' })
+                .eq('user_id', session.user.id)
+                .eq('id', id); // Tenta deletar pela PK 'id'
+            
+            if (countPK && countPK > 0) {
+                return; // Sucesso, paramos por aqui
+            }
+        }
 
-      if (error) console.error("Erro ao deletar do Supabase:", error);
+        // 2. Pelo ID dentro do JSONB 'result_json->id' (Formato atual de salvamento)
+        const { error: errorJSON, count: countJSON } = await supabase
+            .from('analysis_history')
+            .delete({ count: 'exact' })
+            .eq('user_id', session.user.id)
+            .filter('result_json->>id', 'eq', id);
+            
+        if (errorJSON) {
+            console.error("Erro ao deletar por JSON:", errorJSON);
+        }
     }
   } catch (err) {
     console.error("Erro de conexão ao deletar:", err);

@@ -122,7 +122,7 @@ export default function Analysis() {
   const cooldownTimerRef = useRef<number | null>(null);
   const [limitsDisabled, setLimitsDisabled] = useState(DISABLE_LIMITS);
 
-  const { user } = useAuth();
+  const { user, session } = useAuth();
 
   useEffect(() => {
     const sync = async () => {
@@ -200,7 +200,7 @@ export default function Analysis() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("sb-access-token") || ""}`,
+            Authorization: session?.access_token ? `Bearer ${session.access_token}` : "",
           },
           body: JSON.stringify({ checkOnly: true }),
         });
@@ -415,7 +415,7 @@ export default function Analysis() {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
-                  Authorization: `Bearer ${localStorage.getItem("sb-access-token") || ""}`,
+                  Authorization: session?.access_token ? `Bearer ${session.access_token}` : "",
                 },
                 body: JSON.stringify({ frontalImage: frontPhoto, lateralImage: sidePhoto }),
               });

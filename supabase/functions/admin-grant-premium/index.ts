@@ -48,6 +48,7 @@ serve(async (req) => {
     // Profiles table usually has user_id, but maybe not email.
     // Wait, profiles table often doesn't store email to avoid duplication.
     // We must use auth.admin.listUsers()
+    const adminAuth = supabaseAdmin.auth as any;
 
     // Note: This is expensive if there are many users, but for now it's fine.
     // A better way is strictly not available without direct DB access or `rpc`.
@@ -60,7 +61,7 @@ serve(async (req) => {
     let found = false;
     
     while (!found && page <= 10) { // Limit to 10 pages for safety
-        const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+        const { data: { users }, error: listError } = await adminAuth.admin.listUsers({
             page: page,
             perPage: 1000
         });

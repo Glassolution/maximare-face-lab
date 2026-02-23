@@ -22,8 +22,9 @@ export const openCheckout = (url: string, plan: string): boolean => {
       // or just use window.location if the native app intercepts it
       window.location.href = url;
     } else {
-      // Standard Web behavior: Always open in same tab to avoid popup blockers and multiple tabs
-      window.location.href = url;
+      // Standard Web behavior: Open in new tab to keep the app alive
+      // This allows showing "Payment Pending" screen in the background
+      window.open(url, '_blank');
     }
 
     return true;

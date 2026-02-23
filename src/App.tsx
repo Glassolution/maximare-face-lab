@@ -26,6 +26,7 @@ import { useEffect, useState } from "react";
 import { usePaywallGate } from "@/hooks/usePaywallGate";
 import { syncHistoryWithSupabase } from "@/lib/mockData";
 import PaymentResult from "@/pages/PaymentResult";
+import PaymentPendingScreen from "@/pages/PaymentPendingScreen";
 
 const queryClient = new QueryClient();
 
@@ -33,7 +34,8 @@ function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   // ... existing hideNav logic ...
-  const hideNav = ["/", "/onboarding", "/login", "/premium", "/landing", "/payment-result"].includes(location.pathname);
+  const hideNav = ["/", "/onboarding", "/login", "/premium", "/landing", "/payment-result", "/payment-pending"].includes(location.pathname);
+
   const { user, loading } = useAuth();
   
   const { checkGate, PaywallDialog } = usePaywallGate();
@@ -133,6 +135,7 @@ function Layout() {
         <Route path="/premium" element={<Premium />} />
         <Route path="/admin-tools" element={<Admin />} />
         <Route path="/payment-result" element={<PaymentResult />} />
+        <Route path="/payment-pending" element={<PaymentPendingScreen />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {!hideNav && <BottomNav />}

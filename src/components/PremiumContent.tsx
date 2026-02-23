@@ -7,7 +7,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import faceScanHero from "@/assets/face-scan-hero.jpg";
-import { PAYMENT_LINKS, PaymentLinkPlan } from "@/config/paymentLinks";
 import { openCheckout } from "@/lib/openCheckout";
 import { logPaywallEvent, PaywallContext } from "@/lib/paywall";
 import {
@@ -68,24 +67,31 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
         return;
       }
 
-      // Get the correct payment link
-      const paymentLink = PAYMENT_LINKS[selectedPlan as PaymentLinkPlan];
-      
-      if (!paymentLink) {
-        toast.error("Plano indisponível no momento");
-        await logPaywallEvent(session.user.id, 'checkout_failed', { plan: selectedPlan, reason: 'no_payment_link' });
+      // 1. Create dynamic checkout via Edge Function
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: { plan: selectedPlan }
+      });
+
+      if (error || !data?.checkout_url) {
+        console.error('Checkout creation error:', error);
+        toast.error("Erro ao iniciar pagamento. Tente novamente.");
+        await logPaywallEvent(session.user.id, 'checkout_failed', { plan: selectedPlan, reason: 'function_error' });
         return;
       }
 
       await logPaywallEvent(session.user.id, 'checkout_started', { plan: selectedPlan });
 
-      const success = openCheckout(paymentLink, selectedPlan);
+      // 2. Open checkout in new tab
+      const success = openCheckout(data.checkout_url, selectedPlan);
 
       if (!success) {
         await logPaywallEvent(session.user.id, 'checkout_failed', { plan: selectedPlan, reason: 'open_checkout_failed' });
       } else {
-        // Just log success, no modal needed as user is redirected
+        // 3. Navigate to pending screen immediately
         await logPaywallEvent(session.user.id, 'checkout_success', { plan: selectedPlan });
+        
+        if (onClose) onClose(); 
+        navigate("/payment-pending");
       }
 
     } catch (error) {

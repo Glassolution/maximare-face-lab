@@ -75,7 +75,7 @@ export default function Results() {
   const appealLevel = baseAppeal;
   const rankLabel = baseAppeal.toUpperCase();
   
-  const mindsetPercent = mindset === "Blackpilled" ? 100 : mindset === "Redpilled" ? 66 : 33;
+  const mindsetPercent = mindset === "Ascensionado" ? 100 : mindset === "Focado" ? 66 : 33;
 
   return (
     <div className="min-h-screen bg-background text-white flex flex-col items-center justify-center px-4 py-6">
