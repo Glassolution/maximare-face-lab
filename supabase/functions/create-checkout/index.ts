@@ -17,6 +17,12 @@ serve(async (req) => {
   }
 
   try {
+    // Initialize admin client for database operations that require higher privileges (like creating purchases)
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -62,8 +68,8 @@ serve(async (req) => {
         break;
     }
 
-    // 3. Create Purchase
-    const { data: purchase, error: purchaseError } = await supabaseClient
+    // 3. Create Purchase (Using Admin Client to bypass RLS restrictions on purchases table)
+    const { data: purchase, error: purchaseError } = await supabaseAdmin
       .from('purchases')
       .insert({
         user_id: user.id,
@@ -132,8 +138,8 @@ serve(async (req) => {
       throw new Error(`Mercado Pago Error: ${mpData.message || mpData.error || 'Unknown error'}`);
     }
 
-    // Update purchase with preference ID
-    await supabaseClient
+    // Update purchase with preference ID (Using Admin Client)
+    await supabaseAdmin
       .from('purchases')
       .update({ mp_preference_id: mpData.id })
       .eq('id', purchase.id);
