@@ -234,24 +234,47 @@ serve(async (req) => {
 // --- HELPER: Resolve User & Update ---
 async function resolveAndUpdateUser(supabase: any, ref: string, status: string, expiresAt: string | null) {
     let userId = null;
-    let planType = 'premium_monthly'; // Default
+    let planType = 'monthly'; // Default plan type in profiles table
+    let daysToAdd = 30;
 
-    // 1. Try as Purchase ID
-    if (ref.includes('-') && ref.length > 30) { // Simple UUID check heuristic
-        const { data: purchase } = await supabase
-            .from('purchases')
-            .select('*')
-            .eq('id', ref)
-            .maybeSingle();
+    console.log(`Resolving user for ref: ${ref}, status: ${status}`);
+
+    // 1. Try to find purchase by ID (external_reference from MP)
+    const { data: purchase, error: purchaseError } = await supabase
+        .from('purchases')
+        .select('*')
+        .eq('id', ref)
+        .maybeSingle();
+
+    if (purchaseError) {
+        console.error("Error finding purchase:", purchaseError);
+    }
+
+    if (purchase) {
+        console.log("Purchase found:", purchase);
+        userId = purchase.user_id;
         
-        if (purchase) {
-            userId = purchase.user_id;
-            if (purchase.plan === 'weekly') planType = 'premium_weekly';
-            if (purchase.plan === 'yearly') planType = 'premium_yearly';
+        // Map purchase plan to profile plan_type and days
+        if (purchase.plan === 'weekly') {
+            planType = 'weekly';
+            daysToAdd = 7;
+        } else if (purchase.plan === 'yearly') {
+            planType = 'yearly';
+            daysToAdd = 365;
         } else {
-            userId = ref;
+            planType = 'monthly';
+            daysToAdd = 30;
         }
+        
+        // Update purchase status
+        await supabase.from('purchases').update({ 
+            status: status === 'active' ? 'approved' : status,
+            updated_at: new Date().toISOString()
+        }).eq('id', purchase.id);
+
     } else {
+        // Fallback: assume ref is user_id (legacy behavior)
+        console.log("Purchase not found, assuming ref is user_id");
         userId = ref; 
     }
 
@@ -260,25 +283,42 @@ async function resolveAndUpdateUser(supabase: any, ref: string, status: string, 
         return;
     }
 
-    // Default expiration if null (Renew)
-    if (!expiresAt) {
-        const { data: profile } = await supabase.from('profiles').select('subscription_expires_at').eq('id', userId).single();
-        const currentExp = profile?.subscription_expires_at ? new Date(profile.subscription_expires_at) : new Date();
+    // 2. Calculate expiration date
+    let newExpiresAt = expiresAt;
+    
+    if (!newExpiresAt && status === 'active') {
+        // Fetch current profile to stack subscription if valid
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('subscription_expires_at')
+            .eq('id', userId)
+            .single();
+            
         const now = new Date();
-        const base = currentExp > now ? currentExp : now;
+        const currentExp = profile?.subscription_expires_at ? new Date(profile.subscription_expires_at) : now;
         
-        const days = planType === 'premium_weekly' ? 7 : (planType === 'premium_yearly' ? 365 : 30);
-        expiresAt = new Date(base.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+        // If current expiration is in the future, add to it. Otherwise start from now.
+        const baseDate = currentExp > now ? currentExp : now;
+        
+        const futureDate = new Date(baseDate);
+        futureDate.setDate(futureDate.getDate() + daysToAdd);
+        newExpiresAt = futureDate.toISOString();
     }
 
-    // Update Profile
+    console.log(`Updating profile ${userId}: status=${status}, plan=${planType}, expires=${newExpiresAt}`);
+
+    // 3. Update Profile
     const { error } = await supabase.from('profiles').update({
-        subscription_status: status,
-        plan_type: planType,
-        subscription_expires_at: expiresAt,
-        updated_at: new Date().toISOString()
+        subscription_status: status, // 'active'
+        plan_type: planType,         // 'weekly', 'monthly', 'yearly'
+        subscription_expires_at: newExpiresAt,
+        updated_at: new Date().toISOString(),
+        is_premium: status === 'active' // Ensure legacy boolean is also set
     }).eq('id', userId);
 
-    if (error) console.error("Profile update failed:", error);
-    else console.log(`Profile updated for ${userId}: ${status}, exp: ${expiresAt}`);
+    if (error) {
+        console.error("Profile update failed:", error);
+    } else {
+        console.log(`Profile updated successfully for ${userId}`);
+    }
 }
