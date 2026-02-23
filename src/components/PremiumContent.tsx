@@ -74,8 +74,13 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
 
       if (error || !data?.checkout_url) {
         console.error('Checkout creation error:', error);
-        toast.error("Erro ao iniciar pagamento. Tente novamente.");
-        await logPaywallEvent(session.user.id, 'checkout_failed', { plan: selectedPlan, reason: 'function_error' });
+        // Show clearer error message to user/dev
+        if (error?.message) {
+            console.error('Detailed Error:', error.message);
+            // Optionally show toast with more info if needed, but keeping it simple for user
+        }
+        toast.error("Erro ao iniciar pagamento. Verifique sua conexão ou tente mais tarde.");
+        await logPaywallEvent(session.user.id, 'checkout_failed', { plan: selectedPlan, reason: error?.message || 'function_error' });
         return;
       }
 

@@ -23,6 +23,13 @@ serve(async (req) => {
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
 
+    // 1. Validate Env Vars
+    if (!MP_ACCESS_TOKEN) {
+      console.error('Missing MERCADOPAGO_ACCESS_TOKEN');
+      throw new Error('Server Configuration Error: Missing Payment Token');
+    }
+    
+    // 2. Validate User
     const {
       data: { user },
     } = await supabaseClient.auth.getUser();
@@ -39,27 +46,23 @@ serve(async (req) => {
 
     let price = 0;
     let title = '';
-    let duration_days = 0;
-
+    
     switch (plan) {
       case 'weekly':
         price = 24.90;
         title = 'Maximare Premium - Semanal';
-        duration_days = 7;
         break;
       case 'monthly':
         price = 49.90;
         title = 'Maximare Premium - Mensal';
-        duration_days = 30;
         break;
       case 'yearly':
         price = 499.90;
         title = 'Maximare Premium - Anual';
-        duration_days = 365;
         break;
     }
 
-    // Create purchase record
+    // 3. Create Purchase
     const { data: purchase, error: purchaseError } = await supabaseClient
       .from('purchases')
       .insert({
@@ -73,9 +76,15 @@ serve(async (req) => {
       .select()
       .single();
 
-    if (purchaseError) throw purchaseError;
+    if (purchaseError) {
+        console.error('Purchase creation failed:', purchaseError);
+        throw new Error('Failed to create purchase record');
+    }
 
-    // Create Mercado Pago Preference
+    // 4. Construct Preference Body
+    // Ensure we don't send empty notification_url if not set
+    const notificationUrl = WEBHOOK_URL && WEBHOOK_URL.startsWith('http') ? WEBHOOK_URL : undefined;
+
     const preferenceBody = {
       items: [
         {
@@ -86,7 +95,7 @@ serve(async (req) => {
         },
       ],
       external_reference: purchase.id,
-      notification_url: WEBHOOK_URL,
+      notification_url: notificationUrl,
       back_urls: {
         success: `${BACK_URL_BASE}payment-result?status=success&purchase_id=${purchase.id}`,
         failure: `${BACK_URL_BASE}payment-result?status=failure&purchase_id=${purchase.id}`,
@@ -94,15 +103,17 @@ serve(async (req) => {
       },
       auto_return: 'approved',
       payer: {
-        email: user.email,
+        email: user.email || 'customer@maximare.app', // Fallback email if user has none (e.g. phone auth)
       },
       payment_methods: {
           excluded_payment_methods: [],
           excluded_payment_types: [],
           installments: 1
       },
-      binary_mode: true // Impede status "pending" demorados, aprova ou recusa na hora
+      binary_mode: true 
     };
+
+    console.log('Creating preference with body:', JSON.stringify(preferenceBody));
 
     const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method: 'POST',
@@ -117,7 +128,8 @@ serve(async (req) => {
 
     if (!mpResponse.ok) {
       console.error('Mercado Pago Error:', mpData);
-      throw new Error('Failed to create preference');
+      // Return the actual error message from MP for debugging
+      throw new Error(`Mercado Pago Error: ${mpData.message || mpData.error || 'Unknown error'}`);
     }
 
     // Update purchase with preference ID
@@ -128,7 +140,7 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        checkout_url: mpData.init_point, // or sandbox_init_point
+        checkout_url: mpData.init_point, 
         purchase_id: purchase.id,
         mp_preference_id: mpData.id,
       }),
@@ -137,8 +149,9 @@ serve(async (req) => {
         status: 200,
       }
     );
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+  } catch (error: any) {
+    console.error('Create Checkout Error:', error);
+    return new Response(JSON.stringify({ error: error.message, details: error }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
     });
