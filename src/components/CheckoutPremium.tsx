@@ -118,14 +118,14 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
     // If the user is logged in, supabase.auth.getUser() gave us the user.
     // We can use that ID.
     
+    // Intelligent Polling with Backoff
     const checkStatus = async () => {
-        // 1. If we have a payment ID, try to poll MP status directly via RPC (Fail-safe)
+        // 1. Check RPC (if payment ID exists)
         if (currentPaymentId || pixData?.payment_id) {
              const payId = currentPaymentId || pixData?.payment_id;
              console.log("Checking payment status via RPC:", payId);
              
              try {
-                // Use RPC because Edge Function deploy failed
                 const { data: rpcData, error: rpcError } = await supabase.rpc('check_payment_status', { 
                     payment_id_input: payId 
                 });
@@ -133,19 +133,20 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                 if (rpcData && rpcData.success) {
                     console.log("RPC Approved:", rpcData);
                     toast.success("Pagamento confirmado! Acesso liberado.");
-                    clearInterval(interval);
                     setVerifying(false);
                     onSuccess(email);
-                    return;
+                    return true; // Stop polling
+                } else if (rpcData?.error && rpcData?.error.includes("Rate limit")) {
+                    console.log("Rate limit hit, skipping cycle");
                 }
              } catch (err) {
                  console.error("Polling Error:", err);
              }
         }
 
-        // 2. Fallback to Profile Polling
+        // 2. Profile Polling (Backup)
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!user) return false;
 
         const { data } = await supabase
             .from('profiles')
@@ -155,20 +156,42 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
         
         if (data?.subscription_status === 'active' || data?.is_premium) {
             toast.success("Pagamento confirmado! Acesso liberado.");
-            clearInterval(interval);
             setVerifying(false);
             onSuccess(email);
+            return true;
         }
+        return false;
     };
 
     if (pixData?.user_id || verifying) {
-        console.log("Polling for payment status...");
-        interval = setInterval(checkStatus, 3000); // Poll every 3s
-        checkStatus(); // Initial check
+        console.log("Starting intelligent polling...");
+        let attempts = 0;
+        
+        const runPoll = async () => {
+            attempts++;
+            const done = await checkStatus();
+            if (done) return;
+
+            // Backoff Strategy
+            let nextDelay = 3000; // Default 3s
+            if (attempts > 20) nextDelay = 5000; // After 1 min (20 * 3s), slow to 5s
+            if (attempts > 44) nextDelay = 10000; // After 3 min, slow to 10s
+            if (attempts > 60) { // After ~5-6 min, stop
+                setVerifying(false);
+                toast.error("O tempo limite de verificação excedeu. Verifique se o pagamento foi debitado.");
+                return;
+            }
+
+            if (verifying || pixData?.user_id) {
+                interval = setTimeout(runPoll, nextDelay);
+            }
+        };
+
+        runPoll();
     }
 
     return () => {
-        if (interval) clearInterval(interval);
+        if (interval) clearTimeout(interval);
         if (subscription) supabase.removeChannel(subscription);
     };
   }, [pixData, verifying, onSuccess, email, currentPaymentId]);
