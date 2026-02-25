@@ -43,25 +43,73 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
-    if (data) setProfile(data as Profile);
+    try {
+      console.log("[Auth] Fetching profile for:", userId);
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+      
+      if (error) {
+        console.error("[Auth] Profile fetch error:", error);
+      }
+      
+      if (data) {
+        console.log("[Auth] Profile loaded:", {
+            status: data.subscription_status,
+            premium: data.is_premium,
+            plan: data.plan_type
+        });
+        setProfile(data as Profile);
+      }
+    } catch (e) {
+      console.error("[Auth] Unexpected profile error:", e);
+    }
   };
 
   const fetchUserData = async (userId: string) => {
-    const { data } = await supabase
-      .from("user_data")
-      .select("*")
-      .eq("user_id", userId)
-      .single();
-    if (data) setUserData(data as UserData);
+    try {
+      const { data } = await supabase
+        .from("user_data")
+        .select("*")
+        .eq("user_id", userId)
+        .single();
+      if (data) setUserData(data as UserData);
+    } catch (e) {
+      console.error("[Auth] UserData error:", e);
+    }
   };
 
   const loadUserData = async (userId: string) => {
     await Promise.all([fetchProfile(userId), fetchUserData(userId)]);
+  };
+
+  // Exposed function to force reload everything (e.g. after payment)
+  // Debounced: prevents running more than once every 5 seconds
+  const [lastRefreshTime, setLastRefreshTime] = useState(0);
+
+  const refreshSession = async () => {
+    const now = Date.now();
+    if (now - lastRefreshTime < 5000) {
+        console.log("[Auth] Refresh skipped (debounce active)");
+        return;
+    }
+    setLastRefreshTime(now);
+
+    console.log("[Auth] Forcing session refresh...");
+    const { data: { session: newSession }, error } = await supabase.auth.refreshSession();
+    
+    if (error) {
+        console.error("[Auth] Session refresh failed:", error);
+    }
+
+    if (newSession?.user) {
+        setSession(newSession);
+        setUser(newSession.user);
+        await loadUserData(newSession.user.id);
+        console.log("[Auth] Session refreshed & data reloaded.");
+    }
   };
 
   useEffect(() => {
@@ -155,7 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, userData, loading, signUp, signIn, signOut, refreshUserData, updateUserData }}>
+    <AuthContext.Provider value={{ user, session, profile, userData, loading, signUp, signIn, signOut, refreshUserData, refreshSession, updateUserData }}>
       {children}
     </AuthContext.Provider>
   );

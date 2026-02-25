@@ -16,7 +16,12 @@ interface CheckoutPremiumProps {
   onCancel: () => void;
 }
 
+import { useAuth } from "@/hooks/useAuth";
+
+import { AlertTriangle, LifeBuoy, RefreshCw } from 'lucide-react';
+
 export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPremiumProps) => {
+  const { refreshSession } = useAuth(); 
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
   const [loadingUser, setLoadingUser] = useState(true);
@@ -31,11 +36,14 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
 
   const [remountKey, setRemountKey] = useState(0);
   const [verifying, setVerifying] = useState(false);
+  const [pollingStartTime, setPollingStartTime] = useState<number | null>(null);
+  const [showTimeoutFallback, setShowTimeoutFallback] = useState(false);
   const [currentPaymentId, setCurrentPaymentId] = useState<string | null>(null);
 
   // PIX State
   const [pixData, setPixData] = useState<{ qr_code: string; qr_code_base64: string; ticket_url: string; user_id: string; payment_id: string } | null>(null);
   const [copied, setCopied] = useState(false);
+
 
   const [initialEmail, setInitialEmail] = useState('');
 
@@ -131,9 +139,25 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                 });
 
                 if (rpcData && rpcData.success) {
-                    console.log("RPC Approved:", rpcData);
+                    console.log("[Checkout] RPC Approved. Forcing session refresh...", rpcData);
                     toast.success("Pagamento confirmado! Acesso liberado.");
                     setVerifying(false);
+                    
+                    // 1. Force Refresh Session & Profile
+                    await refreshSession();
+                    
+                    // 2. Double check profile state after refresh (Optional, for logging)
+                    const { data: { user: updatedUser } } = await supabase.auth.getUser();
+                    if (updatedUser) {
+                        const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', updatedUser.id).single();
+                        console.log("[Checkout] Final Profile State:", {
+                            is_premium: updatedProfile?.is_premium,
+                            status: updatedProfile?.subscription_status,
+                            plan: updatedProfile?.plan_type,
+                            expires: updatedProfile?.subscription_expires_at
+                        });
+                    }
+
                     onSuccess(email);
                     return true; // Stop polling
                 } else if (rpcData?.error && rpcData?.error.includes("Rate limit")) {
@@ -165,6 +189,8 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
 
     if (pixData?.user_id || verifying) {
         console.log("Starting intelligent polling...");
+        if (!pollingStartTime) setPollingStartTime(Date.now());
+
         let attempts = 0;
         
         const runPoll = async () => {
@@ -172,13 +198,22 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
             const done = await checkStatus();
             if (done) return;
 
+            // Timeout Logic (60s)
+            const elapsed = Date.now() - (pollingStartTime || Date.now());
+            if (elapsed > 60000) {
+                setShowTimeoutFallback(true);
+                // Don't stop polling completely, just slow down significantly to 10s
+                // But UI changes to show fallback
+            }
+
             // Backoff Strategy
             let nextDelay = 3000; // Default 3s
             if (attempts > 20) nextDelay = 5000; // After 1 min (20 * 3s), slow to 5s
-            if (attempts > 44) nextDelay = 10000; // After 3 min, slow to 10s
-            if (attempts > 60) { // After ~5-6 min, stop
+            
+            // Hard stop after 5 minutes of total failure
+            if (attempts > 100) { 
                 setVerifying(false);
-                toast.error("O tempo limite de verificação excedeu. Verifique se o pagamento foi debitado.");
+                toast.error("O tempo limite excedeu. Verifique se o pagamento foi debitado.");
                 return;
             }
 
@@ -197,6 +232,9 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
   }, [pixData, verifying, onSuccess, email, currentPaymentId]);
 
   const manualCheck = async () => {
+      setShowTimeoutFallback(false); // Reset fallback UI if user retries manually
+      setPollingStartTime(Date.now()); // Reset timeout counter
+      
       toast.info("Verificando status...");
       const payId = currentPaymentId || pixData?.payment_id;
       
@@ -273,6 +311,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
       // Track Payment ID for polling
       if (data?.payment_id) {
           setCurrentPaymentId(data.payment_id.toString());
+          setPollingStartTime(Date.now());
       }
 
       if (data?.status === 'approved') {
@@ -281,6 +320,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
       } else if (data?.status === 'in_process' || data?.status === 'pending') {
         toast.info("Pagamento em processamento. Aguarde a confirmação.");
         setVerifying(true); // Start polling
+        setPollingStartTime(Date.now());
       } else {
         toast.error(`Pagamento não aprovado. Status: ${data?.status}`);
       }
@@ -374,7 +414,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
         </div>
 
         <Button onClick={manualCheck} variant="outline" className="w-full mt-4">
-            Já realizei o pagamento
+            Já realizei o pagamento (Recarregar)
         </Button>
 
         <p className="text-xs text-gray-400">Se você já recebeu a confirmação do banco, o acesso será liberado em instantes.</p>

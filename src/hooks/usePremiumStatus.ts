@@ -5,8 +5,14 @@ import { useAuth } from "@/hooks/useAuth";
 
 export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'refunded' | 'expired' | 'trialing' | 'free';
 
+interface ExtendedProfile {
+    subscription_status?: string;
+    subscription_expires_at?: string;
+    plan_type?: string;
+}
+
 export function usePremiumStatus() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth(); // Depend on global profile state
   const [isPremium, setIsPremium] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>('free');
   const [expiresAt, setExpiresAt] = useState<Date | null>(null);
@@ -14,6 +20,7 @@ export function usePremiumStatus() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Logic: Sync with Auth Profile (Single Source of Truth)
     if (!user) {
       setIsPremium(false);
       setSubscriptionStatus('free');
@@ -21,46 +28,37 @@ export function usePremiumStatus() {
       return;
     }
 
-    const checkStatus = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('subscription_status, subscription_expires_at, plan_type')
-          .eq('id', user.id)
-          .single();
+    if (!profile) {
+      // Profile loading or not found
+      return; 
+    }
 
-        if (error) {
-          console.error('Error fetching profile for premium status:', error);
-          setIsPremium(false);
-          setSubscriptionStatus('free');
-        } else if (data) {
-          const status = (data.subscription_status as SubscriptionStatus) || 'free';
-          const expires = data.subscription_expires_at ? new Date(data.subscription_expires_at) : null;
-          const plan = data.plan_type || 'free';
-          
-          const now = new Date();
-          
-          // STRICT CHECK: Only active/trialing AND future expiration date are valid.
-          const isValid = (status === 'active' || status === 'trialing') && (expires ? expires > now : false);
-          
-          setIsPremium(isValid);
-          setSubscriptionStatus(status);
-          setExpiresAt(expires);
-          setPlanType(plan);
-        }
-      } catch (err) {
-        console.error('Unexpected error checking premium status:', err);
-        setIsPremium(false);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkStatus();
+    // Parse status from global profile
+    const status = (profile.subscription_status as SubscriptionStatus) || 'free';
+    const expires = profile.subscription_expires_at ? new Date(profile.subscription_expires_at) : null;
+    const plan = profile.plan_type || 'free';
     
-    // Subscribe to realtime changes on profiles table for this user
-    const channel = supabase
-      .channel(`profile-subscription-${user.id}`)
+    const now = new Date();
+    
+    // STRICT CHECK: Only active/trialing AND future expiration date are valid.
+    const isValid = (status === 'active' || status === 'trialing') && (expires ? expires > now : false);
+    
+    console.log(`[PremiumStatus] User: ${user.id} | Status: ${status} | Valid: ${isValid}`);
+    
+    setIsPremium(isValid);
+    setSubscriptionStatus(status);
+    setExpiresAt(expires);
+    setPlanType(plan);
+    setLoading(false);
+
+  }, [user, profile]); // Re-run when global profile changes
+
+  // Realtime is handled in AuthProvider via fetchProfile, 
+  // but if we want instant feedback here without waiting for AuthProvider:
+  useEffect(() => {
+     if (!user) return;
+     const channel = supabase
+      .channel(`premium-status-${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -69,17 +67,30 @@ export function usePremiumStatus() {
           table: 'profiles',
           filter: `id=eq.${user.id}`,
         },
-        (payload) => {
-          console.log('Realtime subscription update:', payload);
-          checkStatus();
+        (payload: any) => {
+          console.log('[PremiumStatus] Realtime update:', payload.new);
+          // We could force a refresh here, but AuthProvider should handle it if it listens.
+          // Let's rely on AuthProvider refreshing the profile.
+          // Actually, AuthProvider doesn't listen to realtime. 
+          // So we should trigger a refresh?
+          // Ideally useAuth should expose a refreshProfile method.
+          // For now, let's just update local state if payload has data
+          const newData = payload.new;
+          if (newData) {
+              const status = (newData.subscription_status as SubscriptionStatus) || 'free';
+              const expires = newData.subscription_expires_at ? new Date(newData.subscription_expires_at) : null;
+              const isValid = (status === 'active' || status === 'trialing') && (expires ? expires > new Date() : false);
+              
+              setIsPremium(isValid);
+              setSubscriptionStatus(status);
+              setExpiresAt(expires);
+              setPlanType(newData.plan_type || 'free');
+          }
         }
       )
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-
+      
+      return () => { supabase.removeChannel(channel); };
   }, [user]);
 
   return { isPremium, subscriptionStatus, expiresAt, planType, loading };
