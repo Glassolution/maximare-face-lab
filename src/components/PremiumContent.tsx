@@ -45,7 +45,7 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
     const { data: { session } } = await supabase.auth.getSession();
     
     if (session) {
-        navigate('/analysis'); 
+        navigate('/profile', { state: { premiumActivated: true } }); 
     } else {
         // Guest User - Trigger Password Reset so they can set their password
         if (email) {

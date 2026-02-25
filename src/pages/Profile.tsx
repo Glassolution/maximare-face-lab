@@ -33,6 +33,17 @@ export default function Profile() {
   
   // Fetch badges
   useEffect(() => {
+    if (location.state?.premiumActivated) {
+        toast.success("Assinatura Premium ativada com sucesso!", {
+            duration: 5000,
+            icon: "👑"
+        });
+        // Clear state to avoid showing it again on refresh
+        navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location]);
+
+  useEffect(() => {
     const fetchBadges = async () => {
         if (!user) return;
         
