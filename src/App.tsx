@@ -25,8 +25,8 @@ import { ThemeProvider } from "@/theme/ThemeProvider";
 import { useEffect, useState } from "react";
 import { usePaywallGate } from "@/hooks/usePaywallGate";
 import { syncHistoryWithSupabase } from "@/lib/mockData";
-import PaymentResult from "@/pages/PaymentResult";
-import PaymentPendingScreen from "@/pages/PaymentPendingScreen";
+
+import UpdatePassword from "@/pages/UpdatePassword";
 
 const queryClient = new QueryClient();
 
@@ -34,7 +34,7 @@ function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   // ... existing hideNav logic ...
-  const hideNav = ["/", "/onboarding", "/login", "/premium", "/landing", "/payment-result", "/payment-pending"].includes(location.pathname);
+  const hideNav = ["/", "/onboarding", "/login", "/premium", "/landing", "/update-password"].includes(location.pathname);
 
   const { user, loading } = useAuth();
   
@@ -50,7 +50,7 @@ function Layout() {
   useEffect(() => {
     const checkPeriodicPaywall = async () => {
       if (!user || loading) return;
-      if (location.pathname === "/premium" || location.pathname === "/login" || location.pathname === "/" || location.pathname === "/payment-result") return;
+      if (location.pathname === "/premium" || location.pathname === "/login" || location.pathname === "/" || location.pathname === "/update-password") return;
       
       // Only check on main tabs to avoid spamming while navigating sub-pages
       const mainTabs = ["/analysis", "/profile", "/trends", "/progress"];
@@ -80,7 +80,7 @@ function Layout() {
 
     const interval = setInterval(() => {
       // Don't show if already on premium page or login
-      if (location.pathname === "/premium" || location.pathname === "/login" || location.pathname === "/payment-result") return;
+      if (location.pathname === "/premium" || location.pathname === "/login" || location.pathname === "/update-password") return;
       
       console.log("[App] Triggering periodic paywall check");
       checkGate({ trigger: 'periodic_force' });
@@ -111,7 +111,8 @@ function Layout() {
     !user &&
     location.pathname !== "/login" &&
     location.pathname !== "/" &&
-    location.pathname !== "/onboarding"
+    location.pathname !== "/onboarding" &&
+    location.pathname !== "/update-password"
   ) {
     return <Navigate to="/login" replace />;
   }
@@ -133,9 +134,8 @@ function Layout() {
         <Route path="/look-alike" element={<LookAlike />} />
         <Route path="/login" element={<Login />} />
         <Route path="/premium" element={<Premium />} />
+        <Route path="/update-password" element={<UpdatePassword />} />
         <Route path="/admin-tools" element={<Admin />} />
-        <Route path="/payment-result" element={<PaymentResult />} />
-        <Route path="/payment-pending" element={<PaymentPendingScreen />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {!hideNav && <BottomNav />}

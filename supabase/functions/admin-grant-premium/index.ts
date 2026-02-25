@@ -41,48 +41,22 @@ serve(async (req) => {
     );
 
     // 1. Find User ID by Email (Admin API)
-    // List users returns paginated, but we can search/filter in some versions. 
-    // Unfortunately listUsers doesn't filter by email directly in all versions easily without iterating.
-    // But we can try generating the ID if we knew the algorithm, but we don't.
-    // Let's try to query the public.profiles first if email is stored there? 
-    // Profiles table usually has user_id, but maybe not email.
-    // Wait, profiles table often doesn't store email to avoid duplication.
-    // We must use auth.admin.listUsers()
     const adminAuth = supabaseAdmin.auth as any;
+    const { data: { users }, error: listError } = await adminAuth.admin.listUsers();
+    
+    if (listError) throw listError;
+    
+    // Simple filter in memory (assuming < 1000 users for now, else need pagination loop)
+    const user = users.find((u: any) => u.email?.toLowerCase() === email.toLowerCase());
 
-    // Note: This is expensive if there are many users, but for now it's fine.
-    // A better way is strictly not available without direct DB access or `rpc`.
-    
-    // Attempt to find user
-    let userId = null;
-    
-    // Pagination loop to find user
-    let page = 1;
-    let found = false;
-    
-    while (!found && page <= 10) { // Limit to 10 pages for safety
-        const { data: { users }, error: listError } = await adminAuth.admin.listUsers({
-            page: page,
-            perPage: 1000
-        });
-        
-        if (listError) throw listError;
-        if (!users || users.length === 0) break;
-        
-        const user = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
-        if (user) {
-            userId = user.id;
-            found = true;
-        }
-        page++;
-    }
-
-    if (!userId) {
+    if (!user) {
         return new Response(JSON.stringify({ error: `User not found for email: ${email}` }), {
             status: 404,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
     }
+
+    const userId = user.id;
 
     // 2. Grant Premium
     const now = new Date();
@@ -92,44 +66,29 @@ serve(async (req) => {
       .from('profiles')
       .update({
         subscription_status: 'active',
-        plan_type: 'premium_yearly',
+        is_premium: true,
+        premium_since: now.toISOString(),
         subscription_expires_at: expiresAt.toISOString(),
-        updated_at: now.toISOString(),
-        premium_status: true, // Legacy support
-        premium_until: expiresAt.toISOString() // Legacy support
+        plan_type: 'yearly',
+        premium_plan_id: 'yearly',
+        payment_provider: 'admin_grant',
+        payment_status: 'approved',
+        updated_at: now.toISOString()
       })
       .eq('id', userId);
 
     if (updateError) {
-      throw updateError;
+        throw updateError;
     }
 
-    // 3. Create a fake purchase record so it looks legitimate in history
-    await supabaseAdmin.from('purchases').insert({
-        user_id: userId,
-        provider: 'mercadopago',
-        plan: 'yearly',
-        amount_cents: 0,
-        currency: 'BRL',
-        status: 'approved',
-        mp_payment_id: 'MANUAL_ADMIN_GRANT_' + now.getTime(),
-        created_at: now.toISOString(),
-        updated_at: now.toISOString()
+    return new Response(JSON.stringify({ message: `Premium granted to ${email}` }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-    return new Response(JSON.stringify({ 
-      success: true, 
-      message: `Premium granted to ${email} (ID: ${userId})`,
-      data: { userId, expiresAt }
-    }), { 
+  } catch (err: any) {
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200 
-    });
-
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400,
     });
   }
 });

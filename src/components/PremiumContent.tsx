@@ -7,8 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import faceScanHero from "@/assets/face-scan-hero.jpg";
-import { openCheckout } from "@/lib/openCheckout";
 import { logPaywallEvent, PaywallContext } from "@/lib/paywall";
+import { CheckoutPremium } from "./CheckoutPremium";
 import {
   Dialog,
   DialogContent,
@@ -25,9 +25,9 @@ interface PremiumContentProps {
 }
 
 export default function PremiumContent({ onClose, context, isModal = false }: PremiumContentProps) {
-  const [loading, setLoading] = useState<PlanType | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<PlanType>('yearly');
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleClose = () => {
@@ -37,6 +37,54 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
       navigate(-1);
     }
   };
+
+  const handleSuccess = async (email?: string) => {
+    setShowCheckout(false);
+    
+    // Check if user is logged in
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (session) {
+        navigate('/analysis'); 
+    } else {
+        // Guest User - Trigger Password Reset so they can set their password
+        if (email) {
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: `${window.location.origin}/update-password`,
+            });
+            
+            if (error) {
+                console.error("Error sending reset email:", error);
+                // Don't block success flow, just warn
+                toast.success("Pagamento aprovado! Faça login para acessar.");
+            } else {
+                toast.success("Verifique seu e-mail para definir sua senha e acessar sua conta!");
+            }
+            navigate('/login');
+        } else {
+            navigate('/login');
+        }
+    }
+  };
+
+  if (showCheckout) {
+    const price = PLAN_CONFIG.PLANS[selectedPlan].price;
+    return (
+      <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center p-4 overflow-y-auto">
+        <div className="w-full max-w-md">
+            <Button variant="ghost" onClick={() => setShowCheckout(false)} className="mb-4">
+                Voltar
+            </Button>
+            <CheckoutPremium 
+                plan={selectedPlan} 
+                price={price} 
+                onSuccess={handleSuccess}
+                onCancel={() => setShowCheckout(false)}
+            />
+        </div>
+      </div>
+    );
+  }
 
   const getDynamicTitle = () => {
     if (!context) return "Desbloqueie acesso\nilimitado";
@@ -57,71 +105,18 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
   };
 
   const handleSubscribe = async () => {
+    setLoading(true);
     try {
-      setLoading(selectedPlan);
-      
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Faça login para continuar");
-        navigate("/login");
-        return;
-      }
-
-      // 1. Create dynamic checkout via Edge Function
-      const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { plan: selectedPlan }
-      });
-
-      // Handle custom error response from Edge Function (returned as 200 OK with error field)
-      if (data?.error) {
-        console.error('Server returned error:', data.error);
-        toast.error(`Erro no servidor: ${data.error}`); 
-        await logPaywallEvent(session.user.id, 'checkout_failed', { plan: selectedPlan, reason: data.error });
-        return;
-      }
-
-      if (error || !data?.checkout_url) {
-        console.error('Checkout creation error:', error);
-        // Show clearer error message to user/dev
-        if (error?.message) {
-            console.error('Detailed Error:', error.message);
-        }
-        toast.error("Erro ao iniciar pagamento. Verifique sua conexão ou tente mais tarde.");
-        await logPaywallEvent(session.user.id, 'checkout_failed', { plan: selectedPlan, reason: error?.message || 'function_error' });
-        return;
-      }
-
-      await logPaywallEvent(session.user.id, 'checkout_started', { plan: selectedPlan });
-
-      // 2. Open checkout in new tab
-      const success = openCheckout(data.checkout_url, selectedPlan);
-
-      if (!success) {
-        await logPaywallEvent(session.user.id, 'checkout_failed', { plan: selectedPlan, reason: 'open_checkout_failed' });
-      } else {
-        // 3. Navigate to pending screen immediately
-        await logPaywallEvent(session.user.id, 'checkout_success', { plan: selectedPlan });
-        
-        if (onClose) onClose(); 
-        navigate("/payment-pending");
-      }
+      
+      await logPaywallEvent(session?.user?.id || 'guest', 'checkout_started', { plan: selectedPlan });
+      setShowCheckout(true);
 
     } catch (error) {
-      console.error(error);
-      toast.error("Erro ao iniciar pagamento. Tente novamente.");
+      console.error('Subscription error:', error);
+      toast.error("Erro ao iniciar assinatura.");
     } finally {
-      setLoading(null);
-    }
-  };
-
-  const handlePaymentConfirm = () => {
-    setShowConfirmModal(false);
-    // Here we could trigger a status check or just return to app
-    toast.success("Pagamento em processamento. Seu acesso será liberado em breve!");
-    if (onClose) {
-      onClose();
-    } else {
-      navigate("/profile");
+      setLoading(false);
     }
   };
 
