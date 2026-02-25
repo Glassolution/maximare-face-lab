@@ -35,6 +35,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const USERNAME_DOMAIN = "@maximare.local";
 
+import { logger } from "@/lib/logger";
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -44,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchProfile = async (userId: string) => {
     try {
-      console.log("[Auth] Fetching profile for:", userId);
+      logger.log("[Auth]", "Fetching profile for:", userId);
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
@@ -52,11 +54,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single();
       
       if (error) {
-        console.error("[Auth] Profile fetch error:", error);
+        logger.error("[Auth]", "Profile fetch error:", error);
       }
       
       if (data) {
-        console.log("[Auth] Profile loaded:", {
+        logger.log("[Auth]", "Profile loaded:", {
             status: data.subscription_status,
             premium: data.is_premium,
             plan: data.plan_type
@@ -64,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(data as Profile);
       }
     } catch (e) {
-      console.error("[Auth] Unexpected profile error:", e);
+      logger.error("[Auth]", "Unexpected profile error:", e);
     }
   };
 
@@ -77,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single();
       if (data) setUserData(data as UserData);
     } catch (e) {
-      console.error("[Auth] UserData error:", e);
+      logger.error("[Auth]", "UserData error:", e);
     }
   };
 
@@ -92,23 +94,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshSession = async () => {
     const now = Date.now();
     if (now - lastRefreshTime < 5000) {
-        console.log("[Auth] Refresh skipped (debounce active)");
+        logger.log("[Auth]", "Refresh skipped (debounce active)");
         return;
     }
     setLastRefreshTime(now);
 
-    console.log("[Auth] Forcing session refresh...");
+    logger.log("[Auth]", "Forcing session refresh...");
     const { data: { session: newSession }, error } = await supabase.auth.refreshSession();
     
     if (error) {
-        console.error("[Auth] Session refresh failed:", error);
+        logger.error("[Auth]", "Session refresh failed:", error);
     }
 
     if (newSession?.user) {
         setSession(newSession);
         setUser(newSession.user);
         await loadUserData(newSession.user.id);
-        console.log("[Auth] Session refreshed & data reloaded.");
+        logger.log("[Auth]", "Session refreshed & data reloaded.");
     }
   };
 

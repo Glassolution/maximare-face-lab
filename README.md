@@ -47,6 +47,56 @@ npm run dev
 - Navigate to the main page of your repository.
 - Click on the "Code" button (green button) near the top right.
 - Select the "Codespaces" tab.
+
+## 🚀 Como Testar Pagamento em Produção (Checklist)
+
+Para validar que o sistema de pagamentos está funcionando corretamente em produção, siga este checklist.
+
+### Pré-requisitos
+- Conta no Mercado Pago (Sandbox ou Produção) configurada.
+- Variáveis de ambiente definidas no Vercel/Supabase (`MERCADOPAGO_ACCESS_TOKEN`, `SUPABASE_SERVICE_ROLE_KEY`, `VITE_DEBUG_MODE=true` para logs).
+
+### Passo a Passo
+
+1.  **Login:** Acesse a aplicação e faça login.
+2.  **Console:** Abra o Developer Tools (F12) e verifique se `[Auth]` logs estão aparecendo (se `VITE_DEBUG_MODE=true`).
+3.  **Checkout:**
+    - Vá para `/premium` ou clique em um recurso bloqueado.
+    - Escolha "Cartão" (Testes) ou "PIX" (Real/Sandbox).
+    - **PIX:** Gere o QR Code. Copie e pague (no Sandbox do MP App ou banco real com valor baixo).
+    - **Cartão:** Use cartões de teste do Mercado Pago.
+4.  **Verificação (Fluxo Automático):**
+    - Após pagar, aguarde na tela do QR Code.
+    - O sistema deve detectar o pagamento em até 10 segundos (Polling Inteligente).
+    - **Logs Esperados:**
+        - `[Checkout] Checking payment status via RPC: ...`
+        - `[Checkout] RPC Approved. Forcing session refresh...`
+        - `[Auth] Forcing session refresh...`
+        - `[Auth] Session refreshed & data reloaded.`
+        - `[Checkout] Final Profile State: { is_premium: true, status: 'active', ... }`
+5.  **Verificação (Fallback Manual):**
+    - Se demorar, clique em "Já realizei o pagamento".
+    - Deve aparecer o Toast "Confirmado!" e redirecionar.
+
+### 🛡️ Fonte da Verdade (Premium Status)
+
+O sistema utiliza uma validação estrita para determinar se o usuário é Premium. Não confiamos apenas em flags booleanas simples.
+
+- **Tabela:** `public.profiles`
+- **Campos Críticos:**
+    - `subscription_status`: Deve ser `'active'` ou `'trialing'`.
+    - `subscription_expires_at`: Deve ser uma data **futura** (`> new Date()`).
+- **Lógica (Frontend `usePremiumStatus`):**
+    ```typescript
+    const isValid = (status === 'active' || status === 'trialing') && (expires ? expires > now : false);
+    ```
+    *Nota: O campo `is_premium` no banco é mantido para facilidade de queries simples, mas o frontend valida a expiração.*
+
+### 🆘 Suporte e Debug
+
+- **Debug Mode:** Defina `VITE_DEBUG_MODE=true` no `.env` para ver logs detalhados de Auth e Checkout.
+- **Canal de Suporte:** O botão "Falar com Suporte" no fallback de timeout aponta para `mailto:suporte@maximare.com.br`. Verifique se este email é monitorado.
+
 - Click on "New codespace" to launch a new Codespace environment.
 - Edit files directly within the Codespace and commit and push your changes once you're done.
 

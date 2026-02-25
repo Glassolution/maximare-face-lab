@@ -244,8 +244,10 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
             const { data: rpcData } = await supabase.rpc('check_payment_status', { payment_id_input: payId });
             
             if (rpcData && rpcData.success) {
+                console.log("[Checkout] Manual Check Approved.");
                 toast.success("Confirmado!");
                 setVerifying(false);
+                await refreshSession();
                 onSuccess(email);
                 return;
             } else {
@@ -266,8 +268,10 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
       if (user) {
           const { data } = await supabase.from('profiles').select('subscription_status, is_premium').eq('id', user.id).maybeSingle();
           if (data?.subscription_status === 'active' || data?.is_premium) {
+              console.log("[Checkout] Manual Profile Check Approved.");
               toast.success("Confirmado!");
               setVerifying(false);
+              await refreshSession();
               onSuccess(email);
           } else {
               toast.warning("Pagamento ainda não confirmado pelo banco. Tente novamente em instantes.");

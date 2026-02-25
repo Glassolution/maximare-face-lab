@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from "@/hooks/useAuth";
+import { logger } from "@/lib/logger";
 
 export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'refunded' | 'expired' | 'trialing' | 'free';
 
@@ -43,7 +44,7 @@ export function usePremiumStatus() {
     // STRICT CHECK: Only active/trialing AND future expiration date are valid.
     const isValid = (status === 'active' || status === 'trialing') && (expires ? expires > now : false);
     
-    console.log(`[PremiumStatus] User: ${user.id} | Status: ${status} | Valid: ${isValid}`);
+    logger.log("[PremiumStatus]", `User: ${user.id} | Status: ${status} | Valid: ${isValid}`);
     
     setIsPremium(isValid);
     setSubscriptionStatus(status);
@@ -68,7 +69,7 @@ export function usePremiumStatus() {
           filter: `id=eq.${user.id}`,
         },
         (payload: any) => {
-          console.log('[PremiumStatus] Realtime update:', payload.new);
+          logger.log("[PremiumStatus]", 'Realtime update:', payload.new);
           // We could force a refresh here, but AuthProvider should handle it if it listens.
           // Let's rely on AuthProvider refreshing the profile.
           // Actually, AuthProvider doesn't listen to realtime. 
