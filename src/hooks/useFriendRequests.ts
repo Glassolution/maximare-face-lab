@@ -56,15 +56,15 @@ export function useFriendRequests() {
 
           const { data: profiles, error: profilesError } = await supabase
             .from('profiles')
-            .select('user_id, username, display_name, avatar_url')
-            .in('user_id', Array.from(userIds));
+            .select('id, username, display_name, avatar_url')
+            .in('id', Array.from(userIds));
 
           if (profilesError) throw profilesError;
 
           const enrichedRequests = data.map(r => ({
               ...r,
-              requester: profiles?.find(p => p.user_id === r.requester_id),
-              addressee: profiles?.find(p => p.user_id === r.addressee_id)
+              requester: profiles?.find(p => p.id === r.requester_id),
+              addressee: profiles?.find(p => p.id === r.addressee_id)
           })) as FriendRequest[];
 
           setIncomingRequests(enrichedRequests.filter(r => r.addressee_id === user.id));

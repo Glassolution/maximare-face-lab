@@ -40,8 +40,8 @@ export function useFriends() {
             // Fetch profiles
             const { data: profilesData, error: profilesError } = await supabase
                 .from('profiles')
-                .select('user_id, username, display_name, avatar_url, plan_type, visibility_score')
-                .in('user_id', friendIds);
+                .select('id, username, display_name, avatar_url, plan_type, visibility_score')
+                .in('id', friendIds);
             
             if (profilesError) throw profilesError;
 
@@ -54,13 +54,14 @@ export function useFriends() {
             if (userDataError) console.error("Error fetching user data", userDataError);
 
             const friendsWithProfiles = friendsData.map(f => {
-                const profile = profilesData?.find(p => p.user_id === f.friend_id);
+                const profile = profilesData?.find(p => p.id === f.friend_id);
                 const userData = userDataList?.find(u => u.user_id === f.friend_id);
                 
                 return {
                     ...f,
                     profile: profile ? {
                         ...profile,
+                        user_id: profile.id, // Compatibility alias
                         last_analysis_score: userData?.last_analysis_score || null
                     } : null
                 };

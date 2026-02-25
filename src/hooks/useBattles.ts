@@ -58,15 +58,15 @@ export function useBattles() {
 
         const { data: profiles, error: profilesError } = await supabase
             .from('profiles')
-            .select('user_id, username, display_name, avatar_url')
-            .in('user_id', Array.from(userIds));
+            .select('id, username, display_name, avatar_url')
+            .in('id', Array.from(userIds));
         
         if (profilesError) throw profilesError;
 
         const enrichedBattles = data.map(b => ({
             ...b,
-            challenger: profiles?.find(p => p.user_id === b.challenger_id),
-            opponent: profiles?.find(p => p.user_id === b.opponent_id)
+            challenger: profiles?.find(p => p.id === b.challenger_id),
+            opponent: profiles?.find(p => p.id === b.opponent_id)
         })) as Battle[];
 
         setBattles(enrichedBattles);
