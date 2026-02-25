@@ -124,17 +124,22 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
              const payId = currentPaymentId || pixData?.payment_id;
              console.log("Checking payment status via RPC:", payId);
              
-             const { data: rpcData, error: rpcError } = await supabase.rpc('check_payment_status', { 
-                 payment_id_input: payId 
-             });
+             try {
+                // Use RPC because Edge Function deploy failed
+                const { data: rpcData, error: rpcError } = await supabase.rpc('check_payment_status', { 
+                    payment_id_input: payId 
+                });
 
-             if (rpcData && rpcData.status === 'approved') {
-                 console.log("RPC Approved:", rpcData);
-                 toast.success("Pagamento confirmado! Acesso liberado.");
-                 clearInterval(interval);
-                 setVerifying(false);
-                 onSuccess(email);
-                 return;
+                if (rpcData && rpcData.success) {
+                    console.log("RPC Approved:", rpcData);
+                    toast.success("Pagamento confirmado! Acesso liberado.");
+                    clearInterval(interval);
+                    setVerifying(false);
+                    onSuccess(email);
+                    return;
+                }
+             } catch (err) {
+                 console.error("Polling Error:", err);
              }
         }
 
@@ -153,8 +158,6 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
             clearInterval(interval);
             setVerifying(false);
             onSuccess(email);
-        } else if (data?.payment_status === 'pending' && verifying) {
-             // Still pending...
         }
     };
 
@@ -169,6 +172,47 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
         if (subscription) supabase.removeChannel(subscription);
     };
   }, [pixData, verifying, onSuccess, email, currentPaymentId]);
+
+  const manualCheck = async () => {
+      toast.info("Verificando status...");
+      const payId = currentPaymentId || pixData?.payment_id;
+      
+      if (payId) {
+          try {
+            // Use RPC because Edge Function deploy failed
+            const { data: rpcData } = await supabase.rpc('check_payment_status', { payment_id_input: payId });
+            
+            if (rpcData && rpcData.success) {
+                toast.success("Confirmado!");
+                setVerifying(false);
+                onSuccess(email);
+                return;
+            } else {
+                 if (rpcData?.status === 'pending') {
+                     toast.warning("O pagamento ainda está pendente no banco.");
+                 } else {
+                     toast.warning("Pagamento não confirmado ainda. Tente novamente.");
+                 }
+                 return;
+            }
+          } catch (err) {
+              console.error("Manual Check Error:", err);
+          }
+      }
+      
+      // Fallback Profile Check
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+          const { data } = await supabase.from('profiles').select('subscription_status, is_premium').eq('id', user.id).maybeSingle();
+          if (data?.subscription_status === 'active' || data?.is_premium) {
+              toast.success("Confirmado!");
+              setVerifying(false);
+              onSuccess(email);
+          } else {
+              toast.warning("Pagamento ainda não confirmado pelo banco. Tente novamente em instantes.");
+          }
+      }
+  };
 
   const handleCardSubmit = async (formData: any) => {
     setLoading(true);
@@ -305,6 +349,10 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
             <Loader2 className="h-5 w-5 animate-spin" />
             <span>Consultando status no servidor...</span>
         </div>
+
+        <Button onClick={manualCheck} variant="outline" className="w-full mt-4">
+            Já realizei o pagamento
+        </Button>
 
         <p className="text-xs text-gray-400">Se você já recebeu a confirmação do banco, o acesso será liberado em instantes.</p>
       </div>

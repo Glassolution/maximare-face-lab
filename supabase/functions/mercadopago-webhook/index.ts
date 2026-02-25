@@ -117,6 +117,25 @@ serve(async (req) => {
             if (userId && payment.status === 'approved') {
                 // Determine duration via plan_id in metadata, or fallback to description
                 let planId = payment.metadata?.plan_id;
+
+                // Insert/Update Payments Table (Audit)
+                const { error: paymentError } = await supabaseAdmin.from('payments').upsert({
+                    payment_id: payment.id.toString(),
+                    user_id: userId,
+                    plan_id: planId,
+                    status: payment.status,
+                    amount: payment.transaction_amount,
+                    currency: payment.currency_id,
+                    metadata: payment.metadata,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'payment_id' });
+
+                if (paymentError) {
+                    console.error("[Webhook] Payments Table Update Error:", paymentError);
+                } else {
+                    console.log(`[Webhook] Payments table updated.`);
+                }
+
                 let days = 30;
                 let planType = 'monthly';
                 

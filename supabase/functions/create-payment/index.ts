@@ -182,6 +182,23 @@ serve(async (req) => {
        if (updateError) console.error("Failed to update profile:", updateError);
     }
 
+    console.log(`[Create-Payment] Created Payment ID: ${payment.id} for User: ${userId}`);
+
+    // Insert into 'payments' table for tracking
+    const { error: insertError } = await supabaseAdmin.from('payments').insert({
+        payment_id: payment.id.toString(),
+        user_id: userId,
+        plan_id: plan_id,
+        status: payment.status,
+        amount: payment.transaction_amount,
+        currency: payment.currency_id,
+        metadata: payment.metadata
+    });
+
+    if (insertError) {
+        console.error("[Create-Payment] Failed to insert into payments table:", insertError);
+    }
+
     // Return Data
     const responseData: any = {
         status: payment.status,
