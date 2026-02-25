@@ -450,8 +450,13 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
               <div className="space-y-2">
                   <Label className="text-xs uppercase text-gray-400 font-semibold tracking-wider">Código PIX Copia e Cola</Label>
                   <div className="flex gap-2">
-                      <Input value={pixData.qr_code} readOnly className="text-xs bg-gray-50 font-mono" />
-                      <Button size="icon" variant="outline" onClick={copyToClipboard}>
+                      <Input 
+                        value={pixData.qr_code} 
+                        readOnly 
+                        className="text-xs bg-gray-50 font-mono h-10" 
+                        onFocus={(e) => e.target.select()}
+                      />
+                      <Button size="icon" variant="outline" onClick={copyToClipboard} className="h-10 w-10 shrink-0">
                           {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                       </Button>
                   </div>
