@@ -31,9 +31,10 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
 
   const [remountKey, setRemountKey] = useState(0);
   const [verifying, setVerifying] = useState(false);
+  const [currentPaymentId, setCurrentPaymentId] = useState<string | null>(null);
 
   // PIX State
-  const [pixData, setPixData] = useState<{ qr_code: string; qr_code_base64: string; ticket_url: string; user_id: string } | null>(null);
+  const [pixData, setPixData] = useState<{ qr_code: string; qr_code_base64: string; ticket_url: string; user_id: string; payment_id: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
   const [initialEmail, setInitialEmail] = useState('');
@@ -118,6 +119,26 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
     // We can use that ID.
     
     const checkStatus = async () => {
+        // 1. If we have a payment ID, try to poll MP status directly via RPC (Fail-safe)
+        if (currentPaymentId || pixData?.payment_id) {
+             const payId = currentPaymentId || pixData?.payment_id;
+             console.log("Checking payment status via RPC:", payId);
+             
+             const { data: rpcData, error: rpcError } = await supabase.rpc('check_payment_status', { 
+                 payment_id_input: payId 
+             });
+
+             if (rpcData && rpcData.status === 'approved') {
+                 console.log("RPC Approved:", rpcData);
+                 toast.success("Pagamento confirmado! Acesso liberado.");
+                 clearInterval(interval);
+                 setVerifying(false);
+                 onSuccess(email);
+                 return;
+             }
+        }
+
+        // 2. Fallback to Profile Polling
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
@@ -125,7 +146,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
             .from('profiles')
             .select('subscription_status, is_premium, payment_status')
             .eq('id', user.id)
-            .single();
+            .maybeSingle();
         
         if (data?.subscription_status === 'active' || data?.is_premium) {
             toast.success("Pagamento confirmado! Acesso liberado.");
@@ -139,7 +160,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
 
     if (pixData?.user_id || verifying) {
         console.log("Polling for payment status...");
-        interval = setInterval(checkStatus, 2000);
+        interval = setInterval(checkStatus, 3000); // Poll every 3s
         checkStatus(); // Initial check
     }
 
@@ -147,7 +168,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
         if (interval) clearInterval(interval);
         if (subscription) supabase.removeChannel(subscription);
     };
-  }, [pixData, verifying, onSuccess, email]);
+  }, [pixData, verifying, onSuccess, email, currentPaymentId]);
 
   const handleCardSubmit = async (formData: any) => {
     setLoading(true);
@@ -181,6 +202,11 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
 
       if (error) throw new Error(error.message || 'Erro ao processar pagamento.');
       if (data?.error) throw new Error(data.error);
+
+      // Track Payment ID for polling
+      if (data?.payment_id) {
+          setCurrentPaymentId(data.payment_id.toString());
+      }
 
       if (data?.status === 'approved') {
         toast.success("Pagamento aprovado!");
@@ -235,7 +261,8 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                 qr_code: data.qr_code,
                 qr_code_base64: data.qr_code_base64,
                 ticket_url: data.ticket_url,
-                user_id: data.user_id
+                user_id: data.user_id,
+                payment_id: data.payment_id // Ensure backend returns this
             });
             toast.success("QR Code gerado! Realize o pagamento.");
         } else {
