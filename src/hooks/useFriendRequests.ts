@@ -87,6 +87,7 @@ export function useFriendRequests() {
 
       let targetUserId;
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(username);
+      const isShortId = /^\d{4}$/.test(username);
 
       if (isUUID) {
           targetUserId = username;
@@ -99,6 +100,18 @@ export function useFriendRequests() {
             
           if (profileError) throw profileError;
           if (!profile) throw new Error('Usuário não encontrado pelo ID');
+      } else if (isShortId) {
+          // Search by Short ID
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('short_id', username)
+            .maybeSingle();
+            
+          if (profileError) throw profileError;
+          if (!profile) throw new Error('Usuário não encontrado pelo ID curto');
+          
+          targetUserId = profile.id;
       } else {
           // 1. Find the user ID from the username or display name
           const { data: profiles, error: profileError } = await supabase

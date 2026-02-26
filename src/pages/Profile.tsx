@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Crown, ChevronRight, Settings, Shield, Zap, Star, TrendingUp, Search, LogOut, Moon, Sun, CreditCard } from "lucide-react";
+import { Crown, ChevronRight, Settings, Shield, Zap, Star, TrendingUp, Search, LogOut, Moon, Sun, CreditCard, Copy } from "lucide-react";
 import { getAnalysisHistory } from "@/lib/mockData";
+import { toast } from "sonner";
 import { Link, useNavigate } from "react-router-dom";
 import { getTier, getNextTier, ExtendedAnalysisResult } from "@/lib/rankingSystem";
 import { useAuth } from "@/hooks/useAuth";
@@ -31,7 +32,9 @@ export default function Profile() {
   const [showSubscription, setShowSubscription] = useState(false);
   const [earnedBadges, setEarnedBadges] = useState<string[]>([]);
   
-  // Fetch badges
+  const [shortId, setShortId] = useState<string | null>(null);
+  
+  // Fetch badges and short_id
   useEffect(() => {
     if (location.state?.premiumActivated) {
         toast.success("Assinatura Premium ativada com sucesso!", {
@@ -44,10 +47,21 @@ export default function Profile() {
   }, [location]);
 
   useEffect(() => {
-    const fetchBadges = async () => {
+    const fetchProfileData = async () => {
         if (!user) return;
         
         try {
+            // Fetch Short ID
+            const { data: profileData } = await supabase
+                .from('profiles')
+                .select('short_id')
+                .eq('id', user.id)
+                .single();
+            
+            if (profileData?.short_id) {
+                setShortId(profileData.short_id);
+            }
+
             // 1. Get existing badges first for instant load
             const { data: currentBadges } = await supabase
                 .from('user_badges')
@@ -74,11 +88,11 @@ export default function Profile() {
                  }
             }
         } catch (e) {
-            console.error("Error checking achievements", e);
+            console.error("Error checking achievements/profile", e);
         }
     };
     
-    fetchBadges();
+    fetchProfileData();
   }, [user]);
 
   const badgesList = [
@@ -158,10 +172,28 @@ export default function Profile() {
                  <span className="font-heading text-2xl font-bold text-gradient">M</span>
              )}
           </div>
-          <h1 className="font-heading text-xl font-bold text-foreground flex items-center justify-center gap-2">
-            {displayName}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">{totalAnalyses} análise{totalAnalyses !== 1 ? "s" : ""} realizada{totalAnalyses !== 1 ? "s" : ""}</p>
+          <div className="flex flex-col items-center gap-1 mt-1">
+            <h1 className="font-heading text-xl font-bold text-foreground">
+              {displayName}
+            </h1>
+            {user?.id && (
+                <div 
+                    className="flex items-center gap-1.5 px-3 py-1 bg-muted/50 rounded-full cursor-pointer hover:bg-muted transition-colors group"
+                    onClick={() => {
+                        if (shortId) {
+                            navigator.clipboard.writeText(shortId);
+                            toast.success("ID copiado!", { duration: 2000 });
+                        }
+                    }}
+                >
+                     <span className="text-[12px] text-muted-foreground font-mono font-bold tracking-widest">
+                        #{shortId || '...'}
+                     </span>
+                     <Copy className="w-3 h-3 text-muted-foreground group-hover:text-primary transition-colors" />
+                </div>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground mt-3">{totalAnalyses} análise{totalAnalyses !== 1 ? "s" : ""} realizada{totalAnalyses !== 1 ? "s" : ""}</p>
         
           {/* Status Badge */}
           <div className="w-full mt-6 px-2">
