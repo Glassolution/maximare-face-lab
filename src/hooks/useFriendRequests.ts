@@ -81,10 +81,11 @@ export function useFriendRequests() {
     }
   };
 
-  const sendRequest = async (username: string) => {
+  const sendRequest = async (usernameInput: string) => {
     try {
       if (!user) throw new Error('Usuário não autenticado');
 
+      const username = usernameInput.trim();
       let targetUserId;
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(username);
       const isShortId = /^\d{4}$/.test(username);
@@ -114,14 +115,14 @@ export function useFriendRequests() {
           targetUserId = profile.id;
       } else {
           // 1. Find the user ID from the username or display name
-          const searchTerm = username.trim();
-          const pattern = `%${searchTerm}%`;
+          const searchTerm = username;
           
-          // Use a robust OR filter with quoted values to handle spaces correctly
+          // Using a simpler query structure to avoid syntax errors with spaces
+          // We search for exact match on username OR partial match on display_name
           const { data: profiles, error: profileError } = await supabase
             .from('profiles')
             .select('id')
-            .or(`username.ilike."${pattern}",display_name.ilike."${pattern}",short_id.eq."${searchTerm}"`)
+            .or(`username.eq."${searchTerm}",username.ilike."%${searchTerm}%",display_name.ilike."%${searchTerm}%"`)
             .limit(1)
             .maybeSingle();
     

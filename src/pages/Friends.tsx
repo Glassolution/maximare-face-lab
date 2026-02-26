@@ -203,7 +203,7 @@ export default function Friends() {
                 <div className="relative flex-1">
                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input 
-                        placeholder="Nome de usuário ou ID" 
+                        placeholder="Nome de usuário (@user) ou ID (4 dígitos)" 
                         className="pl-8" 
                         value={searchUsername}
                         onChange={(e) => setSearchUsername(e.target.value)}

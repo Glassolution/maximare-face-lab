@@ -27,15 +27,17 @@ export function useFriends() {
     if (!user) return;
     setLoading(true);
     try {
+        // Fetch friendships where user is either user_id or friend_id
         const { data: friendsData, error } = await supabase
             .from('friends')
             .select('user_id, friend_id, created_at')
-            .eq('user_id', user.id);
+            .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`);
 
         if (error) throw error;
 
         if (friendsData && friendsData.length > 0) {
-            const friendIds = friendsData.map(f => f.friend_id);
+            // Identify the OTHER user's ID
+            const friendIds = friendsData.map(f => f.user_id === user.id ? f.friend_id : f.user_id);
             
             // Fetch profiles
             const { data: profilesData, error: profilesError } = await supabase
@@ -54,11 +56,14 @@ export function useFriends() {
             if (userDataError) console.error("Error fetching user data", userDataError);
 
             const friendsWithProfiles = friendsData.map(f => {
-                const profile = profilesData?.find(p => p.id === f.friend_id);
-                const userData = userDataList?.find(u => u.user_id === f.friend_id);
+                const actualFriendId = f.user_id === user.id ? f.friend_id : f.user_id;
+                const profile = profilesData?.find(p => p.id === actualFriendId);
+                const userData = userDataList?.find(u => u.user_id === actualFriendId);
                 
                 return {
-                    ...f,
+                    user_id: user.id, // Normalized for UI
+                    friend_id: actualFriendId, // The actual friend ID
+                    created_at: f.created_at,
                     profile: profile ? {
                         ...profile,
                         user_id: profile.id, // Compatibility alias

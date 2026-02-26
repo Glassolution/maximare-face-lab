@@ -156,13 +156,11 @@ export default function Profile() {
 
   // Determine what to display
   // Logic: 
-  // 1. If username exists and is NOT a UUID (meaning user set a custom username), show @username
-  // 2. Else DO NOT show ID badge at all (user requested "retire o ID" if it's the number)
-  const isCustomUsername = profileUsername && !/^[0-9a-f]{8}-[0-9a-f]{4}/.test(profileUsername);
-  const shouldShowBadge = isCustomUsername;
+  // 1. Always show short_id if available (per user request: "volte a usar os IDs de 4 casas")
+  // 2. If custom username exists, show that too.
   
-  const displayId = `@${profileUsername}`;
-  const copyText = `@${profileUsername}`;
+  const displayId = shortId ? `ID: ${shortId}` : (profileUsername ? `@${profileUsername}` : "Sem ID");
+  const copyText = shortId || profileUsername || "";
 
   return (
     <div className="min-h-screen pt-6 pb-28 px-4">
@@ -188,20 +186,26 @@ export default function Profile() {
             <h1 className="font-heading text-xl font-bold text-foreground">
               {displayName}
             </h1>
-            {shouldShowBadge && (
-                <div 
-                    className="flex items-center gap-1.5 px-3 py-1 bg-muted/50 rounded-full cursor-pointer hover:bg-muted transition-colors group"
-                    onClick={() => {
-                        navigator.clipboard.writeText(copyText);
-                        toast.success("Username copiado!", { duration: 2000 });
-                    }}
-                >
-                     <span className="text-[12px] text-muted-foreground font-mono font-bold tracking-widest">
-                        {displayId}
-                     </span>
-                     <Copy className="w-3 h-3 text-muted-foreground group-hover:text-primary transition-colors" />
-                </div>
-            )}
+            <div className="flex flex-col items-center gap-1">
+                {profileUsername && !/^[0-9a-f]{8}-[0-9a-f]{4}/.test(profileUsername) && (
+                    <span className="text-sm text-muted-foreground">@{profileUsername}</span>
+                )}
+                
+                {shortId && (
+                    <div 
+                        className="flex items-center gap-1.5 px-3 py-1 bg-muted/50 rounded-full cursor-pointer hover:bg-muted transition-colors group mt-1"
+                        onClick={() => {
+                            navigator.clipboard.writeText(shortId);
+                            toast.success("ID copiado!", { duration: 2000 });
+                        }}
+                    >
+                         <span className="text-[12px] text-muted-foreground font-mono font-bold tracking-widest">
+                            ID: {shortId}
+                         </span>
+                         <Copy className="h-3 w-3 text-muted-foreground group-hover:text-foreground transition-colors" />
+                    </div>
+                )}
+            </div>
           </div>
           <p className="text-sm text-muted-foreground mt-3">{totalAnalyses} análise{totalAnalyses !== 1 ? "s" : ""} realizada{totalAnalyses !== 1 ? "s" : ""}</p>
         
