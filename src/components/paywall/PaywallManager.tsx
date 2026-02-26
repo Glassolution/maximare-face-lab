@@ -25,8 +25,8 @@ export function PaywallManager({ children }: PaywallManagerProps) {
   const [lastShownAt, setLastShownAt] = useState<number>(0);
 
   // Constants
-  const COOLDOWN_MS = 120000; // 2 minutes
-  const MAX_PER_SESSION = 3;
+  const COOLDOWN_MS = 600000; // 10 minutes
+  const MAX_PER_SESSION = 1;
 
   const triggerPaywall = () => {
     if (isPremium) return;
