@@ -33,6 +33,7 @@ export default function Profile() {
   const [earnedBadges, setEarnedBadges] = useState<string[]>([]);
   
   const [shortId, setShortId] = useState<string | null>(null);
+  const [profileUsername, setProfileUsername] = useState<string | null>(null);
   
   // Fetch badges and short_id
   useEffect(() => {
@@ -51,15 +52,16 @@ export default function Profile() {
         if (!user) return;
         
         try {
-            // Fetch Short ID
+            // Fetch Short ID and Username
             const { data: profileData } = await supabase
                 .from('profiles')
-                .select('short_id')
+                .select('short_id, username')
                 .eq('id', user.id)
                 .single();
             
-            if (profileData?.short_id) {
-                setShortId(profileData.short_id);
+            if (profileData) {
+                if (profileData.short_id) setShortId(profileData.short_id);
+                if (profileData.username) setProfileUsername(profileData.username);
             }
 
             // 1. Get existing badges first for instant load
@@ -152,6 +154,16 @@ export default function Profile() {
     return new Intl.DateTimeFormat('pt-BR').format(d);
   };
 
+  // Determine what to display
+  // Logic: 
+  // 1. If username exists and is NOT a UUID (meaning user set a custom username), show @username
+  // 2. Else DO NOT show ID badge at all (user requested "retire o ID" if it's the number)
+  const isCustomUsername = profileUsername && !/^[0-9a-f]{8}-[0-9a-f]{4}/.test(profileUsername);
+  const shouldShowBadge = isCustomUsername;
+  
+  const displayId = `@${profileUsername}`;
+  const copyText = `@${profileUsername}`;
+
   return (
     <div className="min-h-screen pt-6 pb-28 px-4">
       <div className="container max-w-lg mx-auto space-y-6">
@@ -176,18 +188,16 @@ export default function Profile() {
             <h1 className="font-heading text-xl font-bold text-foreground">
               {displayName}
             </h1>
-            {user?.id && (
+            {shouldShowBadge && (
                 <div 
                     className="flex items-center gap-1.5 px-3 py-1 bg-muted/50 rounded-full cursor-pointer hover:bg-muted transition-colors group"
                     onClick={() => {
-                        if (shortId) {
-                            navigator.clipboard.writeText(shortId);
-                            toast.success("ID copiado!", { duration: 2000 });
-                        }
+                        navigator.clipboard.writeText(copyText);
+                        toast.success("Username copiado!", { duration: 2000 });
                     }}
                 >
                      <span className="text-[12px] text-muted-foreground font-mono font-bold tracking-widest">
-                        #{shortId || '...'}
+                        {displayId}
                      </span>
                      <Copy className="w-3 h-3 text-muted-foreground group-hover:text-primary transition-colors" />
                 </div>

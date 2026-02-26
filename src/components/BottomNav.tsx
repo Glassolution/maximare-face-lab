@@ -1,96 +1,116 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, LineChart, Users, User, Sparkles, Swords } from "lucide-react";
-import navIcon from "@/assets/nav.png";
+import { Home, LineChart, Users, User, Sparkles, Swords, Plus, ScanFace } from "lucide-react";
 import { motion } from "framer-motion";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
+import { Button } from "@/components/ui/button";
 
 export default function BottomNav() {
   const location = useLocation();
 
   const isActive = (path: string) => location.pathname === path;
 
+  const NavItem = ({ to, icon: Icon, active }: { to: string; icon: any; active: boolean }) => (
+    <Link to={to} className="flex items-center justify-center">
+      <div className={`flex items-center justify-center p-2.5 rounded-full transition-all duration-300 ${active ? "bg-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.5)]" : "bg-transparent"}`}>
+        <Icon
+          className={`h-5 w-5 md:h-6 md:w-6 transition-colors ${
+            active ? "text-white" : "text-zinc-500"
+          } stroke-[1.5px]`}
+        />
+      </div>
+    </Link>
+  );
+
   return (
     <nav className="fixed bottom-6 left-0 right-0 z-50 flex justify-center pointer-events-none">
       <div className="pointer-events-auto w-auto mx-auto">
         <div className="relative">
-          <div className="h-16 rounded-full bg-graphite flex items-center px-5 shadow-[0_10px_40px_rgba(0,0,0,0.7)] border border-white/5">
-            <div className="flex items-center gap-4 md:gap-5">
+          <div className="h-20 rounded-full bg-[#0a0a0a] flex items-center px-6 shadow-[0_10px_40px_rgba(0,0,0,0.8)] border border-white/5 backdrop-blur-xl">
+            <div className="flex items-center gap-6">
               {/* Home / Dashboard */}
-              <Link
-                to="/analysis"
-                className="flex items-center justify-center"
-              >
-                <Home
-                  className={`h-6 w-6 md:h-7 md:w-7 transition-colors ${
-                    isActive("/analysis") ? "text-white" : "text-zinc-400"
-                  }`}
-                />
-              </Link>
+              <NavItem to="/analysis" icon={Home} active={isActive("/analysis")} />
 
-              {/* Duelos (Moved to Left) */}
-              <Link to="/battles" className="flex items-center justify-center">
-                <Swords
-                  className={`h-6 w-6 md:h-7 md:w-7 transition-colors ${
-                    isActive("/battles") ? "text-primary" : "text-zinc-400"
-                  }`}
-                />
-              </Link>
+              {/* Duelos */}
+              <NavItem to="/battles" icon={Swords} active={isActive("/battles")} />
 
-              {/* Progresso / Analytics */}
-              <Link
-                to="/progress"
-                className="flex items-center justify-center"
-              >
-                <LineChart
-                  className={`h-6 w-6 md:h-7 md:w-7 transition-colors ${
-                    isActive("/progress") ? "text-primary" : "text-zinc-400"
-                  }`}
-                />
-              </Link>
+              {/* Central Action Button */}
+              <Drawer>
+                <DrawerTrigger asChild>
+                  <div className="relative flex items-center justify-center -mt-12 mx-2 group cursor-pointer">
+                    <motion.div
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="relative"
+                    >
+                        {/* Hexagon Shape */}
+                        <div 
+                            className="h-16 w-16 bg-blue-600 flex items-center justify-center shadow-[0_0_30px_rgba(37,99,235,0.6)] group-hover:bg-blue-500 transition-colors"
+                            style={{ 
+                                clipPath: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)" 
+                            }}
+                        >
+                            <Plus className="text-white w-8 h-8" strokeWidth={3} />
+                        </div>
+                    </motion.div>
+                  </div>
+                </DrawerTrigger>
+                <DrawerContent className="bg-[#0a0a0a] border-zinc-800">
+                  <div className="mx-auto w-full max-w-sm">
+                    <DrawerHeader>
+                      <DrawerTitle className="text-center text-white text-xl">O que deseja fazer?</DrawerTitle>
+                    </DrawerHeader>
+                    <div className="p-4 pb-8 space-y-3">
+                      <Link to="/analysis?start=true">
+                        <Button className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center justify-start px-6 gap-4 mb-3">
+                          <div className="bg-white/20 p-2 rounded-lg">
+                            <ScanFace className="w-5 h-5" />
+                          </div>
+                          <div className="text-left">
+                            <span className="block font-semibold">Nova Análise</span>
+                            <span className="text-xs text-blue-100 font-normal">Capturar métricas faciais</span>
+                          </div>
+                        </Button>
+                      </Link>
 
-              <Link
-                to="/analysis?start=true"
-                className="relative flex items-center justify-center -mt-8 mx-0"
-              >
-                <motion.div
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                  className="h-20 w-20 md:h-24 md:w-24 rounded-full flex items-center justify-center overflow-hidden shadow-xl"
-                >
-                  <img
-                    src={navIcon}
-                    alt="Iniciar análise"
-                    className="h-full w-full object-cover"
-                  />
-                </motion.div>
-              </Link>
+                      <Link to="/progress">
+                        <Button variant="outline" className="w-full h-14 bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-white rounded-xl flex items-center justify-start px-6 gap-4 mb-3">
+                          <div className="bg-zinc-800 p-2 rounded-lg">
+                            <LineChart className="w-5 h-5 text-blue-500" />
+                          </div>
+                          <div className="text-left">
+                            <span className="block font-semibold">Meu Progresso</span>
+                            <span className="text-xs text-zinc-400 font-normal">Acompanhe sua evolução</span>
+                          </div>
+                        </Button>
+                      </Link>
 
-              {/* Trends */}
-              <Link to="/trends" className="flex items-center justify-center">
-                <Sparkles
-                  className={`h-6 w-6 md:h-7 md:w-7 transition-colors ${
-                    isActive("/trends") ? "text-primary" : "text-zinc-400"
-                  }`}
-                />
-              </Link>
+                      <Link to="/trends">
+                        <Button variant="outline" className="w-full h-14 bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-white rounded-xl flex items-center justify-start px-6 gap-4">
+                          <div className="bg-zinc-800 p-2 rounded-lg">
+                            <Sparkles className="w-5 h-5 text-amber-500" />
+                          </div>
+                          <div className="text-left">
+                            <span className="block font-semibold">Plano Personalizado</span>
+                            <span className="text-xs text-zinc-400 font-normal">Recomendações exclusivas</span>
+                          </div>
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                </DrawerContent>
+              </Drawer>
 
               {/* Amigos */}
-              <Link to="/friends" className="flex items-center justify-center">
-                <Users
-                  className={`h-6 w-6 md:h-7 md:w-7 transition-colors ${
-                    isActive("/friends") ? "text-primary" : "text-zinc-400"
-                  }`}
-                />
-              </Link>
+              <NavItem to="/friends" icon={Users} active={isActive("/friends")} />
 
               {/* Conta */}
-              <Link to="/profile" className="flex items-center justify-center">
-                <User
-                  className={`h-6 w-6 md:h-7 md:w-7 transition-colors ${
-                    isActive("/profile") ? "text-primary" : "text-zinc-400"
-                  }`}
-                />
-              </Link>
+              <NavItem to="/profile" icon={User} active={isActive("/profile")} />
             </div>
           </div>
         </div>

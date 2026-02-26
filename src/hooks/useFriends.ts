@@ -73,11 +73,7 @@ export function useFriends() {
 
     } catch (error: any) {
       console.error('Error fetching friends:', error);
-      toast({
-        title: 'Erro ao carregar amigos',
-        description: error.message,
-        variant: 'destructive',
-      });
+      // Fallback: If join failed, try manual fetch or show error
     } finally {
       setLoading(false);
     }

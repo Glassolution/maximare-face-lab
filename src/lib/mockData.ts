@@ -96,6 +96,10 @@ export const mockRecommendations: Recommendation[] = [
 ];
 
 export function getAnalysisHistory(): AnalysisResult[] {
+  // If we are logged in, we trust syncHistoryWithSupabase to have updated this
+  // BUT if we just switched accounts, this might still hold the old user's data until sync finishes
+  // A better approach is to namespace this by user_id, but for now we rely on the sync to overwrite it.
+  
   const stored = localStorage.getItem("maximare_history");
   if (!stored) return [];
   try {
@@ -107,6 +111,10 @@ export function getAnalysisHistory(): AnalysisResult[] {
   } catch {
     return [];
   }
+}
+
+export function clearLocalHistory() {
+    localStorage.removeItem("maximare_history");
 }
 
 export async function deleteAnalysis(id: string) {
@@ -264,8 +272,14 @@ export async function saveAnalysis(analysis: AnalysisResult) {
 export async function syncHistoryWithSupabase(): Promise<AnalysisResult[]> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return [];
+    if (!session?.user) {
+        // If no user logged in, return empty array to clear previous user's data from UI
+        // But do NOT clear local storage yet to avoid losing guest data if that was the intent
+        // Actually, if we switch accounts, we want to clear the previous user's data from view.
+        return [];
+    }
 
+    // 1. Fetch data strictly for the CURRENT user
     const { data, error } = await supabase
       .from('analysis_history')
       .select('result_json')
@@ -275,27 +289,17 @@ export async function syncHistoryWithSupabase(): Promise<AnalysisResult[]> {
 
     if (error) throw error;
 
-    if (data && data.length > 0) {
+    if (data) {
       const remoteHistory = data.map(d => d.result_json) as AnalysisResult[];
       
-      // Merge with local history to prevent data loss of unsynced items
-      const localHistory = getAnalysisHistory();
-      const combined = [...remoteHistory, ...localHistory];
-      
-      // Deduplicate by ID
-      const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
-      
-      // Sort by date descending
-      unique.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      
-      const finalHistory = unique.slice(0, 20);
-
+      // Overwrite local storage with this user's data
+      // This ensures that when we switch accounts, 'getAnalysisHistory' returns the correct data
       try {
-        localStorage.setItem("maximare_history", JSON.stringify(finalHistory));
+        localStorage.setItem("maximare_history", JSON.stringify(remoteHistory));
       } catch (e) {
         console.warn("Não foi possível salvar histórico no cache local (quota):", e);
       }
-      return finalHistory;
+      return remoteHistory;
     }
     return [];
   } catch (err) {

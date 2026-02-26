@@ -18,11 +18,14 @@ export default function Friends() {
   const handleSendRequest = async () => {
     if (!searchUsername.trim()) return;
     setIsSearching(true);
-    // Remove @ if present
-    const username = searchUsername.trim().replace(/^@/, '');
-    await sendRequest(username);
-    setIsSearching(false);
-    setSearchUsername("");
+    try {
+      // Remove @ if present
+      const username = searchUsername.trim().replace(/^@/, '');
+      await sendRequest(username);
+      setSearchUsername("");
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   return (
@@ -114,13 +117,20 @@ export default function Friends() {
                             {incomingRequests.map(req => (
                                 <div key={req.id} className="flex items-center justify-between p-2 border rounded-lg">
                                     <div className="flex items-center gap-3">
-                                        <Avatar>
-                                            <AvatarImage src={req.requester?.avatar_url || undefined} />
-                                            <AvatarFallback>{req.requester?.username?.substring(0, 2).toUpperCase()}</AvatarFallback>
+                                        <Avatar className="h-10 w-10 border border-border">
+                                            <AvatarImage 
+                                                src={req.requester?.avatar_url || undefined} 
+                                                alt={req.requester?.display_name || "User"}
+                                            />
+                                            <AvatarFallback>{req.requester?.username?.substring(0, 2).toUpperCase() || "??"}</AvatarFallback>
                                         </Avatar>
-                                        <div>
-                                            <p className="font-medium">{req.requester?.display_name || req.requester?.username}</p>
-                                            <p className="text-xs text-muted-foreground">@{req.requester?.username}</p>
+                                        <div className="flex flex-col">
+                                            <p className="font-medium flex items-center gap-2">
+                                                {req.requester?.display_name || req.requester?.username}
+                                                {req.requester?.username && (
+                                                    <span className="text-xs text-muted-foreground font-normal">@{req.requester.username}</span>
+                                                )}
+                                            </p>
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
@@ -153,13 +163,21 @@ export default function Friends() {
                             {outgoingRequests.map(req => (
                                 <div key={req.id} className="flex items-center justify-between p-2 border rounded-lg">
                                     <div className="flex items-center gap-3">
-                                        <Avatar>
-                                            <AvatarImage src={req.addressee?.avatar_url || undefined} />
-                                            <AvatarFallback>{req.addressee?.username?.substring(0, 2).toUpperCase()}</AvatarFallback>
+                                        <Avatar className="h-10 w-10 border border-border">
+                                            <AvatarImage 
+                                                src={req.addressee?.avatar_url || undefined} 
+                                                alt={req.addressee?.display_name || "User"}
+                                                onLoadingStatusChange={(status) => console.log("Avatar loading:", status, req.addressee?.avatar_url)}
+                                            />
+                                            <AvatarFallback>{req.addressee?.username?.substring(0, 2).toUpperCase() || "??"}</AvatarFallback>
                                         </Avatar>
-                                        <div>
-                                            <p className="font-medium">{req.addressee?.display_name || req.addressee?.username}</p>
-                                            <p className="text-xs text-muted-foreground">@{req.addressee?.username}</p>
+                                        <div className="flex flex-col">
+                                            <p className="font-medium flex items-center gap-2">
+                                                {req.addressee?.display_name || req.addressee?.username}
+                                                {req.addressee?.username && (
+                                                    <span className="text-xs text-muted-foreground font-normal">@{req.addressee.username}</span>
+                                                )}
+                                            </p>
                                         </div>
                                     </div>
                                     <Button size="sm" variant="ghost" onClick={() => cancelRequest(req.id)}>

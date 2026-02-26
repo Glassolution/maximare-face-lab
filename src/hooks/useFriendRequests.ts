@@ -32,6 +32,7 @@ export function useFriendRequests() {
     if (!user) return;
     setLoading(true);
     try {
+      // 1. Fetch raw requests
       const { data, error } = await supabase
         .from('friend_requests')
         .select('*')
@@ -41,19 +42,14 @@ export function useFriendRequests() {
 
       if (error) throw error;
 
-      if (data) {
+      if (data && data.length > 0) {
           const userIds = new Set<string>();
           data.forEach(r => {
               userIds.add(r.requester_id);
               userIds.add(r.addressee_id);
           });
           
-          if (userIds.size === 0) {
-             setIncomingRequests([]);
-             setOutgoingRequests([]);
-             return;
-          }
-
+          // 2. Fetch profiles manually to avoid schema relationship errors
           const { data: profiles, error: profilesError } = await supabase
             .from('profiles')
             .select('id, username, display_name, avatar_url')
@@ -61,8 +57,12 @@ export function useFriendRequests() {
 
           if (profilesError) throw profilesError;
 
-          const enrichedRequests = data.map(r => ({
-              ...r,
+          const enrichedRequests = data.map((r: any) => ({
+              id: r.id,
+              requester_id: r.requester_id,
+              addressee_id: r.addressee_id,
+              status: r.status,
+              created_at: r.created_at,
               requester: profiles?.find(p => p.id === r.requester_id),
               addressee: profiles?.find(p => p.id === r.addressee_id)
           })) as FriendRequest[];
@@ -114,10 +114,13 @@ export function useFriendRequests() {
           targetUserId = profile.id;
       } else {
           // 1. Find the user ID from the username or display name
+          // Using ilike with wildcards for a bit more flexibility, but keeping it strict enough
+          // We search in username, display_name, and short_id (just in case)
           const { data: profiles, error: profileError } = await supabase
             .from('profiles')
             .select('id')
-            .or(`username.ilike.${username},display_name.ilike.${username}`)
+            .or(`username.ilike.${username},display_name.ilike.${username},username.ilike.%${username}%,display_name.ilike.%${username}%`)
+            .limit(1) // Get the first match
             .maybeSingle();
     
           if (profileError) throw profileError;

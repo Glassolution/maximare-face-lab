@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
+import { clearLocalHistory } from "@/lib/mockData";
 
 interface Profile {
   id: string;
@@ -117,6 +118,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, sess) => {
+        if (event === 'SIGNED_OUT') {
+            // Clear sensitive local data on sign out
+            clearLocalHistory();
+        }
         setSession(sess);
         setUser(sess?.user ?? null);
         if (sess?.user) {
