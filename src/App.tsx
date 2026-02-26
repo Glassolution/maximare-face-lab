@@ -21,6 +21,7 @@ import NotFound from "@/pages/NotFound";
 import Login from "@/pages/Login";
 import Premium from "@/pages/Premium";
 import Admin from "@/pages/Admin";
+import Subscription from "@/pages/Subscription";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 import { useEffect, useState } from "react";
@@ -35,7 +36,7 @@ function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   // ... existing hideNav logic ...
-  const hideNav = ["/", "/onboarding", "/login", "/premium", "/landing", "/update-password"].includes(location.pathname);
+  const hideNav = ["/", "/onboarding", "/login", "/premium", "/landing", "/update-password", "/subscription"].includes(location.pathname);
 
   const { user, loading } = useAuth();
   
@@ -136,6 +137,7 @@ function Layout() {
         <Route path="/look-alike" element={<LookAlike />} />
         <Route path="/login" element={<Login />} />
         <Route path="/premium" element={<Premium />} />
+        <Route path="/subscription" element={<Subscription />} />
         <Route path="/update-password" element={<UpdatePassword />} />
         <Route path="/admin-tools" element={<Admin />} />
         <Route path="*" element={<NotFound />} />

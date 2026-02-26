@@ -47,9 +47,7 @@ export function PaywallManager() {
 
   const handleSubscribe = () => {
       setShowPaywall(false);
-      navigate('/profile'); 
-      const planName = selectedPlan === 'annual' ? 'Anual' : selectedPlan === 'monthly' ? 'Mensal' : 'Semanal';
-      toast.success(`Plano ${planName} selecionado!`);
+      navigate(`/subscription?plan=${selectedPlan}`); 
   };
   
   return (
