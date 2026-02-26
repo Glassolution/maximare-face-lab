@@ -60,41 +60,41 @@ export function PaywallManager() {
   
   return (
     <Dialog open={showPaywall} onOpenChange={setShowPaywall}>
-      <DialogContent className="sm:max-w-md rounded-3xl border-2 border-blue-500/20 bg-background/95 backdrop-blur-xl">
-        <DialogHeader className="space-y-4 text-center">
-          <div className="mx-auto h-16 w-16 rounded-full bg-blue-500/10 flex items-center justify-center mb-2 animate-pulse">
-            <Crown className="h-8 w-8 text-blue-500" />
+      <DialogContent className="w-[90%] max-w-[340px] rounded-3xl border-2 border-blue-500/20 bg-background/95 backdrop-blur-xl p-5">
+        <DialogHeader className="space-y-3 text-center">
+          <div className="mx-auto h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center mb-1 animate-pulse">
+            <Crown className="h-6 w-6 text-blue-500" />
           </div>
-          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
+          <DialogTitle className="text-xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent leading-tight">
             Desbloqueie o Potencial Máximo
           </DialogTitle>
-          <DialogDescription className="text-base">
+          <DialogDescription className="text-sm">
             {paywallType === 'full' 
-              ? "Você atingiu o limite gratuito de hoje. Assine Premium para análises ilimitadas e acesso total."
-              : "Torne-se Premium para análises ilimitadas, relatórios detalhados e prioridade na fila."}
+              ? "Limite gratuito atingido. Assine Premium para acesso total."
+              : "Torne-se Premium para análises ilimitadas e prioridade."}
           </DialogDescription>
         </DialogHeader>
         
-        <div className="grid gap-4 py-4">
-          <div className="flex items-center gap-3 p-3 rounded-2xl bg-muted/50 border border-border/50">
-            <Zap className="h-5 w-5 text-blue-500" />
-            <div className="text-sm">
+        <div className="grid gap-3 py-3">
+          <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-muted/50 border border-border/50">
+            <Zap className="h-4 w-4 text-blue-500 shrink-0" />
+            <div className="text-xs">
               <p className="font-semibold">Análises Ilimitadas</p>
-              <p className="text-muted-foreground text-xs">Sem esperar 24h entre fotos</p>
+              <p className="text-muted-foreground text-[10px]">Sem esperar 24h entre fotos</p>
             </div>
           </div>
-          <div className="flex items-center gap-3 p-3 rounded-2xl bg-muted/50 border border-border/50">
-            <Lock className="h-5 w-5 text-blue-500" />
-            <div className="text-sm">
-              <p className="font-semibold">Acesso ao Método Mogging</p>
-              <p className="text-muted-foreground text-xs">Guias exclusivos de evolução</p>
+          <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-muted/50 border border-border/50">
+            <Lock className="h-4 w-4 text-blue-500 shrink-0" />
+            <div className="text-xs">
+              <p className="font-semibold">Método Mogging</p>
+              <p className="text-muted-foreground text-[10px]">Guias exclusivos de evolução</p>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-col gap-2 mt-2">
+        <div className="flex flex-col gap-2 mt-1">
           <Button 
-            className="w-full rounded-2xl py-6 text-base font-bold bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-500/20"
+            className="w-full rounded-2xl py-5 text-sm font-bold bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-500/20"
             onClick={() => {
                 setShowPaywall(false);
                 navigate('/profile'); // Redirect to subscription plan
@@ -103,7 +103,7 @@ export function PaywallManager() {
           >
             Ser Premium Agora
           </Button>
-          <Button variant="ghost" className="text-xs text-muted-foreground rounded-xl" onClick={() => setShowPaywall(false)}>
+          <Button variant="ghost" className="text-[10px] text-muted-foreground rounded-xl h-auto py-2" onClick={() => setShowPaywall(false)}>
             Continuar com limitações
           </Button>
         </div>
