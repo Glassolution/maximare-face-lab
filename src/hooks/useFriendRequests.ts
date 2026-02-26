@@ -114,13 +114,15 @@ export function useFriendRequests() {
           targetUserId = profile.id;
       } else {
           // 1. Find the user ID from the username or display name
-          // Using ilike with wildcards for a bit more flexibility, but keeping it strict enough
-          // We search in username, display_name, and short_id (just in case)
+          const searchTerm = username.trim();
+          const pattern = `%${searchTerm}%`;
+          
+          // Use a robust OR filter with quoted values to handle spaces correctly
           const { data: profiles, error: profileError } = await supabase
             .from('profiles')
             .select('id')
-            .or(`username.ilike.${username},display_name.ilike.${username},username.ilike.%${username}%,display_name.ilike.%${username}%`)
-            .limit(1) // Get the first match
+            .or(`username.ilike."${pattern}",display_name.ilike."${pattern}",short_id.eq."${searchTerm}"`)
+            .limit(1)
             .maybeSingle();
     
           if (profileError) throw profileError;
