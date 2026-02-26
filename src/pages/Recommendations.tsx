@@ -1,66 +1,210 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getAnalysisHistory } from "@/lib/mockData";
-import { generatePersonalizedPlan, PersonalizedPlan } from "@/lib/smartTrendsEngine";
+import { generatePersonalizedPlan, PersonalizedPlan, SmartTrend, ScientificReference } from "@/lib/smartTrendsEngine";
 import { usePaywallGate } from "@/hooks/usePaywallGate";
-import { Badge } from "@/components/ui/badge";
-import { 
-  ChevronDown, 
-  Droplets, 
-  Scissors, 
-  Dumbbell, 
-  PersonStanding, 
-  Shirt, 
-  Zap, 
-  Target, 
-  Eye, 
-  Scan, 
-  AlertTriangle, 
-  CheckCircle2, 
-  Clock, 
-  Activity, 
+import {
+  ChevronDown,
+  Zap,
+  Target,
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
   BookOpen,
-  TrendingUp
+  TrendingUp,
+  Shield,
+  ExternalLink,
+  Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import TutorialStepByStep from "@/components/TutorialStepByStep";
 
-const catIcons: Record<string, React.ElementType> = { 
-  skincare: Droplets, 
-  cabelo: Scissors, 
-  exercicio: Dumbbell, 
-  habito: PersonStanding, 
-  estilo: Shirt, 
-  procedimento: Activity 
+// ─── Phase Labels ───
+const phaseLabels: Record<string, { label: string; order: number }> = {
+  week1: { label: "Semana 1", order: 0 },
+  week2_4: { label: "Semana 2–4", order: 1 },
+  month2_plus: { label: "Mês 2+", order: 2 },
 };
 
-const priorityColors: Record<string, string> = {
-  critica: "bg-red-500/20 text-red-400 border-red-500/30",
-  alta: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  media: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
-};
+// ─── Evidence Badge ───
+function EvidenceBadge({ level }: { level: string }) {
+  const styles: Record<string, string> = {
+    Alta: "bg-success/10 text-success border-success/20",
+    Moderada: "bg-primary/10 text-primary border-primary/20",
+    Baixa: "bg-muted text-muted-foreground border-border",
+  };
+  return (
+    <span className={`text-[9px] uppercase tracking-wider font-mono px-1.5 py-0.5 rounded border ${styles[level] || styles.Baixa}`}>
+      {level}
+    </span>
+  );
+}
 
-const evidenceColors: Record<string, string> = {
-  "Alta": "bg-green-500/20 text-green-400 border-green-500/30",
-  "Moderada": "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  "Baixa": "bg-gray-500/20 text-gray-400 border-gray-500/30"
-};
+// ─── Protocol Card ───
+function ProtocolCard({
+  trend,
+  isOpen,
+  onToggle,
+  onOpenTutorial,
+  index,
+}: {
+  trend: SmartTrend;
+  isOpen: boolean;
+  onToggle: () => void;
+  onOpenTutorial: () => void;
+  index: number;
+}) {
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05 }}
+      className={`rounded-2xl border transition-all duration-200 overflow-hidden ${
+        isOpen ? "bg-card border-primary/20" : "bg-card/50 border-border/30"
+      }`}
+    >
+      {/* Header */}
+      <button className="w-full p-4 flex items-center gap-3 text-left" onClick={onToggle}>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="font-semibold text-sm text-foreground leading-tight truncate">{trend.title}</h3>
+            <EvidenceBadge level={trend.validation} />
+          </div>
+          <p className="text-xs text-muted-foreground line-clamp-1">{trend.subtitle}</p>
+        </div>
+        <ChevronDown className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+      </button>
 
+      {/* Expanded */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-5 space-y-4">
+              {/* Why for you */}
+              <div className="p-3 rounded-xl bg-primary/5 border border-primary/10">
+                <p className="text-[10px] uppercase tracking-widest text-primary font-mono mb-1">Por que para você</p>
+                <p className="text-xs text-foreground/80 leading-relaxed">{trend.reason}</p>
+              </div>
+
+              {/* Steps */}
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono mb-2.5 flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3 w-3" /> Passo a passo
+                </p>
+                <div className="space-y-2">
+                  {trend.steps.map((step, i) => (
+                    <div key={i} className="flex gap-3 items-start">
+                      <span className="text-[10px] font-mono text-muted-foreground mt-0.5 w-4 shrink-0">{i + 1}.</span>
+                      <div>
+                        <p className="text-xs font-medium text-foreground">{step.text}</p>
+                        {step.detail && <p className="text-[11px] text-muted-foreground leading-relaxed mt-0.5">{step.detail}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Meta */}
+              <div className="flex gap-3">
+                <div className="flex-1 p-2.5 rounded-lg bg-muted/20">
+                  <p className="text-[10px] text-muted-foreground mb-0.5">Frequência</p>
+                  <p className="text-xs font-medium text-foreground">{trend.frequency}</p>
+                </div>
+                <div className="flex-1 p-2.5 rounded-lg bg-muted/20">
+                  <p className="text-[10px] text-muted-foreground mb-0.5">Resultados em</p>
+                  <p className="text-xs font-medium text-foreground">{trend.duration}</p>
+                </div>
+              </div>
+
+              {/* Contraindications */}
+              {trend.contraindications && trend.contraindications.length > 0 && (
+                <div className="p-3 rounded-xl bg-warning/5 border border-warning/10">
+                  <p className="text-[10px] uppercase tracking-widest text-warning/70 font-mono mb-1.5 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" /> Contraindicações
+                  </p>
+                  <ul className="space-y-1">
+                    {trend.contraindications.map((c, i) => (
+                      <li key={i} className="text-[11px] text-foreground/70 flex items-start gap-1.5">
+                        <span className="text-warning/50 mt-0.5">•</span> {c}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Warning */}
+              {trend.warning && (
+                <p className="text-[10px] text-muted-foreground italic border-l-2 border-warning/30 pl-3">
+                  {trend.warning}
+                </p>
+              )}
+
+              {/* References */}
+              {trend.references && trend.references.length > 0 && (
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono mb-1.5 flex items-center gap-1">
+                    <BookOpen className="h-3 w-3" /> Referências
+                  </p>
+                  <div className="space-y-1">
+                    {trend.references.map((ref, i) => (
+                      <div key={i} className="flex items-start gap-1.5">
+                        <span className="text-[9px] text-muted-foreground/50 mt-0.5">[{i + 1}]</span>
+                        <p className="text-[10px] text-muted-foreground leading-relaxed">
+                          {ref.title} ({ref.year}). <span className="italic">{ref.source}</span>
+                          {ref.doi && (
+                            <a href={`https://doi.org/${ref.doi}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-primary ml-1">
+                              DOI <ExternalLink className="h-2.5 w-2.5" />
+                            </a>
+                          )}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Science */}
+              <p className="text-[10px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 leading-relaxed">
+                {trend.science}
+              </p>
+
+              {/* Tutorial button */}
+              <button
+                onClick={onOpenTutorial}
+                className="w-full h-11 rounded-xl bg-primary/10 border border-primary/20 text-primary text-sm font-medium flex items-center justify-center gap-2 hover:bg-primary/15 transition-colors"
+              >
+                <Play className="h-4 w-4" /> Ver tutorial
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+// ─── Main Page ───
 export default function Recommendations() {
   const [plan, setPlan] = useState<PersonalizedPlan | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [tutorialTrend, setTutorialTrend] = useState<SmartTrend | null>(null);
   const { checkGate } = usePaywallGate();
 
   useEffect(() => {
-    // Paywall Check (Hard Gate for Premium Plan)
-    checkGate({ trigger: 'feature_locked', featureName: 'recommendations_plan' });
-
+    checkGate({ trigger: "feature_locked", featureName: "recommendations_plan" });
     const history = getAnalysisHistory();
     if (history.length > 0) {
       const latest = history[0];
       const generatedPlan = generatePersonalizedPlan(latest as any);
       setPlan(generatedPlan);
-      // Auto-expand first item if available
       if (generatedPlan.trends.length > 0) {
         setExpanded(generatedPlan.trends[0].id);
       }
@@ -70,9 +214,9 @@ export default function Recommendations() {
   if (!plan) {
     return (
       <div className="min-h-screen pt-24 flex flex-col items-center justify-center px-4 text-center">
-        <Zap className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
-        <h2 className="text-xl font-bold mb-2">Nenhum plano encontrado</h2>
-        <p className="text-muted-foreground mb-6">Realize uma análise facial para gerar seu plano personalizado.</p>
+        <Zap className="h-10 w-10 text-muted-foreground/40 mb-4" />
+        <h2 className="text-lg font-semibold mb-2">Nenhum plano encontrado</h2>
+        <p className="text-sm text-muted-foreground mb-6 max-w-xs">Realize uma análise facial para gerar seu plano personalizado.</p>
         <Link to="/analysis">
           <Button>Iniciar Análise</Button>
         </Link>
@@ -80,236 +224,146 @@ export default function Recommendations() {
     );
   }
 
+  // Group trends by phase
+  const phaseGroups: Record<string, SmartTrend[]> = {};
+  plan.trends.forEach((t) => {
+    const phase = t.phase || "week1";
+    if (!phaseGroups[phase]) phaseGroups[phase] = [];
+    phaseGroups[phase].push(t);
+  });
+
+  const sortedPhases = Object.keys(phaseGroups).sort(
+    (a, b) => (phaseLabels[a]?.order ?? 99) - (phaseLabels[b]?.order ?? 99)
+  );
+
+  // Top 3 focus areas from bottlenecks
+  const topFocus = plan.bottlenecks.slice(0, 3);
+
+  // Today's checklist (quick wins from week1 phase)
+  const todayActions = plan.trends
+    .filter((t) => t.phase === "week1")
+    .slice(0, 3)
+    .map((t) => ({
+      title: t.title,
+      time: t.session_duration || t.duration,
+    }));
+
   return (
     <div className="min-h-screen pt-6 pb-28 px-4 bg-background text-foreground">
-      <div className="container max-w-lg mx-auto">
+      <div className="container max-w-lg mx-auto space-y-8">
         
-        {/* Header */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-8 flex items-end justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-primary/10 rounded-full">
-                <Zap className="h-5 w-5 text-primary" />
+        {/* ─── A) Topo: Score + Focus ─── */}
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
+          <div className="flex items-end justify-between">
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">Plano de Evolução</p>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-4xl font-bold text-foreground leading-none">{(plan.gerScore / 10).toFixed(1)}</span>
+                <span className="text-xs text-muted-foreground">Aura Score</span>
               </div>
-              <h1 className="font-heading text-xl font-bold">Plano de Evolução</h1>
             </div>
-            <p className="text-sm text-muted-foreground max-w-[200px]">
-              Estratégia dinâmica baseada no seu diagnóstico estrutural.
-            </p>
+            <Link to="/progress" className="flex items-center gap-1 text-xs text-primary hover:underline">
+              <TrendingUp className="h-3.5 w-3.5" /> Progresso
+            </Link>
           </div>
-          
-          <div className="text-right">
-             <div className="flex flex-col items-end">
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">Score Geral</span>
-                <span className="text-3xl font-bold text-primary leading-none">{(plan.gerScore / 10).toFixed(1)}</span>
-             </div>
-             <Link to="/progress" className="flex items-center gap-1 text-[10px] text-primary mt-1 hover:underline justify-end">
-               <TrendingUp className="h-3 w-3" /> Ver Progresso
-             </Link>
-          </div>
+
+          {/* Focus areas */}
+          {topFocus.length > 0 && (
+            <div className="flex gap-2">
+              {topFocus.map((b, i) => (
+                <div
+                  key={b.id}
+                  className="flex-1 p-3 rounded-xl bg-card border border-border/30"
+                >
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="text-[10px] font-mono text-primary">#{i + 1}</span>
+                    <Target className="h-3 w-3 text-muted-foreground" />
+                  </div>
+                  <p className="text-xs font-medium text-foreground leading-tight truncate">{b.area}</p>
+                  <div className="mt-1.5 h-1 rounded-full bg-muted/30 overflow-hidden">
+                    <div
+                      className="h-full bg-primary/60 rounded-full"
+                      style={{ width: `${Math.max(5, (b.severity || 5) * 10)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </motion.div>
 
-        {/* Diagnóstico Estrutural / Prioridades */}
-        {plan.bottlenecks.length > 0 && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }} 
-            animate={{ opacity: 1, y: 0 }} 
+        {/* ─── B) O que fazer hoje ─── */}
+        {todayActions.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="mb-8"
           >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold flex items-center gap-2">
-                <Target className="h-4 w-4 text-primary" />
-                Diagnóstico Estrutural
-              </h2>
-              <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                {plan.bottlenecks.length} Prioridades
-              </span>
-            </div>
-            
-            <div className="grid grid-cols-1 gap-3">
-              {plan.bottlenecks.map((item, i) => (
-                <div key={item.id} className="glass p-3 rounded-xl flex items-center justify-between border border-white/5">
-                  <div className="flex items-center gap-3">
-                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${priorityColors[item.priority] || "bg-muted"}`}>
-                      {item.icon === "Target" && <Target className="h-4 w-4" />}
-                      {item.icon === "Eye" && <Eye className="h-4 w-4" />}
-                      {item.icon === "Droplets" && <Droplets className="h-4 w-4" />}
-                      {item.icon === "Scissors" && <Scissors className="h-4 w-4" />}
-                      {item.icon === "Scan" && <Scan className="h-4 w-4" />}
-                      {item.icon === "Zap" && <Zap className="h-4 w-4" />}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{item.area}</p>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-muted-foreground">Severidade:</span>
-                        <div className="h-1.5 w-16 bg-muted/30 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-primary/70 rounded-full" 
-                            style={{ width: `${(item.severity || 5) * 10}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono mb-3">O que fazer hoje</p>
+            <div className="space-y-2">
+              {todayActions.map((a, i) => (
+                <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border/30">
+                  <div className="h-5 w-5 rounded-md border border-border/50 flex items-center justify-center">
+                    <CheckCircle2 className="h-3 w-3 text-muted-foreground/40" />
                   </div>
-                  <Badge variant="outline" className={`text-[10px] uppercase border ${priorityColors[item.priority]}`}>
-                    {item.priority}
-                  </Badge>
+                  <span className="text-sm text-foreground flex-1">{a.title}</span>
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <Clock className="h-3 w-3" /> {a.time}
+                  </span>
                 </div>
               ))}
             </div>
           </motion.div>
         )}
 
-        {/* Intervenções Dinâmicas */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 mb-2">
-            <BookOpen className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold">Intervenções Selecionadas</h2>
-          </div>
+        {/* ─── C) Protocolos por fase ─── */}
+        {sortedPhases.map((phase) => (
+          <motion.div
+            key={phase}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
+                {phaseLabels[phase]?.label || phase}
+              </p>
+              <div className="flex-1 h-px bg-border/30" />
+            </div>
 
-          {plan.trends.map((trend, i) => {
-            const Icon = catIcons[trend.category] || Zap;
-            const isOpen = expanded === trend.id;
-            
-            return (
-              <motion.div 
-                key={trend.id} 
-                layout
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 + (i * 0.1) }}
-                className={`rounded-2xl border transition-all duration-300 overflow-hidden ${
-                  isOpen ? "bg-card border-primary/30 shadow-lg shadow-primary/5" : "glass border-white/5"
-                }`}
-              >
-                {/* Card Header */}
-                <button 
-                  className="w-full p-4 flex items-start gap-3 text-left" 
-                  onClick={() => setExpanded(isOpen ? null : trend.id)}
-                >
-                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-                    isOpen ? "bg-primary text-primary-foreground" : "bg-muted/50 text-muted-foreground"
-                  }`}>
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="font-semibold text-sm leading-tight mb-1">{trend.title}</h3>
-                        <p className="text-xs text-muted-foreground line-clamp-1">{trend.subtitle}</p>
-                      </div>
-                      <ChevronDown className={`h-4 w-4 text-muted-foreground shrink-0 mt-0.5 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
-                    </div>
-                    
-                    {!isOpen && (
-                      <div className="mt-2 flex items-center gap-2">
-                         <Badge variant="secondary" className="text-[10px] h-5 bg-primary/5 text-primary border-primary/10">
-                            {trend.category}
-                         </Badge>
-                         <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                            <Clock className="h-3 w-3" /> {trend.duration}
-                         </span>
-                      </div>
-                    )}
-                  </div>
-                </button>
+            <div className="space-y-3">
+              {phaseGroups[phase].map((trend, i) => (
+                <ProtocolCard
+                  key={trend.id}
+                  trend={trend}
+                  isOpen={expanded === trend.id}
+                  onToggle={() => setExpanded(expanded === trend.id ? null : trend.id)}
+                  onOpenTutorial={() => setTutorialTrend(trend)}
+                  index={i}
+                />
+              ))}
+            </div>
+          </motion.div>
+        ))}
 
-                {/* Expanded Content */}
-                <AnimatePresence>
-                  {isOpen && (
-                    <motion.div 
-                      initial={{ height: 0, opacity: 0 }} 
-                      animate={{ height: "auto", opacity: 1 }} 
-                      exit={{ height: 0, opacity: 0 }} 
-                      className="overflow-hidden"
-                    >
-                      <div className="px-4 pb-5 pt-0 space-y-5">
-                        
-                        {/* Justificativa Personalizada */}
-                        <div className="bg-primary/5 rounded-xl p-3 border border-primary/10">
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <Scan className="h-3.5 w-3.5 text-primary" />
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-primary">Por que para você?</span>
-                          </div>
-                          <p className="text-xs text-foreground/90 leading-relaxed">
-                            {trend.reason}
-                          </p>
-                        </div>
-
-                        {/* Tutorial / Passos */}
-                        <div>
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                            Tutorial Prático
-                          </h4>
-                          <div className="space-y-3">
-                            {trend.steps.map((step, idx) => (
-                              <div key={idx} className="relative pl-4 border-l-2 border-muted/30">
-                                <div className="absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full bg-primary/20 ring-2 ring-background" />
-                                <p className="text-xs font-semibold text-foreground mb-0.5">{step.text}</p>
-                                {step.detail && <p className="text-[11px] text-muted-foreground leading-relaxed">{step.detail}</p>}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Meta Info Grid */}
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="bg-muted/30 rounded-lg p-2.5">
-                            <span className="text-[10px] text-muted-foreground block mb-1">Tempo Estimado</span>
-                            <span className="text-xs font-medium flex items-center gap-1.5">
-                              <Clock className="h-3.5 w-3.5 text-primary" />
-                              {trend.duration}
-                            </span>
-                          </div>
-                          <div className="bg-muted/30 rounded-lg p-2.5">
-                            <span className="text-[10px] text-muted-foreground block mb-1">Evidência Científica</span>
-                            <Badge variant="outline" className={`text-[10px] border-0 h-5 px-1.5 ${evidenceColors[trend.validation] || "bg-muted"}`}>
-                              {trend.validation}
-                            </Badge>
-                          </div>
-                        </div>
-
-                        {/* Ciência / Explicação */}
-                        <div>
-                          <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
-                            Base Científica
-                          </h4>
-                          <p className="text-[11px] text-muted-foreground leading-relaxed italic border-l-2 border-primary/20 pl-3">
-                            "{trend.science}"
-                          </p>
-                        </div>
-
-                        {/* Aviso / Contraindicação */}
-                        {(trend.disclaimer || trend.warning) && (
-                          <div className="flex gap-2 items-start bg-yellow-500/5 p-2.5 rounded-lg border border-yellow-500/10">
-                            <AlertTriangle className="h-4 w-4 text-yellow-500/70 shrink-0 mt-0.5" />
-                            <p className="text-[10px] text-yellow-600/90 dark:text-yellow-400/90 leading-relaxed">
-                              {trend.warning || trend.disclaimer}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Tags */}
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {trend.tags.map((tag) => (
-                            <span key={tag} className="text-[9px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-white/5">
-                              #{tag}
-                            </span>
-                          ))}
-                        </div>
-
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            );
-          })}
+        {/* Disclaimer */}
+        <div className="flex items-start gap-2 p-3 rounded-xl bg-muted/10 border border-border/20">
+          <Shield className="h-4 w-4 text-muted-foreground/50 shrink-0 mt-0.5" />
+          <p className="text-[10px] text-muted-foreground leading-relaxed">
+            Este plano é educacional e não substitui orientação médica ou dermatológica. Se tiver condições pré-existentes, consulte um profissional.
+          </p>
         </div>
       </div>
+
+      {/* Tutorial overlay */}
+      <AnimatePresence>
+        {tutorialTrend && (
+          <TutorialStepByStep
+            trend={tutorialTrend}
+            onClose={() => setTutorialTrend(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
