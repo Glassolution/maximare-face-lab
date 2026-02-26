@@ -1,6 +1,9 @@
 -- Migration: Fix Ambiguous Column Reference in submit_battle_move
 -- Renames parameter 'analysis_id' to 'p_analysis_id' to avoid conflict with table column 'analysis_id' (if it exists in join) or general ambiguity.
 
+-- Drop the function first because we are changing parameter names
+DROP FUNCTION IF EXISTS submit_battle_move(uuid, uuid);
+
 CREATE OR REPLACE FUNCTION submit_battle_move(battle_id uuid, p_analysis_id uuid)
 RETURNS json
 LANGUAGE plpgsql
