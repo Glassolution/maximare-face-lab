@@ -81,7 +81,7 @@ export function PaywallManager() {
                 <p className="text-[10px] text-zinc-400">Teste rápido de 7 dias</p>
               </div>
               <div className="text-right">
-                <span className="block font-bold text-lg">R$ 19,90</span>
+                <span className="block font-bold text-lg">R$ 24,90</span>
               </div>
             </div>
           </div>
@@ -126,7 +126,7 @@ export function PaywallManager() {
                 <p className="text-[10px] text-zinc-400">Compromisso total</p>
               </div>
               <div className="text-right">
-                <span className="block font-bold text-xl">R$ 299,90</span>
+                <span className="block font-bold text-xl">R$ 499,90</span>
                 <span className="text-[10px] text-blue-400 font-bold">ECONOMIZE 50%</span>
               </div>
             </div>
