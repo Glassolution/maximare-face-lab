@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 import faceScanHero from "@/assets/face-scan-hero.jpg";
 import { logPaywallEvent, PaywallContext } from "@/lib/paywall";
 import { CheckoutPremium } from "./CheckoutPremium";
-import { PlanSelection } from "./PlanSelection";
+import { PlanConfirmation } from "./PlanConfirmation";
 
 interface PremiumContentProps {
   onClose?: () => void;
@@ -19,7 +19,7 @@ interface PremiumContentProps {
 
 export default function PremiumContent({ onClose, context, isModal = false }: PremiumContentProps) {
   const [selectedPlan, setSelectedPlan] = useState<PlanType>('yearly');
-  const [step, setStep] = useState<'landing' | 'plan_selection' | 'payment'>('landing');
+  const [step, setStep] = useState<'landing' | 'confirmation' | 'payment'>('landing');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -65,26 +65,26 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
     return (
       <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center p-4 overflow-y-auto">
         <div className="w-full max-w-md">
-            <Button variant="ghost" onClick={() => setStep('plan_selection')} className="mb-4">
+            <Button variant="ghost" onClick={() => setStep('confirmation')} className="mb-4">
                 Voltar
             </Button>
             <CheckoutPremium 
                 plan={selectedPlan} 
                 price={price} 
                 onSuccess={handleSuccess}
-                onCancel={() => setStep('plan_selection')}
+                onCancel={() => setStep('confirmation')}
             />
         </div>
       </div>
     );
   }
 
-  if (step === 'plan_selection') {
+  if (step === 'confirmation') {
       return (
         <div className={`fixed inset-0 z-50 bg-background-light dark:bg-background-dark overflow-hidden`}>
-            <PlanSelection 
-                onPlanSelected={(plan) => {
-                    setSelectedPlan(plan);
+            <PlanConfirmation 
+                selectedPlan={selectedPlan}
+                onConfirm={() => {
                     setStep('payment');
                 }}
                 onBack={() => setStep('landing')}
@@ -118,8 +118,8 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
       const { data: { session } } = await supabase.auth.getSession();
       
       await logPaywallEvent(session?.user?.id || 'guest', 'checkout_started', { plan: selectedPlan });
-      // Change to plan selection step instead of direct checkout
-      setStep('plan_selection');
+      // Change to confirmation step
+      setStep('confirmation');
 
     } catch (error) {
       console.error('Subscription error:', error);
