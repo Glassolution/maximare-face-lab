@@ -60,12 +60,12 @@ export function PaywallManager() {
   
   return (
     <Dialog open={showPaywall} onOpenChange={setShowPaywall}>
-      <DialogContent className="sm:max-w-md rounded-3xl border-2 border-amber-500/20 bg-background/95 backdrop-blur-xl">
+      <DialogContent className="sm:max-w-md rounded-3xl border-2 border-blue-500/20 bg-background/95 backdrop-blur-xl">
         <DialogHeader className="space-y-4 text-center">
-          <div className="mx-auto h-16 w-16 rounded-full bg-amber-500/10 flex items-center justify-center mb-2 animate-pulse">
-            <Crown className="h-8 w-8 text-amber-500" />
+          <div className="mx-auto h-16 w-16 rounded-full bg-blue-500/10 flex items-center justify-center mb-2 animate-pulse">
+            <Crown className="h-8 w-8 text-blue-500" />
           </div>
-          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-amber-400 to-orange-600 bg-clip-text text-transparent">
+          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
             Desbloqueie o Potencial Máximo
           </DialogTitle>
           <DialogDescription className="text-base">
@@ -76,15 +76,15 @@ export function PaywallManager() {
         </DialogHeader>
         
         <div className="grid gap-4 py-4">
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 border border-border/50">
+          <div className="flex items-center gap-3 p-3 rounded-2xl bg-muted/50 border border-border/50">
             <Zap className="h-5 w-5 text-blue-500" />
             <div className="text-sm">
               <p className="font-semibold">Análises Ilimitadas</p>
               <p className="text-muted-foreground text-xs">Sem esperar 24h entre fotos</p>
             </div>
           </div>
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 border border-border/50">
-            <Lock className="h-5 w-5 text-purple-500" />
+          <div className="flex items-center gap-3 p-3 rounded-2xl bg-muted/50 border border-border/50">
+            <Lock className="h-5 w-5 text-blue-500" />
             <div className="text-sm">
               <p className="font-semibold">Acesso ao Método Mogging</p>
               <p className="text-muted-foreground text-xs">Guias exclusivos de evolução</p>
@@ -94,7 +94,7 @@ export function PaywallManager() {
 
         <div className="flex flex-col gap-2 mt-2">
           <Button 
-            className="w-full rounded-xl py-6 text-base font-bold bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-lg shadow-amber-500/20"
+            className="w-full rounded-2xl py-6 text-base font-bold bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-500/20"
             onClick={() => {
                 setShowPaywall(false);
                 navigate('/profile'); // Redirect to subscription plan
@@ -103,7 +103,7 @@ export function PaywallManager() {
           >
             Ser Premium Agora
           </Button>
-          <Button variant="ghost" className="text-xs text-muted-foreground" onClick={() => setShowPaywall(false)}>
+          <Button variant="ghost" className="text-xs text-muted-foreground rounded-xl" onClick={() => setShowPaywall(false)}>
             Continuar com limitações
           </Button>
         </div>
