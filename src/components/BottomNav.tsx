@@ -28,11 +28,11 @@ export default function BottomNav() {
   );
 
   return (
-    <nav className="fixed bottom-6 left-0 right-0 z-50 flex justify-center pointer-events-none">
+    <nav className="fixed bottom-4 left-0 right-0 z-50 flex justify-center pointer-events-none">
       <div className="pointer-events-auto w-auto mx-auto">
         <div className="relative">
-          <div className="h-20 rounded-full bg-[#0a0a0a] flex items-center px-6 shadow-[0_10px_40px_rgba(0,0,0,0.8)] border border-white/5 backdrop-blur-xl">
-            <div className="flex items-center gap-6">
+          <div className="h-16 rounded-full bg-[#0a0a0a] flex items-center px-5 shadow-[0_10px_40px_rgba(0,0,0,0.8)] border border-white/5 backdrop-blur-xl">
+            <div className="flex items-center gap-5">
               {/* Home / Dashboard */}
               <NavItem to="/analysis" icon={Home} active={isActive("/analysis")} />
 
@@ -42,7 +42,7 @@ export default function BottomNav() {
               {/* Central Action Button */}
               <Drawer>
                 <DrawerTrigger asChild>
-                  <div className="relative flex items-center justify-center -mt-12 mx-2 group cursor-pointer">
+                  <div className="relative flex items-center justify-center -mt-8 mx-1 group cursor-pointer">
                     <motion.div
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
@@ -50,12 +50,12 @@ export default function BottomNav() {
                     >
                         {/* Hexagon Shape */}
                         <div 
-                            className="h-16 w-16 bg-blue-600 flex items-center justify-center shadow-[0_0_30px_rgba(37,99,235,0.6)] group-hover:bg-blue-500 transition-colors"
+                            className="h-14 w-14 bg-blue-600 flex items-center justify-center shadow-[0_0_30px_rgba(37,99,235,0.6)] group-hover:bg-blue-500 transition-colors"
                             style={{ 
                                 clipPath: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)" 
                             }}
                         >
-                            <Plus className="text-white w-8 h-8" strokeWidth={3} />
+                            <Plus className="text-white w-7 h-7" strokeWidth={3} />
                         </div>
                     </motion.div>
                   </div>

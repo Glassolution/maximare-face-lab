@@ -709,18 +709,18 @@ export default function Analysis() {
             )}
 
             {(captureStep === "front-capture" || captureStep === "side-capture") && (
-                <div className="flex flex-col h-full">
-                    <div className="relative aspect-[3/4] w-full max-w-sm mx-auto rounded-3xl border border-border/30 glass overflow-hidden mb-6">
+                <div className="flex flex-col h-full items-center">
+                    <div className="relative aspect-[3/4] w-full max-w-[280px] mx-auto rounded-3xl border border-border/30 glass overflow-hidden mb-4 shadow-lg">
                         <AnimatePresence mode="wait">
                             {mode === "webcam" ? (
                                 <motion.div key="webcam" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0">
                                 <video ref={videoRef} className="h-full w-full object-cover" autoPlay playsInline muted />
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                    <div className="w-48 h-64 border-2 border-dashed border-primary/40 rounded-[50%]" />
+                                    <div className="w-40 h-56 border-2 border-dashed border-primary/40 rounded-[50%]" />
                                 </div>
-                                <div className="absolute bottom-6 left-0 right-0 flex justify-center">
-                                    <button onClick={capturePhoto} className="h-16 w-16 rounded-full bg-primary glow-primary flex items-center justify-center">
-                                    <Camera className="h-7 w-7 text-primary-foreground" />
+                                <div className="absolute bottom-4 left-0 right-0 flex justify-center">
+                                    <button onClick={capturePhoto} className="h-14 w-14 rounded-full bg-primary glow-primary flex items-center justify-center">
+                                    <Camera className="h-6 w-6 text-primary-foreground" />
                                     </button>
                                 </div>
                                 </motion.div>
@@ -733,14 +733,14 @@ export default function Analysis() {
                                 </motion.div>
                             ) : (
                                 <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                                className="absolute inset-0 flex flex-col items-center justify-center gap-4"
+                                className="absolute inset-0 flex flex-col items-center justify-center gap-3"
                                 onDragOver={(e) => e.preventDefault()}
                                 onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); }}
                                 >
-                                <div className="w-48 h-64 border-2 border-dashed border-border/50 rounded-[50%] flex items-center justify-center">
-                                    <Camera className="h-10 w-10 text-muted-foreground/30" />
+                                <div className="w-40 h-56 border-2 border-dashed border-border/50 rounded-[50%] flex items-center justify-center">
+                                    <Camera className="h-8 w-8 text-muted-foreground/30" />
                                 </div>
-                                <p className="text-xs text-muted-foreground">Arraste ou use as opções abaixo</p>
+                                <p className="text-[10px] text-muted-foreground">Arraste ou use as opções abaixo</p>
                                 </motion.div>
                             )}
                         </AnimatePresence>
@@ -748,11 +748,11 @@ export default function Analysis() {
                     </div>
                     
                     {!(captureStep === "front-capture" ? frontPhoto : sidePhoto) && mode !== "webcam" && (
-                        <div className="flex flex-col gap-3 max-w-sm mx-auto w-full">
-                            <Button onClick={startWebcam} className="gap-2 rounded-2xl py-6 glow-sm bg-blue-500 hover:bg-blue-600 text-white border-none">
+                        <div className="flex flex-col gap-2 max-w-[280px] mx-auto w-full mb-20">
+                            <Button onClick={startWebcam} className="gap-2 rounded-xl py-5 glow-sm bg-blue-500 hover:bg-blue-600 text-white border-none text-sm">
                                 <Camera className="h-4 w-4 shrink-0" /> <span className="truncate">Usar câmera</span>
                             </Button>
-                            <Button variant="outline" className="gap-2 rounded-2xl py-6 glass border-blue-500/30 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10" onClick={() => fileInputRef.current?.click()}>
+                            <Button variant="outline" className="gap-2 rounded-xl py-5 glass border-blue-500/30 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 text-sm" onClick={() => fileInputRef.current?.click()}>
                                 <Upload className="h-4 w-4 shrink-0" /> <span className="truncate">Enviar foto</span>
                             </Button>
                             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
@@ -760,9 +760,9 @@ export default function Analysis() {
                     )}
 
                     {(captureStep === "front-capture" ? frontPhoto : sidePhoto) && (
-                        <div className="max-w-sm mx-auto w-full space-y-3">
-                            <Button className="w-full rounded-2xl py-6 text-base font-semibold glow-primary" onClick={nextStep}>
-                                <Zap className="h-5 w-5 mr-2" /> {captureStep === "side-capture" ? "Finalizar Análise" : "Próxima Foto"}
+                        <div className="max-w-[280px] mx-auto w-full space-y-2 mb-20">
+                            <Button className="w-full rounded-xl py-5 text-sm font-semibold glow-primary" onClick={nextStep}>
+                                <Zap className="h-4 w-4 mr-2" /> {captureStep === "side-capture" ? "Finalizar Análise" : "Próxima Foto"}
                             </Button>
                         </div>
                     )}
