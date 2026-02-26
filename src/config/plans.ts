@@ -10,9 +10,9 @@ export const PLAN_CONFIG = {
     weekly: {
       id: 'weekly',
       title: 'Semanal',
-      price: 1.00,
-      cents: 100,
-      description: 'R$ 1,00/semana',
+      price: 24.90,
+      cents: 2490,
+      description: 'R$ 24,90/semana',
       features: ['Análise ilimitada', 'Resultados detalhados', 'Prioridade no suporte'],
       badge: null
     },
