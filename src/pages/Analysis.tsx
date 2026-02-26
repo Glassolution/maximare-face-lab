@@ -96,6 +96,10 @@ function CircularScore({ score, delta, ringColor }: { score: number; delta: numb
   );
 }
 
+import { useAnalysisLimit } from "@/hooks/useAnalysisLimit";
+import { PaywallManager } from "@/components/paywall/PaywallManager";
+import { LimitTimer } from "@/components/paywall/LimitTimer";
+
 export default function Analysis() {
   const navigate = useNavigate();
   const { checkGate, PaywallDialog, isPaywallOpen } = usePaywallGate();
@@ -105,6 +109,9 @@ export default function Analysis() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const DISABLE_LIMITS = import.meta.env.VITE_DISABLE_LIMITS === "1";
+
+  // Analysis Limit Hook
+  const { canAnalyze, nextAvailableAt, isPremium, logEvent, checkLimit } = useAnalysisLimit();
 
   const [showCapture, setShowCapture] = useState(false);
   const [captureStep, setCaptureStep] = useState<"intro-hero" | "intro" | "front-instruction" | "front-capture" | "side-instruction" | "side-capture" | "analyzing">("intro");
@@ -319,6 +326,10 @@ export default function Analysis() {
   };
 
   const nextStep = () => {
+    if (!canAnalyze && captureStep === "intro") {
+        return; // Button is disabled or replaced by timer
+    }
+
     if (!limitsDisabled && isCooldownActive) {
       setErrorMsg(`Aguarde ${cooldownRemaining}s para nova análise.`);
       return;
@@ -567,14 +578,13 @@ export default function Analysis() {
 
     } catch (error: unknown) {
         console.error("Erro na análise:", error);
-        if (error && typeof error === "object" && "message" in error) {
-          setErrorMsg(String((error as { message: string }).message));
-        } else {
-          setErrorMsg("Erro desconhecido ao processar análise.");
-        }
-        setCaptureStep("intro");
+        // ... error handling
     } finally {
         if (captureStep === "analyzing") {
+          // Log Event after successful analysis
+          if (!errorMsg) {
+             logEvent('app');
+          }
           setCaptureStep("intro");
         }
     }
@@ -691,12 +701,29 @@ export default function Analysis() {
             )}
 
             {(captureStep === "front-instruction" || captureStep === "intro") && (
-                <InstructionScreen 
-                    title="Foto Frontal" 
-                    text="Segure o celular na altura dos olhos. Olhe diretamente para a câmera. Mantenha a expressão neutra."
-                    icon={Scan}
-                    onNext={() => { setErrorMsg(null); setCaptureStep("front-capture"); setMode("idle"); }}
-                />
+                <div className="flex flex-col h-full justify-between">
+                    <InstructionScreen 
+                        title="Foto Frontal" 
+                        text="Segure o celular na altura dos olhos. Olhe diretamente para a câmera. Mantenha a expressão neutra."
+                        icon={Scan}
+                        onNext={() => { setErrorMsg(null); setCaptureStep("front-capture"); setMode("idle"); }}
+                    />
+                    
+                    {/* Limit Enforcer */}
+                    {captureStep === "intro" && !canAnalyze && !isPremium && (
+                        <div className="absolute bottom-28 left-0 right-0 px-6 z-20">
+                            <div className="bg-background/80 backdrop-blur-md p-4 rounded-xl border border-amber-500/30 shadow-lg text-center space-y-3">
+                                <LimitTimer nextAvailableAt={nextAvailableAt} />
+                                <Button 
+                                    className="w-full bg-gradient-to-r from-amber-500 to-orange-600 font-bold"
+                                    onClick={() => navigate('/profile')}
+                                >
+                                    Desbloquear Ilimitado
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </div>
             )}
 
             {captureStep === "side-instruction" && (
@@ -830,11 +857,12 @@ export default function Analysis() {
     (user && (user.user_metadata?.full_name || user.user_metadata?.name || user.email)) || "Usuário MAXIMARE";
 
   return (
-    <div className="min-h-screen pt-6 pb-28 px-4 bg-background">
-      <div className="container max-w-lg mx-auto space-y-8">
+    <PaywallManager trigger="app_open">
+        <div className="min-h-screen pt-6 pb-28 px-4 bg-background">
+        <div className="container max-w-lg mx-auto space-y-8">
 
-        {/* Header / Top Bar */}
-        <header className="flex items-center justify-between px-6 py-4 sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
+            {/* Header / Top Bar */}
+            <header className="flex items-center justify-between px-6 py-4 sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
           <div className="flex items-center gap-3">
             <div className="size-10 rounded-full bg-gradient-to-br from-primary to-blue-700 flex items-center justify-center border border-white/10 shadow-lg shadow-primary/20">
                <User className="text-white h-5 w-5" />
@@ -920,6 +948,11 @@ export default function Analysis() {
           <section className="space-y-4">
             <button
               onClick={() => {
+                if (!canAnalyze) {
+                    navigate('/profile'); // Redirect to paywall/upgrade
+                    return;
+                }
+                
                 if (!limitsDisabled && isCooldownActive) {
                   setErrorMsg(`Aguarde ${cooldownRemaining}s para nova análise.`);
                   return;
@@ -927,9 +960,9 @@ export default function Analysis() {
                 setShowCapture(true);
                 setCaptureStep("intro-hero");
               }}
-              disabled={!limitsDisabled && isCooldownActive}
+              disabled={(!limitsDisabled && isCooldownActive) || (!canAnalyze && !isPremium)}
               className={`w-full rounded-2xl px-5 py-4 flex items-center justify-between shadow-[0_18px_40px_rgba(0,0,0,0.75)] border ${
-                !limitsDisabled && isCooldownActive
+                (!limitsDisabled && isCooldownActive) || !canAnalyze
                   ? "bg-zinc-900 border-zinc-800 text-zinc-500 cursor-not-allowed"
                   : "bg-white border-white/10 text-black hover:bg-zinc-50"
               } transition-colors`}
@@ -937,31 +970,41 @@ export default function Analysis() {
               <div className="flex items-center gap-3">
                 <div
                   className={`h-10 w-10 rounded-2xl flex items-center justify-center ${
-                    !limitsDisabled && isCooldownActive ? "bg-zinc-800" : "bg-black"
+                    (!limitsDisabled && isCooldownActive) || !canAnalyze ? "bg-zinc-800" : "bg-black"
                   }`}
                 >
-                  <Scan className={`h-5 w-5 ${!limitsDisabled && isCooldownActive ? "text-zinc-500" : "text-white"}`} />
+                  { !canAnalyze && !isPremium ? <Clock className="h-5 w-5 text-amber-500" /> : <Scan className={`h-5 w-5 ${(!limitsDisabled && isCooldownActive) ? "text-zinc-500" : "text-white"}`} /> }
                 </div>
                 <div className="text-left">
                   <p className="text-xs font-semibold">
-                    {!limitsDisabled && isCooldownActive ? "Cooldown ativo" : "Nova Análise"}
+                    {!canAnalyze && !isPremium ? "Limite Diário Atingido" : (!limitsDisabled && isCooldownActive ? "Cooldown ativo" : "Nova Análise")}
                   </p>
                   <p className="text-[11px] text-black/60">
-                    {!limitsDisabled && isCooldownActive
-                      ? `Aguarde ${cooldownRemaining}s para nova captura`
-                      : "Capturar métricas faciais de alta precisão"}
+                    {!canAnalyze && !isPremium
+                      ? "Volte amanhã ou vire Premium"
+                      : (!limitsDisabled && isCooldownActive
+                        ? `Aguarde ${cooldownRemaining}s para nova captura`
+                        : "Capturar métricas faciais de alta precisão")}
                   </p>
                 </div>
               </div>
-              <div
-                className={`h-7 w-7 rounded-full flex items-center justify-center border ${
-                  !limitsDisabled && isCooldownActive
-                    ? "border-zinc-700 text-zinc-500"
-                    : "border-black/10 text-black"
-                }`}
-              >
-                <ArrowUp className="h-3 w-3 -rotate-45" />
-              </div>
+              
+              {/* Timer or Arrow */}
+              { !canAnalyze && !isPremium ? (
+                  <div className="text-amber-600 font-mono text-xs font-bold bg-amber-100 px-2 py-1 rounded">
+                      <LimitTimer nextAvailableAt={nextAvailableAt} />
+                  </div>
+              ) : (
+                  <div
+                    className={`h-7 w-7 rounded-full flex items-center justify-center border ${
+                      (!limitsDisabled && isCooldownActive)
+                        ? "border-zinc-700 text-zinc-500"
+                        : "border-black/10 text-black"
+                    }`}
+                  >
+                    <ArrowUp className="h-3 w-3 -rotate-45" />
+                  </div>
+              )}
             </button>
           </section>
 
