@@ -22,13 +22,13 @@ CREATE TABLE IF NOT EXISTS friendships (
 
 -- Ensure uniqueness per pair (A->B is same as B->A logic for uniqueness)
 -- Using a unique index on LEAST/GREATEST to prevent duplicate rows for the same pair
-CREATE UNIQUE INDEX unique_friendship_pair 
+CREATE UNIQUE INDEX IF NOT EXISTS unique_friendship_pair 
 ON friendships (LEAST(requester_id, addressee_id), GREATEST(requester_id, addressee_id));
 
 -- Indexes for performance
-CREATE INDEX idx_friendships_requester_status ON friendships(requester_id, status);
-CREATE INDEX idx_friendships_addressee_status ON friendships(addressee_id, status);
-CREATE INDEX idx_friendships_status ON friendships(status);
+CREATE INDEX IF NOT EXISTS idx_friendships_requester_status ON friendships(requester_id, status);
+CREATE INDEX IF NOT EXISTS idx_friendships_addressee_status ON friendships(addressee_id, status);
+CREATE INDEX IF NOT EXISTS idx_friendships_status ON friendships(status);
 
 -- 2. Create 'blocks' table
 CREATE TABLE IF NOT EXISTS blocks (
@@ -40,8 +40,8 @@ CREATE TABLE IF NOT EXISTS blocks (
 );
 
 -- Indexes for blocks
-CREATE INDEX idx_blocks_blocker ON blocks(blocker_id);
-CREATE INDEX idx_blocks_blocked ON blocks(blocked_id);
+CREATE INDEX IF NOT EXISTS idx_blocks_blocker ON blocks(blocker_id);
+CREATE INDEX IF NOT EXISTS idx_blocks_blocked ON blocks(blocked_id);
 
 -- 3. Update 'profiles' table
 ALTER TABLE profiles 
@@ -58,6 +58,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_friendships_updated_at ON friendships;
 CREATE TRIGGER trigger_friendships_updated_at
 BEFORE UPDATE ON friendships
 FOR EACH ROW
@@ -83,6 +84,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_update_friends_count ON friendships;
 CREATE TRIGGER trigger_update_friends_count
 AFTER INSERT OR UPDATE OR DELETE ON friendships
 FOR EACH ROW
@@ -95,11 +97,13 @@ ALTER TABLE blocks ENABLE ROW LEVEL SECURITY;
 
 -- Friendships Policies
 -- SELECT: Users can see rows where they are involved
+DROP POLICY IF EXISTS "Users can view their own friendships" ON friendships;
 CREATE POLICY "Users can view their own friendships"
 ON friendships FOR SELECT
 USING (auth.uid() = requester_id OR auth.uid() = addressee_id);
 
 -- INSERT: Only requester can insert, and must not be blocked
+DROP POLICY IF EXISTS "Users can insert friendship requests" ON friendships;
 CREATE POLICY "Users can insert friendship requests"
 ON friendships FOR INSERT
 WITH CHECK (
@@ -114,12 +118,14 @@ WITH CHECK (
 -- UPDATE: 
 -- Requester can cancel (pending -> canceled)
 -- Addressee can accept/reject (pending -> accepted/rejected)
+DROP POLICY IF EXISTS "Users can update their friendships" ON friendships;
 CREATE POLICY "Users can update their friendships"
 ON friendships FOR UPDATE
 USING (auth.uid() = requester_id OR auth.uid() = addressee_id);
 
 -- DELETE: Only allow if explicitly needed (we prefer update status), but let's allow Unfriend to DELETE if desired.
 -- Ideally unfriend should be an RPC that deletes or sets status to canceled. Let's allow delete for now via RPC mainly.
+DROP POLICY IF EXISTS "Users can delete their friendships" ON friendships;
 CREATE POLICY "Users can delete their friendships"
 ON friendships FOR DELETE
 USING (auth.uid() = requester_id OR auth.uid() = addressee_id);
@@ -127,16 +133,19 @@ USING (auth.uid() = requester_id OR auth.uid() = addressee_id);
 
 -- Blocks Policies
 -- SELECT: Only blocker can see who they blocked (Privacy: blocked user shouldn't verify easily via table select, but RPC handles logic)
+DROP POLICY IF EXISTS "Users can view blocks they created" ON blocks;
 CREATE POLICY "Users can view blocks they created"
 ON blocks FOR SELECT
 USING (auth.uid() = blocker_id);
 
 -- INSERT: Only blocker can insert
+DROP POLICY IF EXISTS "Users can block others" ON blocks;
 CREATE POLICY "Users can block others"
 ON blocks FOR INSERT
 WITH CHECK (auth.uid() = blocker_id);
 
 -- DELETE: Only blocker can unblock
+DROP POLICY IF EXISTS "Users can unblock" ON blocks;
 CREATE POLICY "Users can unblock"
 ON blocks FOR DELETE
 USING (auth.uid() = blocker_id);
@@ -329,6 +338,7 @@ $$;
 
 -- 6.8 Search Users (Optimized)
 -- Returns profiles that match query, excluding blocks
+DROP FUNCTION IF EXISTS search_users(text, int, int);
 CREATE OR REPLACE FUNCTION search_users(search_query text, limit_count int DEFAULT 10, offset_count int DEFAULT 0)
 RETURNS TABLE (
     id uuid,

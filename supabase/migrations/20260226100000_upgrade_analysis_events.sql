@@ -13,4 +13,4 @@ ADD COLUMN IF NOT EXISTS analysis_type text; -- 'front', 'front_lateral'
 CREATE INDEX IF NOT EXISTS idx_face_analysis_events_score ON public.face_analysis_events(score);
 
 -- Create index on image hash for deduplication (inside jsonb)
-CREATE INDEX IF NOT EXISTS idx_face_analysis_events_image_hash ON public.face_analysis_events USING gin ((image_meta->'front'->>'hash'));
+CREATE INDEX IF NOT EXISTS idx_face_analysis_events_image_hash ON public.face_analysis_events USING btree ((image_meta->'front'->>'hash'));

@@ -42,7 +42,14 @@ export function useUserSearch() {
         offset_count: 0
       });
 
-      if (error) throw error;
+      if (error) {
+        // Handle specific PostgREST errors
+        if (error.code === '42703' || error.code === 'PGRST205') {
+            console.error('Schema mismatch in search:', error);
+            throw new Error('Erro interno na busca (schema mismatch).');
+        }
+        throw error;
+      }
 
       if (data) {
         // Map the result to FriendProfile

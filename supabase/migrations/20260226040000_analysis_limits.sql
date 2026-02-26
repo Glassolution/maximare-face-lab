@@ -13,12 +13,13 @@ CREATE TABLE IF NOT EXISTS face_analysis_events (
 );
 
 -- Indexes for performance
-CREATE INDEX idx_analysis_events_user_created ON face_analysis_events(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_analysis_events_user_created ON face_analysis_events(user_id, created_at DESC);
 
 -- 2. RLS Policies
 ALTER TABLE face_analysis_events ENABLE ROW LEVEL SECURITY;
 
 -- Select: Users can see their own history
+DROP POLICY IF EXISTS "Users can view their own analysis events" ON face_analysis_events;
 CREATE POLICY "Users can view their own analysis events"
 ON face_analysis_events FOR SELECT
 USING (auth.uid() = user_id);

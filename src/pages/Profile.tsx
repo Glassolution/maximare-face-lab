@@ -86,18 +86,26 @@ export default function Profile() {
 
             // 2. Run evaluation in background to check for new ones
             // We use a small delay or check less frequently if needed, but for now on mount is fine
-            const { data, error } = await supabase.functions.invoke('check-achievements');
+            const { data: { session } } = await supabase.auth.getSession();
             
-            if (!error && data?.badges_awarded && data.badges_awarded.length > 0) {
-                 // Refresh if new badges awarded
-                 const { data: updatedBadges } = await supabase
-                    .from('user_badges')
-                    .select('badge_id')
-                    .eq('user_id', user.id);
-                    
-                 if (updatedBadges) {
-                    setEarnedBadges(updatedBadges.map(b => b.badge_id));
-                 }
+            if (session) {
+                const { data, error } = await supabase.functions.invoke('check-achievements', {
+                    headers: {
+                        Authorization: `Bearer ${session.access_token}`
+                    }
+                });
+                
+                if (!error && data?.badges_awarded && data.badges_awarded.length > 0) {
+                     // Refresh if new badges awarded
+                     const { data: updatedBadges } = await supabase
+                        .from('user_badges')
+                        .select('badge_id')
+                        .eq('user_id', user.id);
+                        
+                     if (updatedBadges) {
+                        setEarnedBadges(updatedBadges.map(b => b.badge_id));
+                     }
+                }
             }
         } catch (e) {
             console.error("Error checking achievements/profile", e);
