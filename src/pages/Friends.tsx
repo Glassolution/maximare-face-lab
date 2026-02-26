@@ -9,6 +9,7 @@ import { Search } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FriendActionButtons } from "@/components/friends/FriendActionButtons";
 import { FriendProfile } from "@/types/friendship";
+import { Button } from "@/components/ui/button";
 
 export default function Friends() {
   const { friends, loading: friendsLoading, refetch: refetchFriends } = useFriends();
