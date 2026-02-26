@@ -9,14 +9,7 @@ import { useNavigate } from "react-router-dom";
 import faceScanHero from "@/assets/face-scan-hero.jpg";
 import { logPaywallEvent, PaywallContext } from "@/lib/paywall";
 import { CheckoutPremium } from "./CheckoutPremium";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { PlanSelection } from "./PlanSelection";
 
 interface PremiumContentProps {
   onClose?: () => void;
@@ -26,7 +19,7 @@ interface PremiumContentProps {
 
 export default function PremiumContent({ onClose, context, isModal = false }: PremiumContentProps) {
   const [selectedPlan, setSelectedPlan] = useState<PlanType>('yearly');
-  const [showCheckout, setShowCheckout] = useState(false);
+  const [step, setStep] = useState<'landing' | 'plan_selection' | 'payment'>('landing');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -39,7 +32,7 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
   };
 
   const handleSuccess = async (email?: string) => {
-    setShowCheckout(false);
+    setStep('landing');
     
     // Check if user is logged in
     const { data: { session } } = await supabase.auth.getSession();
@@ -67,23 +60,37 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
     }
   };
 
-  if (showCheckout) {
+  if (step === 'payment') {
     const price = PLAN_CONFIG.PLANS[selectedPlan].price;
     return (
       <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center p-4 overflow-y-auto">
         <div className="w-full max-w-md">
-            <Button variant="ghost" onClick={() => setShowCheckout(false)} className="mb-4">
+            <Button variant="ghost" onClick={() => setStep('plan_selection')} className="mb-4">
                 Voltar
             </Button>
             <CheckoutPremium 
                 plan={selectedPlan} 
                 price={price} 
                 onSuccess={handleSuccess}
-                onCancel={() => setShowCheckout(false)}
+                onCancel={() => setStep('plan_selection')}
             />
         </div>
       </div>
     );
+  }
+
+  if (step === 'plan_selection') {
+      return (
+        <div className={`fixed inset-0 z-50 bg-background-light dark:bg-background-dark overflow-hidden`}>
+            <PlanSelection 
+                onPlanSelected={(plan) => {
+                    setSelectedPlan(plan);
+                    setStep('payment');
+                }}
+                onBack={() => setStep('landing')}
+            />
+        </div>
+      );
   }
 
   const getDynamicTitle = () => {
