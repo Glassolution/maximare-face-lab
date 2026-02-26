@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useBattles, Battle } from '@/hooks/useBattles';
 import { useAuth } from '@/hooks/useAuth';
-import { useFriends } from '@/hooks/useFriends';
+import { useFriends } from '@/hooks/useFriendSystem';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -156,8 +156,8 @@ function CreateBattleModal({ onCreate }: { onCreate: (id: string) => Promise<boo
     const [sending, setSending] = useState<string | null>(null);
 
     const filtered = friends.filter(f => 
-        f.profile?.username.toLowerCase().includes(search.toLowerCase()) || 
-        f.profile?.display_name?.toLowerCase().includes(search.toLowerCase())
+        (f.username || "").toLowerCase().includes(search.toLowerCase()) || 
+        (f.display_name || "").toLowerCase().includes(search.toLowerCase())
     );
 
     const handleCreate = async (friendId: string) => {
@@ -196,25 +196,25 @@ function CreateBattleModal({ onCreate }: { onCreate: (id: string) => Promise<boo
                         ) : (
                             <div className="space-y-2">
                                 {filtered.map(f => (
-                                    <div key={f.friend_id} className="flex items-center justify-between p-2 hover:bg-muted rounded-xl transition-colors">
+                                    <div key={f.id} className="flex items-center justify-between p-2 hover:bg-muted rounded-xl transition-colors">
                                         <div className="flex items-center gap-3">
                                             <Avatar>
-                                                <AvatarImage src={f.profile?.avatar_url || undefined} />
-                                                <AvatarFallback>{f.profile?.username.substring(0, 2).toUpperCase()}</AvatarFallback>
+                                                <AvatarImage src={f.avatar_url || undefined} />
+                                                <AvatarFallback>{f.username?.substring(0, 2).toUpperCase() || "??"}</AvatarFallback>
                                             </Avatar>
                                             <div className="overflow-hidden">
-                                                <p className="font-medium text-sm truncate">{f.profile?.display_name}</p>
-                                                <p className="text-xs text-muted-foreground">@{f.profile?.username}</p>
+                                                <p className="font-medium text-sm truncate">{f.display_name || f.username}</p>
+                                                <p className="text-xs text-muted-foreground">@{f.username}</p>
                                             </div>
                                         </div>
                                         <Button 
                                             size="sm" 
                                             variant="secondary"
                                             disabled={!!sending}
-                                            onClick={() => handleCreate(f.friend_id)}
+                                            onClick={() => handleCreate(f.id)}
                                             className="rounded-lg"
                                         >
-                                            {sending === f.friend_id ? "Enviando..." : "Desafiar"}
+                                            {sending === f.id ? "Enviando..." : "Desafiar"}
                                         </Button>
                                     </div>
                                 ))}
