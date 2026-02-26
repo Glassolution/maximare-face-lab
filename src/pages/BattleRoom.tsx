@@ -7,6 +7,8 @@ import { Loader2, Camera, Upload, Trophy, Skull } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
+import { BattleProcessingOverlay } from '@/components/battle/BattleProcessingOverlay';
+import { LoserRevealOverlay } from '@/components/battle/LoserRevealOverlay';
 
 export default function BattleRoom() {
   const { id } = useParams<{ id: string }>();
@@ -14,6 +16,18 @@ export default function BattleRoom() {
   const { battle, opponentProfile, submissions, result, loading, error, submitPhotos } = useBattleRoom(id!);
   const [frontFile, setFrontFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [showResultScreen, setShowResultScreen] = useState(false);
+
+  // Effect to handle navigation after reveal animation
+  useEffect(() => {
+    if (battle?.status === 'completed') {
+        setShowResultScreen(true);
+    }
+  }, [battle?.status]);
+
+  const handleRevealComplete = () => {
+      setShowResultScreen(true);
+  };
 
   if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-8 w-8" /></div>;
   if (error || !battle) return <div className="p-8 text-center text-red-500">Erro: {error || 'Batalha não encontrada'}</div>;
@@ -32,7 +46,7 @@ export default function BattleRoom() {
     );
   }
 
-  // Status: Submission
+  // Status: Submission (or matched)
   if (battle.status === 'matched' || battle.status === 'photo_submission') {
       return (
           <div className="container max-w-lg mx-auto py-6 px-4 space-y-6">
@@ -118,27 +132,20 @@ export default function BattleRoom() {
 
   // Status: Processing
   if (battle.status === 'processing') {
-      return (
-          <div className="flex flex-col h-screen items-center justify-center space-y-6 text-center px-6">
-              <div className="relative">
-                  <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full animate-pulse"></div>
-                  <Loader2 className="h-16 w-16 animate-spin text-primary relative z-10" />
-              </div>
-              <h2 className="text-2xl font-bold">Analisando Rostos...</h2>
-              <p className="text-muted-foreground max-w-xs">A IA está comparando simetria, proporção áurea e harmonia facial.</p>
-              <Progress value={66} className="w-[200px]" />
-          </div>
-      );
+      return <BattleProcessingOverlay />;
   }
 
-  // Status: Completed
-  if (battle.status === 'completed' && result) {
-      const isWinner = result.winner_id === battle.created_by; // Assuming current user is creator for logic, actually need auth check
-      // Better check:
-      // const amIWinner = result.winner_id === user?.id; 
+  // Status: Reveal Loser (Animation)
+  if (battle.status === 'reveal_loser' && !showResultScreen) {
+      return <LoserRevealOverlay result={result} onComplete={handleRevealComplete} />;
+  }
 
+  // Status: Completed or Show Result Screen
+  if (showResultScreen && result) {
+      // Logic to determine labels and colors based on winner/loser
+      // Assuming user logged in is viewing
       return (
-          <div className="container max-w-lg mx-auto py-8 px-4 space-y-8">
+          <div className="container max-w-lg mx-auto py-8 px-4 space-y-8 animate-in fade-in duration-500">
               <div className="text-center space-y-2">
                   <h1 className="text-3xl font-heading font-black text-primary uppercase tracking-tighter">
                       Resultado Final
@@ -153,13 +160,13 @@ export default function BattleRoom() {
                           {result.verdict_label_winner} 🏆
                       </div>
                       <div className="pt-8 pb-4 px-2 text-center bg-card">
-                          <div className="h-20 w-20 mx-auto rounded-full border-4 border-amber-500 overflow-hidden mb-2">
+                          <div className="h-20 w-20 mx-auto rounded-full border-4 border-amber-500 overflow-hidden mb-2 bg-muted">
                               {/* Ideally show the battle photo here */}
-                              <div className="w-full h-full bg-muted flex items-center justify-center text-xl font-bold">
+                              <div className="w-full h-full flex items-center justify-center text-xl font-bold">
                                   {result.winner_score}
                               </div>
                           </div>
-                          <p className="font-bold text-lg">{result.winner_id === opponentProfile?.id ? opponentProfile.display_name : 'Você'}</p>
+                          <p className="font-bold text-lg leading-tight">{result.winner_id === opponentProfile?.id ? opponentProfile.display_name : 'Você'}</p>
                       </div>
                   </div>
 
@@ -169,12 +176,12 @@ export default function BattleRoom() {
                           {result.verdict_label_loser} 💀
                       </div>
                       <div className="pt-8 pb-4 px-2 text-center bg-card">
-                           <div className="h-20 w-20 mx-auto rounded-full border-2 border-muted overflow-hidden mb-2">
-                              <div className="w-full h-full bg-muted flex items-center justify-center text-xl font-bold text-muted-foreground">
+                           <div className="h-20 w-20 mx-auto rounded-full border-2 border-muted overflow-hidden mb-2 bg-muted">
+                              <div className="w-full h-full flex items-center justify-center text-xl font-bold text-muted-foreground">
                                   {result.loser_score}
                               </div>
                           </div>
-                          <p className="font-bold text-lg text-muted-foreground">{result.loser_id === opponentProfile?.id ? opponentProfile.display_name : 'Você'}</p>
+                          <p className="font-bold text-lg leading-tight text-muted-foreground">{result.loser_id === opponentProfile?.id ? opponentProfile.display_name : 'Você'}</p>
                       </div>
                   </div>
               </div>
@@ -207,5 +214,5 @@ export default function BattleRoom() {
       );
   }
 
-  return <div>Estado desconhecido</div>;
+  return <div>Estado desconhecido: {battle.status}</div>;
 }

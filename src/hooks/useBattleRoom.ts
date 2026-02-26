@@ -15,37 +15,11 @@ export function useBattleRoom(battleId: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Realtime Subscription
-  useEffect(() => {
-    if (!battleId || !user) return;
+  // Watchdog Timer Ref
+  const watchdogRef = useRef<NodeJS.Timeout>();
 
-    const channel = supabase
-      .channel(`battle-${battleId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'battles', filter: `id=eq.${battleId}` },
-        (payload) => {
-          setBattle(payload.new as Battle);
-          if (payload.new.status === 'completed') {
-            fetchResult();
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'battle_submissions', filter: `battle_id=eq.${battleId}` },
-        () => fetchSubmissions() // Refetch all to update UI state safely
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [battleId, user]);
-
-  // Initial Fetch
+  // Fetch Battle State
   const fetchBattleState = useCallback(async () => {
-    setLoading(true);
     try {
       // 1. Get Battle
       const { data: battleData, error: battleError } = await supabase
@@ -65,35 +39,87 @@ export function useBattleRoom(battleId: string) {
       }
 
       // 3. Get Submissions
-      await fetchSubmissions();
+      const { data: subs } = await supabase.from('battle_submissions').select('*').eq('battle_id', battleId);
+      if (subs) setSubmissions(subs as BattleSubmission[]);
 
-      // 4. Get Result if completed
-      if (battleData.status === 'completed') {
-        await fetchResult();
+      // 4. Get Result if needed (status is completed or reveal_loser)
+      if (['completed', 'reveal_loser'].includes(battleData.status)) {
+        const { data: res } = await supabase.from('battle_results').select('*').eq('battle_id', battleId).single();
+        if (res) setResult(res as BattleResult);
       }
 
     } catch (err: any) {
       console.error(err);
       setError(err.message);
-      toast.error('Erro ao carregar batalha');
     } finally {
       setLoading(false);
     }
   }, [battleId, user]);
 
-  const fetchSubmissions = async () => {
-    const { data } = await supabase.from('battle_submissions').select('*').eq('battle_id', battleId);
-    if (data) setSubmissions(data as BattleSubmission[]);
-  };
-
-  const fetchResult = async () => {
-    const { data } = await supabase.from('battle_results').select('*').eq('battle_id', battleId).single();
-    if (data) setResult(data as BattleResult);
-  };
-
+  // Realtime Subscription
   useEffect(() => {
+    if (!battleId || !user) return;
+
+    // Initial fetch
     fetchBattleState();
-  }, [fetchBattleState]);
+
+    const channel = supabase
+      .channel(`battle-room-${battleId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'battles', filter: `id=eq.${battleId}` },
+        (payload) => {
+          console.log('[Realtime] Battle update:', payload.new);
+          setBattle(payload.new as Battle);
+          
+          // If status became reveal_loser or completed, fetch result immediately
+          if (['reveal_loser', 'completed'].includes((payload.new as Battle).status)) {
+             // Small delay to ensure result is inserted before we fetch
+             setTimeout(() => {
+                 supabase.from('battle_results').select('*').eq('battle_id', battleId).single()
+                 .then(({ data }) => {
+                     if (data) setResult(data as BattleResult);
+                 });
+             }, 500);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'battle_submissions', filter: `battle_id=eq.${battleId}` },
+        () => {
+            console.log('[Realtime] Submission update');
+            supabase.from('battle_submissions').select('*').eq('battle_id', battleId).then(({ data }) => {
+                if (data) setSubmissions(data as BattleSubmission[]);
+            });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'battle_results', filter: `battle_id=eq.${battleId}` },
+        (payload) => {
+            console.log('[Realtime] Result created:', payload.new);
+            setResult(payload.new as BattleResult);
+        }
+      )
+      .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+              console.log('[Realtime] Connected to battle room');
+          }
+      });
+
+    // Watchdog: If status is processing for too long (>15s), force refetch
+    watchdogRef.current = setInterval(() => {
+        if (battle?.status === 'processing') {
+            fetchBattleState();
+        }
+    }, 10000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      if (watchdogRef.current) clearInterval(watchdogRef.current);
+    };
+  }, [battleId, user, fetchBattleState]); // Removed 'battle' from dependency to avoid re-subscribing on state change
 
   // Actions
   const submitPhotos = async (frontFile: File, sideFile?: File) => {
@@ -113,8 +139,8 @@ export function useBattleRoom(battleId: string) {
         if (uploadError2) throw uploadError2;
       }
 
-      // Submit RPC (Updates DB status)
-      const { data, error } = await supabase.rpc('submit_battle_photos_v2', {
+      // Submit RPC
+      const { error } = await supabase.rpc('submit_battle_photos_v2', {
         p_battle_id: battleId,
         p_front_path: frontPath,
         p_side_path: sidePath
@@ -123,16 +149,18 @@ export function useBattleRoom(battleId: string) {
       if (error) throw error;
       toast.success('Fotos enviadas!');
       
-      // Force processing state locally for immediate feedback (Animation trigger)
-      setBattle(prev => prev ? { ...prev, status: 'processing' } : null);
-
-      // Simulate AI Processing Trigger (Normally Edge Function)
-      // We check if both submitted locally to trigger simulation, or wait for server state
-      // For demo purposes, call simulation RPC after a short delay
+      // Simulate Processing Trigger (Mock)
+      // Check if opponent has submitted (locally) or just try to trigger
+      // We trigger the mock logic after 2s to simulate "waiting for other / processing"
       setTimeout(async () => {
-             toast.info('Processando resultados...');
-             await supabase.rpc('mock_process_battle_result', { p_battle_id: battleId });
-      }, 2000); // 2 seconds animation time before result
+             // Only trigger mock if status is processing (meaning both submitted)
+             // Or we can try to force it for the demo flow if this user is the second one
+             const { data: current } = await supabase.from('battles').select('status').eq('id', battleId).single();
+             if (current?.status === 'processing') {
+                 // Trigger Mock AI
+                 await supabase.rpc('mock_process_battle_result', { p_battle_id: battleId });
+             }
+      }, 2500); 
 
     } catch (err: any) {
       toast.error(err.message || 'Erro ao enviar fotos');

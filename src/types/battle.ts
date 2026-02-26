@@ -3,6 +3,7 @@ export type BattleStatus =
   | 'matched' 
   | 'photo_submission' 
   | 'processing' 
+  | 'reveal_loser'
   | 'completed' 
   | 'canceled' 
   | 'expired';
@@ -17,6 +18,7 @@ export interface Battle {
   matched_at: string | null;
   expires_at: string;
   room_version: number;
+  result_ready_at?: string;
 }
 
 export interface EnrichedBattle extends Battle {
