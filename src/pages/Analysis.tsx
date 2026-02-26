@@ -15,6 +15,7 @@ import {
   User,
   TrendingUp,
   Trash2,
+  Clock,
 } from "lucide-react";
 import { usePaywallGate } from "@/hooks/usePaywallGate";
 import { Button } from "@/components/ui/button";
