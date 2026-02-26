@@ -83,10 +83,79 @@ export function useFriendRequests() {
 
   const sendRequest = async (username: string) => {
     try {
-      const { data, error } = await supabase.rpc('send_friend_request', { target_username: username });
-      if (error) throw error;
-      if (data && !data.success) {
-          throw new Error(data.error || 'Falha ao enviar solicitação');
+      if (!user) throw new Error('Usuário não autenticado');
+
+      let targetUserId;
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(username);
+
+      if (isUUID) {
+          targetUserId = username;
+          // Verify if user exists
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', targetUserId)
+            .maybeSingle();
+            
+          if (profileError) throw profileError;
+          if (!profile) throw new Error('Usuário não encontrado pelo ID');
+      } else {
+          // 1. Find the user ID from the username
+          const { data: profiles, error: profileError } = await supabase
+            .from('profiles')
+            .select('id')
+            .ilike('username', username)
+            .maybeSingle();
+    
+          if (profileError) throw profileError;
+          if (!profiles) throw new Error('Usuário não encontrado');
+          
+          targetUserId = profiles.id;
+      }
+
+      if (targetUserId === user.id) {
+        throw new Error('Você não pode adicionar a si mesmo');
+      }
+
+      // 2. Check if request already exists
+      const { data: existingRequest, error: existingError } = await supabase
+        .from('friend_requests')
+        .select('*')
+        .or(`and(requester_id.eq.${user.id},addressee_id.eq.${targetUserId}),and(requester_id.eq.${targetUserId},addressee_id.eq.${user.id})`)
+        .maybeSingle();
+      
+      if (existingError && existingError.code !== 'PGRST116') throw existingError;
+
+      if (existingRequest) {
+          if (existingRequest.status === 'pending') {
+              throw new Error('Já existe uma solicitação pendente');
+          } else if (existingRequest.status === 'accepted') {
+              throw new Error('Vocês já são amigos');
+          } else {
+              // If rejected or canceled, we can try to re-send (update status to pending)
+              const { error: updateError } = await supabase
+                  .from('friend_requests')
+                  .update({ 
+                      status: 'pending', 
+                      requester_id: user.id, 
+                      addressee_id: targetUserId,
+                      created_at: new Date().toISOString()
+                  })
+                  .eq('id', existingRequest.id);
+                  
+              if (updateError) throw updateError;
+          }
+      } else {
+          // 3. Create new request
+          const { error: insertError } = await supabase
+            .from('friend_requests')
+            .insert({
+              requester_id: user.id,
+              addressee_id: targetUserId,
+              status: 'pending'
+            });
+            
+          if (insertError) throw insertError;
       }
       
       toast({
@@ -96,6 +165,7 @@ export function useFriendRequests() {
       fetchRequests();
       return true;
     } catch (error: any) {
+      console.error(error);
       toast({
         title: 'Erro ao enviar solicitação',
         description: error.message,

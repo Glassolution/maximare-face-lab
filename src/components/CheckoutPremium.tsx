@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { logger } from "@/lib/logger";
 import { PLAN_CONFIG } from "@/config/plans";
+import { motion } from "framer-motion";
 
 interface CheckoutPremiumProps {
   plan: 'weekly' | 'monthly' | 'yearly';
@@ -17,6 +18,76 @@ interface CheckoutPremiumProps {
   onSuccess: (email: string) => void;
   onCancel: () => void;
 }
+
+const ProgressBar = () => {
+  return (
+    <div className="px-8 mb-8">
+      <div className="flex items-center justify-between relative">
+        {/* Step 1: Análise */}
+        <div className="flex flex-col items-center z-10">
+          <motion.div 
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white mb-2 shadow-[0_0_15px_rgba(59,130,246,0.5)] border-2 border-blue-400"
+          >
+            <Check className="w-5 h-5" />
+          </motion.div>
+          <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Análise</span>
+        </div>
+
+        {/* Line 1 */}
+        <div className="flex-grow h-[2px] bg-zinc-800 mx-2 relative overflow-hidden">
+            <motion.div 
+                initial={{ width: "0%" }}
+                animate={{ width: "100%" }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+                className="absolute top-0 left-0 h-full bg-blue-500"
+            />
+        </div>
+
+        {/* Step 2: Plano */}
+        <div className="flex flex-col items-center z-10">
+          <motion.div 
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white mb-2 shadow-[0_0_15px_rgba(59,130,246,0.5)] border-2 border-blue-400"
+          >
+             <Check className="w-5 h-5" />
+          </motion.div>
+          <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Plano</span>
+        </div>
+
+        {/* Line 2 */}
+        <div className="flex-grow h-[2px] bg-zinc-800 mx-2 relative overflow-hidden">
+            <motion.div 
+                initial={{ width: "0%" }}
+                animate={{ width: "100%" }}
+                transition={{ delay: 0.8, duration: 0.8, ease: "easeOut" }}
+                className="absolute top-0 left-0 h-full bg-blue-500"
+            />
+        </div>
+
+        {/* Step 3: Pagamento */}
+        <div className="flex flex-col items-center z-10">
+           <motion.div 
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 1.2 }}
+            className="relative"
+           >
+                <div className="w-10 h-10 rounded-full border-2 border-blue-500 flex items-center justify-center text-blue-500 bg-background-light dark:bg-background-dark mb-2 shadow-[0_0_20px_rgba(59,130,246,0.4)]">
+                    <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse"></div>
+                </div>
+                {/* Ping animation ring */}
+                <div className="absolute inset-0 rounded-full border border-blue-500 animate-ping opacity-20"></div>
+           </motion.div>
+          <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Pagamento</span>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPremiumProps) => {
   const { refreshSession } = useAuth(); 
@@ -387,30 +458,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
               </div>
 
               {/* Progress Steps */}
-              <div className="px-8 mb-8">
-                <div className="flex items-center justify-between relative">
-                  <div className="flex flex-col items-center z-10">
-                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white mb-1 shadow-lg shadow-primary/30">
-                      <Check className="w-4 h-4" />
-                    </div>
-                    <span className="text-[10px] font-medium text-gray-500 uppercase tracking-widest">Análise</span>
-                  </div>
-                  <div className="step-line h-[2px] flex-grow mx-2 bg-primary"></div>
-                  <div className="flex flex-col items-center z-10">
-                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white mb-1 shadow-lg shadow-primary/30">
-                       <Check className="w-4 h-4" />
-                    </div>
-                    <span className="text-[10px] font-medium text-gray-500 uppercase tracking-widest">Plano</span>
-                  </div>
-                  <div className="step-line h-[2px] flex-grow mx-2 bg-primary"></div>
-                  <div className="flex flex-col items-center z-10">
-                     <div className="w-8 h-8 rounded-full border-2 border-primary flex items-center justify-center text-primary bg-background-light dark:bg-background-dark mb-1 shadow-lg shadow-primary/20">
-                      <div className="w-2 h-2 rounded-full bg-primary"></div>
-                    </div>
-                    <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Pagamento</span>
-                  </div>
-                </div>
-              </div>
+              <ProgressBar />
 
               <div className="flex-1 overflow-y-auto px-6 pb-32">
                   {showTimeoutFallback ? (
@@ -495,30 +543,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
       </div>
 
       {/* Progress Steps */}
-      <div className="px-8 mb-6">
-        <div className="flex items-center justify-between relative">
-          <div className="flex flex-col items-center z-10">
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white mb-1 shadow-lg shadow-primary/30">
-              <Check className="w-4 h-4" />
-            </div>
-            <span className="text-[10px] font-medium text-gray-500 uppercase tracking-widest">Análise</span>
-          </div>
-          <div className="step-line h-[2px] flex-grow mx-2 bg-primary"></div>
-          <div className="flex flex-col items-center z-10">
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white mb-1 shadow-lg shadow-primary/30">
-               <Check className="w-4 h-4" />
-            </div>
-            <span className="text-[10px] font-medium text-gray-500 uppercase tracking-widest">Plano</span>
-          </div>
-          <div className="step-line h-[2px] flex-grow mx-2 bg-primary"></div>
-          <div className="flex flex-col items-center z-10">
-             <div className="w-8 h-8 rounded-full border-2 border-primary flex items-center justify-center text-primary bg-background-light dark:bg-background-dark mb-1 shadow-lg shadow-primary/20">
-              <div className="w-2 h-2 rounded-full bg-primary"></div>
-            </div>
-            <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Pagamento</span>
-          </div>
-        </div>
-      </div>
+      <ProgressBar />
 
       <div className="flex-1 overflow-y-auto px-6 pb-32">
         
@@ -535,63 +560,9 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
             </div>
         </div>
 
-        {/* Method Selection - Cards Style */}
-        <div className="space-y-4 mb-8">
-            <p className="text-[12px] uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 font-semibold px-1">Método de Pagamento</p>
-            
-            <div className="grid grid-cols-1 gap-3">
-                <button 
-                    onClick={() => setPaymentMethod('card')}
-                    className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${
-                        paymentMethod === 'card' 
-                        ? 'bg-white dark:bg-slate-card border-blue-500 shadow-lg shadow-blue-500/20' 
-                        : 'bg-white dark:bg-slate-card border-transparent hover:border-gray-200 dark:hover:border-gray-700'
-                    }`}
-                >
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 flex items-center justify-center bg-gray-900 dark:bg-black rounded-xl text-white">
-                            <CreditCard className="w-6 h-6" />
-                        </div>
-                        <div className="text-left">
-                            <p className="font-bold text-sm text-gray-900 dark:text-white">Cartão de Crédito</p>
-                            <p className="text-[10px] text-gray-500">Aprovação imediata</p>
-                        </div>
-                    </div>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                        paymentMethod === 'card' ? 'border-blue-500 bg-blue-500' : 'border-gray-300 dark:border-gray-600'
-                    }`}>
-                        {paymentMethod === 'card' && <div className="w-2 h-2 rounded-full bg-white" />}
-                    </div>
-                </button>
-
-                <button 
-                    onClick={() => setPaymentMethod('pix')}
-                    className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${
-                        paymentMethod === 'pix' 
-                        ? 'bg-white dark:bg-slate-card border-blue-500 shadow-lg shadow-blue-500/20' 
-                        : 'bg-white dark:bg-slate-card border-transparent hover:border-gray-200 dark:hover:border-gray-700'
-                    }`}
-                >
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 flex items-center justify-center bg-gray-900 dark:bg-black rounded-xl text-white">
-                            <QrCode className="w-6 h-6" />
-                        </div>
-                        <div className="text-left">
-                            <p className="font-bold text-sm text-gray-900 dark:text-white">PIX</p>
-                            <p className="text-[10px] text-gray-500">Instantâneo e seguro</p>
-                        </div>
-                    </div>
-                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                        paymentMethod === 'pix' ? 'border-blue-500 bg-blue-500' : 'border-gray-300 dark:border-gray-600'
-                    }`}>
-                        {paymentMethod === 'pix' && <div className="w-2 h-2 rounded-full bg-white" />}
-                    </div>
-                </button>
-            </div>
-        </div>
-
         {/* Form Fields - Always Visible */}
-        <div className="space-y-6">
+        <div className="space-y-4 mb-8">
+            <p className="text-[12px] uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 font-semibold px-1">Seus Dados</p>
             <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -632,8 +603,63 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                     />
                 </div>
             </div>
+        </div>
 
-            <div className="h-[1px] bg-gray-100 dark:bg-zinc-800 my-4"></div>
+        {/* Method Selection - Cards Style */}
+        <div className="space-y-4 mb-8">
+            <p className="text-[12px] uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 font-semibold px-1">Método de Pagamento</p>
+            
+            <div className="grid grid-cols-2 gap-3">
+                <button 
+                    onClick={() => setPaymentMethod('card')}
+                    className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all h-32 ${
+                        paymentMethod === 'card' 
+                        ? 'bg-white dark:bg-slate-card border-blue-500 shadow-lg shadow-blue-500/20' 
+                        : 'bg-white dark:bg-slate-card border-transparent hover:border-gray-200 dark:hover:border-gray-700'
+                    }`}
+                >
+                    <div className="w-10 h-10 flex items-center justify-center bg-gray-900 dark:bg-black rounded-xl text-white mb-3">
+                        <CreditCard className="w-5 h-5" />
+                    </div>
+                    <div className="text-center">
+                        <p className="font-bold text-xs text-gray-900 dark:text-white">Cartão</p>
+                        <p className="text-[9px] text-gray-500 mt-0.5">Aprovação imediata</p>
+                    </div>
+                    <div className={`mt-2 w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                        paymentMethod === 'card' ? 'border-blue-500 bg-blue-500' : 'border-gray-300 dark:border-gray-600'
+                    }`}>
+                        {paymentMethod === 'card' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    </div>
+                </button>
+
+                <button 
+                    onClick={() => setPaymentMethod('pix')}
+                    className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all h-32 ${
+                        paymentMethod === 'pix' 
+                        ? 'bg-white dark:bg-slate-card border-blue-500 shadow-lg shadow-blue-500/20' 
+                        : 'bg-white dark:bg-slate-card border-transparent hover:border-gray-200 dark:hover:border-gray-700'
+                    }`}
+                >
+                    <div className="w-10 h-10 flex items-center justify-center bg-gray-900 dark:bg-black rounded-xl text-white mb-3">
+                        <QrCode className="w-5 h-5" />
+                    </div>
+                    <div className="text-center">
+                        <p className="font-bold text-xs text-gray-900 dark:text-white">PIX</p>
+                        <p className="text-[9px] text-gray-500 mt-0.5">Instantâneo</p>
+                    </div>
+                     <div className={`mt-2 w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                        paymentMethod === 'pix' ? 'border-blue-500 bg-blue-500' : 'border-gray-300 dark:border-gray-600'
+                    }`}>
+                        {paymentMethod === 'pix' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <div className="h-[1px] bg-gray-100 dark:bg-zinc-800 my-4"></div>
+
+        {/* Payment Action Section */}
+        <div className="space-y-6">
             
             {/* PIX Section */}
             <div className={paymentMethod === 'pix' ? 'block space-y-4 animate-fade-in' : 'hidden'}>

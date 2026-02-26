@@ -178,14 +178,14 @@ export default function Friends() {
           <Card>
             <CardHeader>
               <CardTitle>Adicionar Amigo</CardTitle>
-              <CardDescription>Busque por nome de usuário (ex: @joao).</CardDescription>
+              <CardDescription>Busque por nome de usuário (ex: @joao) ou ID.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input 
-                        placeholder="Nome de usuário" 
+                        placeholder="Nome de usuário ou ID" 
                         className="pl-8" 
                         value={searchUsername}
                         onChange={(e) => setSearchUsername(e.target.value)}

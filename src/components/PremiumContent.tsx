@@ -11,6 +11,8 @@ import { logPaywallEvent, PaywallContext } from "@/lib/paywall";
 import { CheckoutPremium } from "./CheckoutPremium";
 import { PlanConfirmation } from "./PlanConfirmation";
 
+import { PaymentSuccess } from "./PaymentSuccess";
+
 interface PremiumContentProps {
   onClose?: () => void;
   context?: PaywallContext;
@@ -19,8 +21,9 @@ interface PremiumContentProps {
 
 export default function PremiumContent({ onClose, context, isModal = false }: PremiumContentProps) {
   const [selectedPlan, setSelectedPlan] = useState<PlanType>('yearly');
-  const [step, setStep] = useState<'landing' | 'confirmation' | 'payment'>('landing');
+  const [step, setStep] = useState<'landing' | 'confirmation' | 'payment' | 'success'>('landing');
   const [loading, setLoading] = useState(false);
+  const [successEmail, setSuccessEmail] = useState<string | undefined>(undefined);
   const navigate = useNavigate();
 
   const handleClose = () => {
@@ -31,9 +34,7 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
     }
   };
 
-  const handleSuccess = async (email?: string) => {
-    setStep('landing');
-    
+  const handleFinalRedirect = async () => {
     // Check if user is logged in
     const { data: { session } } = await supabase.auth.getSession();
     
@@ -41,8 +42,8 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
         navigate('/profile', { state: { premiumActivated: true } }); 
     } else {
         // Guest User - Trigger Password Reset so they can set their password
-        if (email) {
-            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        if (successEmail) {
+            const { error } = await supabase.auth.resetPasswordForEmail(successEmail, {
                 redirectTo: `${window.location.origin}/update-password`,
             });
             
@@ -59,6 +60,17 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
         }
     }
   };
+
+  const handleSuccess = (email?: string) => {
+    setSuccessEmail(email);
+    setStep('success');
+  };
+
+  if (step === 'success') {
+    return (
+      <PaymentSuccess onContinue={handleFinalRedirect} />
+    );
+  }
 
   if (step === 'payment') {
     const price = PLAN_CONFIG.PLANS[selectedPlan].price;
