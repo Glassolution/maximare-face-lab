@@ -3,6 +3,9 @@
 -- or we rely on the public RLS we just added. 
 -- Let's make it robust and explicit about what it returns.
 
+-- Drop function first because return type might have changed or been ambiguous
+DROP FUNCTION IF EXISTS search_users(text, int, int);
+
 CREATE OR REPLACE FUNCTION search_users(
     search_query text,
     limit_count int DEFAULT 20,
