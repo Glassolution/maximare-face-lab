@@ -964,8 +964,8 @@ export default function Analysis() {
               disabled={(!limitsDisabled && isCooldownActive) || (!canAnalyze && !isPremium)}
               className={`w-full rounded-2xl px-5 py-4 flex items-center justify-between shadow-[0_18px_40px_rgba(0,0,0,0.75)] border ${
                 (!limitsDisabled && isCooldownActive) || !canAnalyze
-                  ? "bg-zinc-900 border-zinc-800 text-zinc-500 cursor-not-allowed"
-                  : "bg-white border-white/10 text-black hover:bg-zinc-50"
+                  ? "bg-zinc-900 border-zinc-800 cursor-not-allowed"
+                  : "bg-white border-white/10 hover:bg-zinc-50"
               } transition-colors`}
             >
               <div className="flex items-center gap-3">
@@ -977,10 +977,14 @@ export default function Analysis() {
                   { !canAnalyze && !isPremium ? <Clock className="h-5 w-5 text-amber-500" /> : <Scan className={`h-5 w-5 ${(!limitsDisabled && isCooldownActive) ? "text-zinc-500" : "text-white"}`} /> }
                 </div>
                 <div className="text-left">
-                  <p className="text-xs font-semibold">
+                  <p className={`text-xs font-semibold ${
+                    !canAnalyze && !isPremium ? "text-amber-500" : ((!limitsDisabled && isCooldownActive) ? "text-zinc-500" : "text-black")
+                  }`}>
                     {!canAnalyze && !isPremium ? "Limite Diário Atingido" : (!limitsDisabled && isCooldownActive ? "Cooldown ativo" : "Nova Análise")}
                   </p>
-                  <p className="text-[11px] text-black/60">
+                  <p className={`text-[11px] ${
+                    !canAnalyze && !isPremium ? "text-zinc-400" : ((!limitsDisabled && isCooldownActive) ? "text-zinc-600" : "text-black/60")
+                  }`}>
                     {!canAnalyze && !isPremium
                       ? "Volte amanhã ou vire Premium"
                       : (!limitsDisabled && isCooldownActive
