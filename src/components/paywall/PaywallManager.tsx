@@ -16,7 +16,7 @@ export function PaywallManager() {
   const { user } = useAuth();
   const { isPremium } = useAnalysisLimit();
   const [showPaywall, setShowPaywall] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<'quarterly' | 'lifetime'>('lifetime');
+  const [selectedPlan, setSelectedPlan] = useState<'weekly' | 'monthly' | 'annual'>('annual');
   const navigate = useNavigate();
 
   // Session State (Memory only)
@@ -48,7 +48,8 @@ export function PaywallManager() {
   const handleSubscribe = () => {
       setShowPaywall(false);
       navigate('/profile'); 
-      toast.success(`Plano ${selectedPlan === 'lifetime' ? 'Vitalício' : 'Trimestral'} selecionado!`);
+      const planName = selectedPlan === 'annual' ? 'Anual' : selectedPlan === 'monthly' ? 'Mensal' : 'Semanal';
+      toast.success(`Plano ${planName} selecionado!`);
   };
   
   return (
@@ -65,49 +66,68 @@ export function PaywallManager() {
 
         {/* Plan Selection */}
         <div className="space-y-3 mb-6">
-          {/* Quarterly Plan */}
+          {/* Weekly Plan */}
           <div 
             className={`relative p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 ${
-              selectedPlan === 'quarterly' 
+              selectedPlan === 'weekly' 
                 ? "border-blue-600 bg-blue-600/5 shadow-[0_0_20px_rgba(37,99,235,0.1)]" 
                 : "border-white/10 bg-white/5 hover:bg-white/10"
             }`}
-            onClick={() => setSelectedPlan('quarterly')}
+            onClick={() => setSelectedPlan('weekly')}
           >
-            <div className="flex justify-between items-start">
+            <div className="flex justify-between items-center">
               <div>
-                <h3 className="font-bold text-lg">Acesso Trimestral</h3>
-                <p className="text-xs text-zinc-400 mt-1">Ciclo biológico de 90 dias</p>
+                <h3 className="font-bold text-base">Semanal</h3>
+                <p className="text-[10px] text-zinc-400">Teste rápido de 7 dias</p>
               </div>
               <div className="text-right">
-                <span className="block font-bold text-xl">R$ 49</span>
-                <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Por Trimestre</span>
+                <span className="block font-bold text-lg">R$ 19,90</span>
               </div>
             </div>
           </div>
 
-          {/* Lifetime Plan */}
+          {/* Monthly Plan */}
           <div 
             className={`relative p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 ${
-              selectedPlan === 'lifetime' 
+              selectedPlan === 'monthly' 
                 ? "border-blue-600 bg-blue-600/5 shadow-[0_0_20px_rgba(37,99,235,0.1)]" 
                 : "border-white/10 bg-white/5 hover:bg-white/10"
             }`}
-            onClick={() => setSelectedPlan('lifetime')}
+            onClick={() => setSelectedPlan('monthly')}
+          >
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-base">Mensal</h3>
+                <p className="text-[10px] text-zinc-400">Evolução contínua</p>
+              </div>
+              <div className="text-right">
+                <span className="block font-bold text-lg">R$ 49,90</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Annual Plan */}
+          <div 
+            className={`relative p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 ${
+              selectedPlan === 'annual' 
+                ? "border-blue-600 bg-blue-600/5 shadow-[0_0_20px_rgba(37,99,235,0.1)]" 
+                : "border-white/10 bg-white/5 hover:bg-white/10"
+            }`}
+            onClick={() => setSelectedPlan('annual')}
           >
             {/* Badge */}
             <div className="absolute -top-3 right-4 bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
               MELHOR VALOR
             </div>
 
-            <div className="flex justify-between items-start">
+            <div className="flex justify-between items-center">
               <div>
-                <h3 className="font-bold text-lg">Protocolo Vitalício</h3>
-                <p className="text-xs text-zinc-400 mt-1">Baseline genético único</p>
+                <h3 className="font-bold text-lg">Anual</h3>
+                <p className="text-[10px] text-zinc-400">Compromisso total</p>
               </div>
               <div className="text-right">
-                <span className="block font-bold text-xl">R$ 129</span>
-                <span className="text-[10px] text-blue-400 font-bold">ECONOMIZE 60%</span>
+                <span className="block font-bold text-xl">R$ 299,90</span>
+                <span className="text-[10px] text-blue-400 font-bold">ECONOMIZE 50%</span>
               </div>
             </div>
           </div>
