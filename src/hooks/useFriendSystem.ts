@@ -9,8 +9,10 @@ export function useFriends() {
   const [friends, setFriends] = useState<FriendProfile[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [fatalError, setFatalError] = useState(false);
+
   const fetchFriends = useCallback(async () => {
-    if (!user) return;
+    if (!user || fatalError) return;
     setLoading(true);
     try {
       // 1. Fetch accepted friendships
@@ -20,7 +22,15 @@ export function useFriends() {
         .eq('status', 'accepted')
         .or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`);
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === 'PGRST205' || error.message.includes('does not exist')) {
+            console.error('Critical Error: Friendships table missing. Stopping retries.');
+            setFatalError(true);
+            toast.error('Erro de sistema: Tabela de amigos não encontrada.');
+            return;
+        }
+        throw error;
+      }
 
       if (!friendships || friendships.length === 0) {
         setFriends([]);
@@ -68,8 +78,10 @@ export function useFriendRequests() {
   const [outgoing, setOutgoing] = useState<FriendProfile[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [fatalError, setFatalError] = useState(false);
+
   const fetchRequests = useCallback(async () => {
-    if (!user) return;
+    if (!user || fatalError) return;
     setLoading(true);
     try {
       // 1. Fetch pending friendships
@@ -79,7 +91,15 @@ export function useFriendRequests() {
         .eq('status', 'pending')
         .or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`);
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === 'PGRST205' || error.message.includes('does not exist')) {
+            console.error('Critical Error: Friendships table missing. Stopping retries.');
+            setFatalError(true);
+            toast.error('Erro de sistema: Tabela de solicitações não encontrada.');
+            return;
+        }
+        throw error;
+      }
 
       if (!requests || requests.length === 0) {
         setIncoming([]);

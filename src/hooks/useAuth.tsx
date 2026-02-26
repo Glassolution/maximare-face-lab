@@ -9,6 +9,7 @@ interface Profile {
   username: string;
   display_name: string | null;
   avatar_url: string | null;
+  short_id?: string | null;
 }
 
 interface UserData {
@@ -48,14 +49,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchProfile = async (userId: string) => {
     try {
       logger.log("[Auth]", "Fetching profile for:", userId);
+      // Use limit(1).maybeSingle() to handle 0 or >1 rows gracefully
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", userId)
-        .single();
+        .limit(1)
+        .maybeSingle();
       
       if (error) {
         logger.error("[Auth]", "Profile fetch error:", error);
+        return;
       }
       
       if (data) {
@@ -65,6 +69,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             plan: data.plan_type
         });
         setProfile(data as Profile);
+      } else {
+        // Profile missing (0 rows) - Try to create it automatically
+        logger.log("[Auth]", "Profile missing, attempting to create...");
+        const { error: insertError } = await supabase.from('profiles').insert({
+            id: userId,
+            // defaults will handle the rest, or trigger will fill
+            // but we need username usually if not nullable
+            username: `user_${userId.substring(0, 8)}`,
+        });
+
+        if (insertError) {
+             logger.error("[Auth]", "Failed to auto-create profile:", insertError);
+        } else {
+             // Retry fetch
+             const { data: newData } = await supabase
+                .from("profiles")
+                .select("*")
+                .eq("id", userId)
+                .maybeSingle();
+             if (newData) setProfile(newData as Profile);
+        }
       }
     } catch (e) {
       logger.error("[Auth]", "Unexpected profile error:", e);

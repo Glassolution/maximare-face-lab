@@ -22,7 +22,7 @@ type MenuItem = {
 };
 
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { isPremium, subscriptionStatus, expiresAt, planType } = usePremiumStatus();
   const navigate = useNavigate();
   const history = getAnalysisHistory();
@@ -35,7 +35,15 @@ export default function Profile() {
   const [shortId, setShortId] = useState<string | null>(null);
   const [profileUsername, setProfileUsername] = useState<string | null>(null);
   
-  // Fetch badges and short_id
+  // Sync state with profile from context
+  useEffect(() => {
+    if (profile) {
+        if (profile.short_id) setShortId(profile.short_id);
+        if (profile.username) setProfileUsername(profile.username);
+    }
+  }, [profile]);
+  
+  // Fetch badges and short_id fallback
   useEffect(() => {
     if (location.state?.premiumActivated) {
         toast.success("Assinatura Premium ativada com sucesso!", {
@@ -52,16 +60,18 @@ export default function Profile() {
         if (!user) return;
         
         try {
-            // Fetch Short ID and Username
-            const { data: profileData } = await supabase
-                .from('profiles')
-                .select('short_id, username')
-                .eq('id', user.id)
-                .single();
-            
-            if (profileData) {
-                if (profileData.short_id) setShortId(profileData.short_id);
-                if (profileData.username) setProfileUsername(profileData.username);
+            // Fetch Short ID and Username (fallback if not in context yet)
+            if (!shortId) {
+                const { data: profileData } = await supabase
+                    .from('profiles')
+                    .select('short_id, username')
+                    .eq('id', user.id)
+                    .maybeSingle();
+                
+                if (profileData) {
+                    if (profileData.short_id) setShortId(profileData.short_id);
+                    if (profileData.username) setProfileUsername(profileData.username);
+                }
             }
 
             // 1. Get existing badges first for instant load

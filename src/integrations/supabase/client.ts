@@ -2,9 +2,28 @@
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+// Debug: Validate Connection
+if (SUPABASE_URL) {
+    try {
+        const url = new URL(SUPABASE_URL);
+        console.log(`[Supabase] Client initialized. Host: ${url.hostname}`);
+        if (!url.hostname.includes("xbtendfjajspaidpktsw")) {
+             console.warn("[Supabase] WARNING: You might be connected to the wrong project. Expected ID: xbtendfjajspaidpktsw");
+        }
+    } catch (e) {
+        console.error("[Supabase] Invalid VITE_SUPABASE_URL", e);
+    }
+} else {
+    console.error("[Supabase] Missing VITE_SUPABASE_URL");
+}
+
+if (!SUPABASE_KEY) {
+    console.error("[Supabase] Missing VITE_SUPABASE_ANON_KEY");
+}
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
     storage: localStorage,
     persistSession: true,

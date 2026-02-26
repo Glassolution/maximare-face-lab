@@ -77,7 +77,7 @@ async function rollingGuard(
   const windowStart = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
   try {
     const { data } = await supabase
-      .from("analysis_history")
+      .from("face_analysis_events")
       .select("created_at")
       .eq("user_id", user_id)
       .gte("created_at", windowStart)
@@ -158,7 +158,7 @@ async function canAnalyze(
   // Cooldown using last analysis timestamp
   try {
     const { data: lastAnalysis } = await supabase
-      .from("analysis_history")
+      .from("face_analysis_events")
       .select("created_at")
       .eq("user_id", user_id)
       .order("created_at", { ascending: false })
@@ -342,7 +342,7 @@ serve(async (req: Request) => {
     // SKIP CACHE if forceChad is true, to ensure we overwrite old "Sub5" results
     if (supabase && user_id && !forceChad) {
         let query = supabase
-            .from("analysis_history")
+            .from("face_analysis_events")
             .select("id, created_at, result_json")
             .eq("user_id", user_id)
             .eq("image_meta->front->>hash", frontHash);
@@ -364,7 +364,7 @@ serve(async (req: Request) => {
                 limit: guardRo.isPremium ? null : guardRo.limit,
                 is_premium: guardRo.isPremium,
                 limits_disabled: limitsDisabled,
-                history_id: duplicates.id,
+                history_id: duplicates.id, // ID from face_analysis_events
                 created_at: duplicates.created_at,
                 cooldown_seconds: 0, 
                 cached: true
@@ -868,26 +868,35 @@ Seja preciso. Reconheça a beleza masculina robusta e dê a nota CHAD que ela me
 
     if (supabase && user_id) {
         const source = isPartial ? "front" : "front_lateral";
+        console.log(`[analyze-face] Inserting event for user ${user_id}, request_id: ${analysisId}`);
+        
         const { data: history, error: historyError } = await supabase
-          .from("analysis_history")
+          .from("face_analysis_events")
           .upsert(
             {
               user_id,
-              analysis_id: analysisId,
+              request_id: analysisId,
               result_json: { ...result, ...(songMatch ? { song_match: songMatch } : {}) },
-              source,
+              analysis_type: source,
+              source: 'app',
               score: clampedGer,
               rank: tier.name,
               provider_meta: providerMeta,
               image_meta: imageMeta,
             },
-            { onConflict: "user_id,analysis_id" },
+            { onConflict: "user_id,request_id" },
           )
           .select("id, created_at")
           .single();
         
-        if (!historyError) historyRow = history;
-        await safeInsertLog({ event_type: "analysis_success", provider, ger: finalGer, tier: tier.name });
+        if (historyError) {
+             console.error(`[analyze-face] Insert failed: ${JSON.stringify(historyError)}`);
+             logEvent({ type: "analysis_insert_error", error: String(historyError), request_id: analysisId });
+        } else {
+             console.log(`[analyze-face] Insert success. ID: ${history.id}`);
+             historyRow = history;
+             await safeInsertLog({ event_type: "analysis_success", provider, ger: finalGer, tier: tier.name, request_id: analysisId });
+        }
     }
 
     const responseBody = {

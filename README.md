@@ -1,8 +1,18 @@
-# Welcome to your Lovable project
+# Maximare Face Lab
 
 ## Project info
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+**Supabase Project ID**: `xbtendfjajspaidpktsw`
+**Supabase URL**: `https://xbtendfjajspaidpktsw.supabase.co`
+
+## Setup
+
+Ensure your `.env` file has the following variables:
+
+```env
+VITE_SUPABASE_URL=https://xbtendfjajspaidpktsw.supabase.co
+VITE_SUPABASE_ANON_KEY=your_anon_key_here
+```
 
 ## How can I edit this code?
 
@@ -10,7 +20,7 @@ There are several ways of editing your application.
 
 **Use Lovable**
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+Simply visit the [Lovable Project](https://lovable.dev/projects/xbtendfjajspaidpktsw) and start prompting.
 
 Changes made via Lovable will be committed automatically to this repo.
 

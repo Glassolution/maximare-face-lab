@@ -34,7 +34,7 @@ serve(async (req) => {
 
     // Fetch user analysis history
     const { data: analyses, error: historyError } = await supabaseAdmin
-        .from('analysis_history')
+        .from('face_analysis_events')
         .select('created_at, result_json')
         .eq('user_id', userId)
         .order('created_at', { ascending: true });
