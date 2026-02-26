@@ -117,7 +117,8 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
       const { data: { session } } = await supabase.auth.getSession();
       
       await logPaywallEvent(session?.user?.id || 'guest', 'checkout_started', { plan: selectedPlan });
-      setShowCheckout(true);
+      // Change to plan selection step instead of direct checkout
+      setStep('plan_selection');
 
     } catch (error) {
       console.error('Subscription error:', error);
