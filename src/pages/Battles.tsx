@@ -81,6 +81,19 @@ export default function Battles() {
 function BattleCard({ battle, onClick }: { battle: EnrichedBattle, onClick: () => void }) {
     const isPending = battle.status === 'waiting_for_opponent';
     const opponentName = battle.opponent_profile?.display_name || 'Aguardando...';
+
+    const getStatusLabel = (status: string) => {
+        switch (status) {
+            case 'waiting_for_opponent': return 'Aguardando Oponente';
+            case 'matched': return 'Duelo Iniciado';
+            case 'photo_submission': return 'Envie sua Foto';
+            case 'processing': return 'Processando';
+            case 'completed': return 'Finalizado';
+            case 'canceled': return 'Cancelado';
+            case 'expired': return 'Expirado';
+            default: return status.replace(/_/g, ' ');
+        }
+    };
     
     return (
         <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={onClick}>
@@ -97,9 +110,9 @@ function BattleCard({ battle, onClick }: { battle: EnrichedBattle, onClick: () =
                         }`} />
                     </div>
                     <div>
-                        <p className="font-bold text-sm">vs {opponentName}</p>
+                        <p className="font-bold text-sm">{opponentName === 'Aguardando...' ? 'Novo Duelo' : `vs ${opponentName}`}</p>
                         <p className="text-xs text-muted-foreground capitalize">
-                            {battle.status.replace(/_/g, ' ')} • {formatDistanceToNow(new Date(battle.created_at), { addSuffix: true, locale: ptBR })}
+                            {getStatusLabel(battle.status)} • {formatDistanceToNow(new Date(battle.created_at), { addSuffix: true, locale: ptBR })}
                         </p>
                     </div>
                 </div>
