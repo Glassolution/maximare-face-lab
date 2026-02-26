@@ -1143,5 +1143,6 @@ export default function Analysis() {
         <PaywallDialog />
       </div>
     </div>
+    </PaywallManager>
   );
 }
