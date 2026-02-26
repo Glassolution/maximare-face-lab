@@ -100,11 +100,11 @@ export function useFriendRequests() {
           if (profileError) throw profileError;
           if (!profile) throw new Error('Usuário não encontrado pelo ID');
       } else {
-          // 1. Find the user ID from the username
+          // 1. Find the user ID from the username or display name
           const { data: profiles, error: profileError } = await supabase
             .from('profiles')
             .select('id')
-            .ilike('username', username)
+            .or(`username.ilike.${username},display_name.ilike.${username}`)
             .maybeSingle();
     
           if (profileError) throw profileError;
