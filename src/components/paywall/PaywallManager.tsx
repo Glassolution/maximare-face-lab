@@ -13,7 +13,7 @@ interface PaywallManagerProps {
   trigger: string;
 }
 
-export function PaywallManager() {
+export function PaywallManager({ children }: PaywallManagerProps) {
   const { user } = useAuth();
   const { isPremium } = useAnalysisLimit();
   const [showPaywall, setShowPaywall] = useState(false);
@@ -52,14 +52,16 @@ export function PaywallManager() {
   };
   
   return (
-    <Dialog open={showPaywall} onOpenChange={setShowPaywall}>
-      <DialogContent className="w-[90%] max-w-[380px] p-6 rounded-[2rem] border border-white/10 bg-[#0a0a0a] text-white backdrop-blur-xl shadow-2xl">
-        <VisuallyHidden>
-            <DialogTitle>Desbloqueie seu Potencial</DialogTitle>
-            <DialogDescription>Escolha um plano para acessar todos os recursos.</DialogDescription>
-        </VisuallyHidden>
-        
-        {/* Header */}
+    <>
+      {children}
+      <Dialog open={showPaywall} onOpenChange={setShowPaywall}>
+        <DialogContent className="w-[90%] max-w-[380px] p-6 rounded-[2rem] border border-white/10 bg-[#0a0a0a] text-white backdrop-blur-xl shadow-2xl">
+          <VisuallyHidden>
+              <DialogTitle>Desbloqueie seu Potencial</DialogTitle>
+              <DialogDescription>Escolha um plano para acessar todos os recursos.</DialogDescription>
+          </VisuallyHidden>
+          
+          {/* Header */}
         <div className="text-center mb-6 space-y-2">
           <h2 className="text-2xl font-bold tracking-tight">Desbloqueie seu Potencial</h2>
           <p className="text-sm text-zinc-400 leading-relaxed">
@@ -203,5 +205,6 @@ export function PaywallManager() {
 
       </DialogContent>
     </Dialog>
+    </>
   );
 }
