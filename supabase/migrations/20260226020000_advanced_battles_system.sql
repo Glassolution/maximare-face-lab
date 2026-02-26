@@ -273,11 +273,19 @@ ON CONFLICT (id) DO UPDATE SET public = false;
 
 -- Storage Policies
 DROP POLICY IF EXISTS "Battle photos access" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users can upload battle photos" ON storage.objects;
+DROP POLICY IF EXISTS "Users can view their own battle photos" ON storage.objects;
+DROP POLICY IF EXISTS "Users can update their own battle photos" ON storage.objects;
 
 -- Insert: Authenticated users can upload
 CREATE POLICY "Authenticated users can upload battle photos"
 ON storage.objects FOR INSERT
 WITH CHECK (bucket_id = 'battle-photos' AND auth.role() = 'authenticated');
+
+-- Update: Users can update their own photos (for upsert)
+CREATE POLICY "Users can update their own battle photos"
+ON storage.objects FOR UPDATE
+USING (bucket_id = 'battle-photos' AND auth.uid() = owner);
 
 -- Select: Only owner (for now, or use signed URLs which bypass RLS if using service role, or use storage.objects select policy matching battle participants)
 -- Implementing strict RLS on storage objects is complex because it requires joining with tables.

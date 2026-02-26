@@ -123,17 +123,16 @@ export function useBattleRoom(battleId: string) {
       if (error) throw error;
       toast.success('Fotos enviadas!');
       
+      // Force processing state locally for immediate feedback (Animation trigger)
+      setBattle(prev => prev ? { ...prev, status: 'processing' } : null);
+
       // Simulate AI Processing Trigger (Normally Edge Function)
       // We check if both submitted locally to trigger simulation, or wait for server state
       // For demo purposes, call simulation RPC after a short delay
       setTimeout(async () => {
-          // Only trigger if status becomes processing
-          const { data: current } = await supabase.from('battles').select('status').eq('id', battleId).single();
-          if (current?.status === 'processing') {
              toast.info('Processando resultados...');
              await supabase.rpc('mock_process_battle_result', { p_battle_id: battleId });
-          }
-      }, 2000);
+      }, 2000); // 2 seconds animation time before result
 
     } catch (err: any) {
       toast.error(err.message || 'Erro ao enviar fotos');
