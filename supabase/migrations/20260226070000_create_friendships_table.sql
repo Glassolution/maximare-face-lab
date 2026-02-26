@@ -1,5 +1,8 @@
--- Create friendships table if it doesn't exist
-CREATE TABLE IF NOT EXISTS public.friendships (
+-- Drop table if exists to ensure schema consistency (fixes "column does not exist" errors if table had old schema)
+DROP TABLE IF EXISTS public.friendships CASCADE;
+
+-- Create friendships table
+CREATE TABLE public.friendships (
     id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
     requester_id uuid REFERENCES auth.users(id) NOT NULL,
     receiver_id uuid REFERENCES auth.users(id) NOT NULL,
