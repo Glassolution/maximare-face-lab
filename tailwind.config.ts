@@ -26,6 +26,11 @@ export default {
         "bio-panel": "rgba(10, 20, 30, 0.95)",
         "background-light": "#F8FAFC",
         "background-dark": "#050A18",
+        graphite: {
+          DEFAULT: "#181A20",
+          light: "#2A2D35",
+          dark: "#0F1115",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

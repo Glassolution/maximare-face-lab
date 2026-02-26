@@ -93,6 +93,7 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
       );
   }
 
+  // LANDING PAGE (Original UI)
   const getDynamicTitle = () => {
     if (!context) return "Desbloqueie acesso\nilimitado";
     
