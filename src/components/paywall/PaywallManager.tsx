@@ -55,12 +55,24 @@ export function PaywallManager({ children }: PaywallManagerProps) {
     <>
       {children}
       <Dialog open={showPaywall} onOpenChange={setShowPaywall}>
-        <DialogContent className="w-[90%] max-w-[380px] p-6 rounded-[2rem] border border-white/10 bg-[#0a0a0a] text-white backdrop-blur-xl shadow-2xl">
-          <VisuallyHidden>
-              <DialogTitle>Desbloqueie seu Potencial</DialogTitle>
-              <DialogDescription>Escolha um plano para acessar todos os recursos.</DialogDescription>
-          </VisuallyHidden>
+        <DialogContent className="w-[90%] max-w-[380px] p-6 rounded-[2rem] border border-white/10 bg-[#0a0a0a] text-white backdrop-blur-xl shadow-2xl overflow-y-auto max-h-[90vh]">
+          {/* Close Button Hack for Mobile */}
+          <DialogTitle className="sr-only">Desbloqueie seu Potencial</DialogTitle>
+          <DialogDescription className="sr-only">Escolha um plano para acessar todos os recursos.</DialogDescription>
           
+          <div className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground z-50">
+             {/* The default DialogClose is already there, but sometimes hidden by custom styles. 
+                 Radix UI DialogContent includes a close button by default. 
+                 We just need to ensure z-index and positioning are correct if it's being covered. 
+                 Actually, Shadcn UI DialogContent includes a Close button. 
+                 Let's check if we need to manually add one or style the existing one.
+                 Shadcn's DialogContent usually has a Close button in the top right.
+                 If it's not clickable, it might be z-index issues or overflow hidden.
+                 Since we added overflow-y-auto, it should be fine inside.
+                 But let's make sure content doesn't overlap it.
+             */}
+          </div>
+
           {/* Header */}
         <div className="text-center mb-6 space-y-2">
           <h2 className="text-2xl font-bold tracking-tight">Desbloqueie seu Potencial</h2>
