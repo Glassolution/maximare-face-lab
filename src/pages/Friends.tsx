@@ -10,11 +10,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { FriendActionButtons } from "@/components/friends/FriendActionButtons";
 import { FriendProfile } from "@/types/friendship";
 import { Button } from "@/components/ui/button";
+import { PublicProfileModal } from "@/components/profile/PublicProfileModal";
 
 export default function Friends() {
   const { friends, loading: friendsLoading, refetch: refetchFriends } = useFriends();
   const { incoming, outgoing, loading: requestsLoading, refetch: refetchRequests } = useFriendRequests();
   const { query, setQuery, results, loading: searchLoading, search } = useUserSearch();
+  
+  const [selectedProfile, setSelectedProfile] = useState<FriendProfile | null>(null);
 
   const handleActionComplete = () => {
     refetchFriends();
@@ -25,7 +28,10 @@ export default function Friends() {
 
   const renderUserItem = (user: FriendProfile, context: 'friend' | 'request' | 'search') => (
     <div key={user.id} className="flex items-center justify-between p-3 border rounded-lg bg-card/50 hover:bg-card/80 transition-colors">
-      <div className="flex items-center gap-3">
+      <div 
+        className="flex items-center gap-3 flex-1 cursor-pointer"
+        onClick={() => setSelectedProfile(user)}
+      >
         <Avatar className="h-10 w-10 border border-border">
           <AvatarImage src={user.avatar_url || undefined} />
           <AvatarFallback>{user.username?.substring(0, 2).toUpperCase() || "??"}</AvatarFallback>
@@ -159,6 +165,12 @@ export default function Friends() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <PublicProfileModal 
+        isOpen={!!selectedProfile} 
+        onClose={() => setSelectedProfile(null)} 
+        profile={selectedProfile} 
+      />
     </div>
   );
 }
