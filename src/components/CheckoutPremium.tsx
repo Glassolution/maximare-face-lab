@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { logger } from "@/lib/logger";
+import { PLAN_CONFIG } from "@/config/plans";
 
 interface CheckoutPremiumProps {
   plan: 'weekly' | 'monthly' | 'yearly';
@@ -265,16 +266,15 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
         const { data: { session } } = await supabase.auth.getSession();
         const { data, error } = await supabase.functions.invoke('create-payment', {
             body: {
-                paymentMethodId: 'card', // Generic for Brick
-                email: email, // Use the state email, not the one from Brick (which might be hidden/initial)
-                amount: price,
+                payment_method_id: formData.payment_method_id, // e.g. 'master'
                 token: formData.token,
                 issuer_id: formData.issuer_id,
-                payment_method_id: formData.payment_method_id,
-                transaction_amount: formData.transaction_amount,
                 installments: formData.installments,
-                payer: formData.payer,
-                plan: plan
+                payer: {
+                    email: formData.payer.email,
+                    identification: formData.payer.identification
+                },
+                plan_id: PLAN_CONFIG.PLANS[plan].id
             }
         });
 
@@ -308,22 +308,32 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
   const handlePix = async () => {
     setLoading(true);
     try {
-        // Validate inputs
-        if (!email || !firstName || !lastName || !cpf) {
-            toast.error("Preencha todos os dados para gerar o PIX.");
+        // Validate inputs with detailed messages
+        const missingFields = [];
+        if (!firstName) missingFields.push("Nome");
+        if (!lastName) missingFields.push("Sobrenome");
+        if (!email) missingFields.push("E-mail");
+        if (!cpf) missingFields.push("CPF");
+
+        if (missingFields.length > 0) {
+            toast.error(`Preencha os campos obrigatórios: ${missingFields.join(', ')}`);
             setLoading(false);
             return;
         }
 
         const { data, error } = await supabase.functions.invoke('create-payment', {
             body: {
-                paymentMethodId: 'pix',
-                email,
-                firstName,
-                lastName,
-                cpf,
-                amount: price,
-                plan: plan
+                payment_method_id: 'pix',
+                payer: {
+                    email,
+                    first_name: firstName,
+                    last_name: lastName,
+                    identification: {
+                        type: 'CPF',
+                        number: cpf.replace(/\D/g, '') // Send only numbers
+                    }
+                },
+                plan_id: PLAN_CONFIG.PLANS[plan].id // Send the database UUID for the plan
             }
         });
 
@@ -625,46 +635,46 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
 
             <div className="h-[1px] bg-gray-100 dark:bg-zinc-800 my-4"></div>
             
-            {paymentMethod === 'pix' ? (
-                <div className="space-y-4 animate-fade-in">
-                    <div className="bg-blue-500/10 rounded-xl p-4 flex items-start gap-3">
-                        <div className="bg-blue-500 rounded-full p-1 mt-0.5">
-                            <Check className="w-3 h-3 text-white" />
-                        </div>
-                        <div>
-                            <p className="text-sm font-bold text-blue-500">Pagamento Instantâneo</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                Seu acesso será liberado imediatamente após o pagamento.
-                            </p>
-                        </div>
+            {/* PIX Section */}
+            <div className={paymentMethod === 'pix' ? 'block space-y-4 animate-fade-in' : 'hidden'}>
+                <div className="bg-blue-500/10 rounded-xl p-4 flex items-start gap-3">
+                    <div className="bg-blue-500 rounded-full p-1 mt-0.5">
+                        <Check className="w-3 h-3 text-white" />
                     </div>
+                    <div>
+                        <p className="text-sm font-bold text-blue-500">Pagamento Instantâneo</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            Seu acesso será liberado imediatamente após o pagamento.
+                        </p>
+                    </div>
+                </div>
 
-                    <Button 
-                        onClick={handlePix} 
-                        disabled={loading}
-                        className="w-full bg-primary hover:bg-blue-600 text-white font-bold py-6 rounded-xl shadow-lg shadow-blue-500/20 mt-4 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                    >
-                        {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : `Gerar PIX de R$ ${price.toFixed(2)}`}
-                    </Button>
+                <Button 
+                    onClick={handlePix} 
+                    disabled={loading}
+                    className="w-full bg-primary hover:bg-blue-600 text-white font-bold py-6 rounded-xl shadow-lg shadow-blue-500/20 mt-4 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                    {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : `Gerar PIX de R$ ${price.toFixed(2)}`}
+                </Button>
+            </div>
+
+            {/* Card Section */}
+            <div className={paymentMethod === 'card' ? 'block space-y-4 animate-fade-in' : 'hidden'}>
+                    <p className="text-sm font-bold text-gray-900 dark:text-white mb-2">Cartão de crédito ou débito</p>
+                {/* Card Form handled by Brick */}
+                <div className="bg-transparent dark:bg-transparent rounded-2xl p-1 border-none">
+                    <CardPayment
+                        initialization={initialization}
+                        customization={customization}
+                        onSubmit={handleCardSubmit}
+                        onReady={() => setReady(true)}
+                        onError={(error) => {
+                            console.error('Brick Error:', error);
+                            // toast.error("Erro no formulário de pagamento.");
+                        }}
+                    />
                 </div>
-            ) : (
-                <div className="space-y-4 animate-fade-in">
-                     <p className="text-sm font-bold text-gray-900 dark:text-white mb-2">Cartão de crédito ou débito</p>
-                    {/* Card Form handled by Brick */}
-                    <div className="bg-transparent dark:bg-transparent rounded-2xl p-1 border-none">
-                        <CardPayment
-                            initialization={initialization}
-                            customization={customization}
-                            onSubmit={handleCardSubmit}
-                            onReady={() => setReady(true)}
-                            onError={(error) => {
-                                console.error('Brick Error:', error);
-                                toast.error("Erro no formulário de pagamento.");
-                            }}
-                        />
-                    </div>
-                </div>
-            )}
+            </div>
         </div>
 
       </div>
