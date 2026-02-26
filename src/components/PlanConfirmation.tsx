@@ -105,7 +105,7 @@ export const PlanConfirmation = ({ selectedPlan, onConfirm, onBack }: PlanConfir
             />
             <FeatureItem 
                 icon={<Dumbbell className="w-5 h-5 text-orange-500" />}
-                title="Análise Gym Max"
+                title="Análise Maximare Ultimate"
                 description="Recomendações de treino baseadas no seu biotipo."
             />
              <FeatureItem 

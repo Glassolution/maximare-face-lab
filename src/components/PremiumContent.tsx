@@ -132,7 +132,7 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
   const features = [
     { name: "Análises Ilimitadas", icon: "⚡", free: false, pro: true },
     { name: "Análise Jaw Max", icon: "🗿", free: false, pro: true },
-    { name: "Análise Gym Max", icon: "💪", free: false, pro: true },
+    { name: "Análise Maximare Ultimate", icon: "💪", free: false, pro: true },
     { name: "Análise de Cores", icon: "🎨", free: false, pro: true },
     { name: "Análise Capilar", icon: "✂️", free: false, pro: true },
     { name: "Plano Glow Up", icon: "✨", free: false, pro: true },
