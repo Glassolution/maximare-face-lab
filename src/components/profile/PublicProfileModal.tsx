@@ -18,6 +18,16 @@ export function PublicProfileModal({ isOpen, onClose, profile }: PublicProfileMo
 
   if (!profile) return null;
 
+  const displayName = profile.display_name || profile.username || `Usuário #${profile.short_id}`;
+  const username = profile.username || `user_${profile.short_id}`;
+  // Standardize initials logic: Remove non-letters, take first 2 chars, uppercase. Fallback to "U"
+  const initials = (displayName || "?").replace(/[^a-zA-Z]/g, '').substring(0, 2).toUpperCase() || "U";
+
+  // Resolve Avatar URL if needed (though usually passed resolved from list, but modal might fetch fresh)
+  // Assuming profile passed here is already processed or raw. 
+  // If raw path, we should resolve. But usually the list item has resolved URL.
+  // Let's assume it's resolved or we display as is. If broken image, AvatarFallback shows initials.
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="w-[90%] max-w-sm rounded-3xl border-white/10 bg-[#0a0a0a] text-white">
@@ -25,16 +35,16 @@ export function PublicProfileModal({ isOpen, onClose, profile }: PublicProfileMo
           <div className="flex flex-col items-center gap-4">
             <Avatar className="h-24 w-24 border-4 border-white/5 shadow-xl">
               <AvatarImage src={profile.avatar_url || undefined} className="object-cover" />
-              <AvatarFallback className="text-2xl bg-zinc-800">
-                {profile.username?.substring(0, 2).toUpperCase() || "??"}
+              <AvatarFallback className="text-2xl bg-zinc-800 font-bold text-zinc-400">
+                {initials}
               </AvatarFallback>
             </Avatar>
             
             <div className="text-center space-y-1">
               <DialogTitle className="text-2xl font-bold">
-                {profile.display_name || profile.username}
+                {displayName}
               </DialogTitle>
-              <p className="text-muted-foreground text-sm">@{profile.username}</p>
+              <p className="text-muted-foreground text-sm">@{username}</p>
               {profile.short_id && (
                 <span className="inline-block bg-white/5 px-2 py-0.5 rounded text-[10px] text-zinc-400 mt-1">
                   #{profile.short_id}

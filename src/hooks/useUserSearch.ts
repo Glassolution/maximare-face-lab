@@ -53,15 +53,37 @@ export function useUserSearch() {
 
       if (data) {
         // Map the result to FriendProfile
-        const mapped: FriendProfile[] = data.map((item: any) => ({
-          id: item.id,
-          username: item.username,
-          display_name: item.display_name,
-          avatar_url: item.avatar_url,
-          short_id: item.short_id,
-          friendship_status: item.friendship_status,
-          is_requester: item.friendship_status === 'pending_sent' // Derived from status
-        }));
+        const mapped: FriendProfile[] = data.map((item: any) => {
+           // Fallback logic
+           const displayName = item.display_name || item.username || `Usuário #${item.public_id || item.short_id}`;
+           const username = item.username || `user_${item.public_id || item.short_id}`;
+           
+           // Avatar URL Logic
+           let avatarUrl = item.avatar_url;
+           // If it's a relative path (not starting with http/https) and not empty, treat as storage path
+           if (avatarUrl && !avatarUrl.startsWith('http') && !avatarUrl.startsWith('data:')) {
+               // Assuming it's a path in 'avatars' bucket (which is public)
+               const { data } = supabase.storage.from('avatars').getPublicUrl(avatarUrl);
+               avatarUrl = data.publicUrl;
+           }
+
+           if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+               console.log('[Search] Mapped user:', { 
+                   original: item, 
+                   mapped: { displayName, username, avatarUrl } 
+               });
+           }
+
+           return {
+              id: item.id,
+              username: username, // Use processed username
+              display_name: displayName, // Use processed display_name
+              avatar_url: avatarUrl, // Use processed avatarUrl
+              short_id: item.public_id?.toString() || item.short_id,
+              friendship_status: item.friendship_status,
+              is_requester: item.friendship_status === 'pending_sent'
+           };
+        });
         setResults(mapped);
       } else {
         setResults([]);

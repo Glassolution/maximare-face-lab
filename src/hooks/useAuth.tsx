@@ -10,6 +10,7 @@ interface Profile {
   display_name: string | null;
   avatar_url: string | null;
   short_id?: string | null;
+  public_id?: number | null;
 }
 
 interface UserData {

@@ -26,7 +26,12 @@ export default function Friends() {
     if (query) search(query);
   };
 
-  const renderUserItem = (user: FriendProfile, context: 'friend' | 'request' | 'search') => (
+  const renderUserItem = (user: FriendProfile, context: 'friend' | 'request' | 'search') => {
+    // Already mapped in useUserSearch, but safe fallback here too
+    const displayName = user.display_name || user.username || `Usuário #${user.short_id}`;
+    const initials = (displayName || "?").substring(0, 2).toUpperCase().replace(/[^A-Z]/g, '') || "U";
+
+    return (
     <div key={user.id} className="flex items-center justify-between p-3 border rounded-lg bg-card/50 hover:bg-card/80 transition-colors">
       <div 
         className="flex items-center gap-3 flex-1 cursor-pointer"
@@ -34,11 +39,11 @@ export default function Friends() {
       >
         <Avatar className="h-10 w-10 border border-border">
           <AvatarImage src={user.avatar_url || undefined} />
-          <AvatarFallback>{user.username?.substring(0, 2).toUpperCase() || "??"}</AvatarFallback>
+          <AvatarFallback>{initials}</AvatarFallback>
         </Avatar>
         <div>
           <p className="font-medium text-sm">
-            {user.display_name || user.username}
+            {displayName}
           </p>
           <div className="flex items-center gap-2">
              {user.username && <p className="text-xs text-muted-foreground">@{user.username}</p>}
@@ -52,7 +57,8 @@ export default function Friends() {
         compact={true}
       />
     </div>
-  );
+    );
+  };
 
   return (
     <div className="container mx-auto pb-24 pt-6 px-4">

@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Crown, ChevronRight, Settings, Shield, Zap, Star, TrendingUp, Search, LogOut, Moon, Sun, CreditCard, Copy } from "lucide-react";
+import { Crown, ChevronRight, Settings, Shield, Zap, Star, TrendingUp, Search, LogOut, Moon, Sun, CreditCard, Copy, Upload, Camera } from "lucide-react";
 import { getAnalysisHistory } from "@/lib/mockData";
 import { toast } from "sonner";
 import { Link, useNavigate } from "react-router-dom";
@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/theme/ThemeProvider";
 import { usePremiumStatus } from "@/hooks/usePremiumStatus";
+import { avatarService } from "@/services/avatarService";
 
 type MenuItem = {
   label: string;
@@ -34,14 +35,48 @@ export default function Profile() {
   
   const [shortId, setShortId] = useState<string | null>(null);
   const [profileUsername, setProfileUsername] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Sync state with profile from context
   useEffect(() => {
     if (profile) {
-        if (profile.short_id) setShortId(profile.short_id);
+        // Prioritize public_id (migrated/new system), fallback to short_id
+        if (profile.public_id) setShortId(profile.public_id.toString());
+        else if (profile.short_id) setShortId(profile.short_id);
+
         if (profile.username) setProfileUsername(profile.username);
+        
+        if (profile.avatar_url) {
+            setAvatarUrl(avatarService.getAvatarPublicUrl(profile.avatar_url));
+        }
     }
   }, [profile]);
+  
+  const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+      if (!event.target.files || event.target.files.length === 0) {
+          return;
+      }
+      
+      const file = event.target.files[0];
+      setUploadingAvatar(true);
+      
+      try {
+          const { publicUrl, path } = await avatarService.uploadAvatar(file);
+          
+          // Force refresh avatar with timestamp to bypass browser cache immediately
+          const timestampedUrl = `${publicUrl}?t=${new Date().getTime()}`;
+          setAvatarUrl(timestampedUrl);
+          
+          toast.success("Foto de perfil atualizada!", { icon: "📸" });
+      } catch (error) {
+          console.error("Erro ao atualizar avatar:", error);
+          toast.error("Erro ao atualizar foto de perfil.");
+      } finally {
+          setUploadingAvatar(false);
+      }
+  };
   
   // Fetch badges and short_id fallback
   useEffect(() => {
@@ -64,12 +99,14 @@ export default function Profile() {
             if (!shortId) {
                 const { data: profileData } = await supabase
                     .from('profiles')
-                    .select('short_id, username')
+                    .select('short_id, public_id, username')
                     .eq('id', user.id)
                     .maybeSingle();
                 
                 if (profileData) {
-                    if (profileData.short_id) setShortId(profileData.short_id);
+                    if (profileData.public_id) setShortId(profileData.public_id.toString());
+                    else if (profileData.short_id) setShortId(profileData.short_id);
+                    
                     if (profileData.username) setProfileUsername(profileData.username);
                 }
             }
@@ -188,18 +225,46 @@ export default function Profile() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
           className="flex flex-col items-center text-center pt-4"
         >
-          <div className="h-20 w-20 rounded-full glass-strong flex items-center justify-center mb-3 glow-sm overflow-hidden relative">
-             {isPremium && (
-                <div className="absolute -top-1 -right-1 z-20 bg-background rounded-full p-0.5 shadow-sm">
-                   <Star className="h-6 w-6 text-amber-400 fill-amber-400 drop-shadow-md animate-pulse" />
-                </div>
-             )}
-             {lastAnalysis?.photoUrl ? (
-                 <img src={lastAnalysis.photoUrl} alt="User" className="w-full h-full object-cover" />
-             ) : (
-                 <span className="font-heading text-2xl font-bold text-gradient">M</span>
-             )}
+          <div className="relative group">
+              <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleAvatarChange} 
+                  accept="image/*" 
+                  className="hidden" 
+              />
+              <div 
+                  className="h-24 w-24 rounded-full glass-strong flex items-center justify-center mb-3 glow-sm overflow-hidden relative cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+              >
+                 {isPremium && (
+                    <div className="absolute -top-1 -right-1 z-20 bg-background rounded-full p-0.5 shadow-sm">
+                       <Star className="h-6 w-6 text-amber-400 fill-amber-400 drop-shadow-md animate-pulse" />
+                    </div>
+                 )}
+                 {uploadingAvatar ? (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                    </div>
+                 ) : null}
+                 
+                 {avatarUrl ? (
+                     <img src={avatarUrl} alt="User" className="w-full h-full object-cover" />
+                 ) : lastAnalysis?.photoUrl ? (
+                     <img src={lastAnalysis.photoUrl} alt="User" className="w-full h-full object-cover" />
+                 ) : (
+                     <span className="font-heading text-2xl font-bold text-gradient">
+                        {displayName ? displayName.substring(0, 1).toUpperCase() : "M"}
+                     </span>
+                 )}
+                 
+                 {/* Overlay for hover effect */}
+                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Camera className="text-white h-6 w-6" />
+                 </div>
+              </div>
           </div>
+          
           <div className="flex flex-col items-center gap-1 mt-1">
             <h1 className="font-heading text-xl font-bold text-foreground">
               {displayName}
