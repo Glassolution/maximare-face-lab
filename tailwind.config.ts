@@ -26,6 +26,7 @@ export default {
         "bio-panel": "rgba(10, 20, 30, 0.95)",
         "background-light": "#F8FAFC",
         "background-dark": "#050A18",
+        "slate-card": "#121214",
         graphite: {
           DEFAULT: "#181A20",
           light: "#2A2D35",

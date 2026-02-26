@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Check, X, ShieldCheck } from "lucide-react";
+import { Check, X, ShieldCheck, Zap, ScanFace, Microscope, Palette, Scissors, Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PLAN_CONFIG, PlanType } from "@/config/plans";
 import { supabase } from "@/integrations/supabase/client";
@@ -63,11 +63,8 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
   if (step === 'payment') {
     const price = PLAN_CONFIG.PLANS[selectedPlan].price;
     return (
-      <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center p-4 overflow-y-auto">
-        <div className="w-full max-w-md">
-            <Button variant="ghost" onClick={() => setStep('confirmation')} className="mb-4">
-                Voltar
-            </Button>
+      <div className="fixed inset-0 z-50 bg-background-light dark:bg-background-dark flex flex-col items-center justify-center overflow-hidden">
+        <div className="w-full h-full max-w-md bg-background-light dark:bg-background-dark relative shadow-2xl">
             <CheckoutPremium 
                 plan={selectedPlan} 
                 price={price} 
@@ -130,13 +127,12 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
   };
 
   const features = [
-    { name: "Análises Ilimitadas", icon: "⚡", free: false, pro: true },
-    { name: "Análise Jaw Max", icon: "🗿", free: false, pro: true },
-    { name: "Análise Maximare Ultimate", icon: "💪", free: false, pro: true },
-    { name: "Análise de Cores", icon: "🎨", free: false, pro: true },
-    { name: "Análise Capilar", icon: "✂️", free: false, pro: true },
-    { name: "Plano Glow Up", icon: "✨", free: false, pro: true },
-    { name: "Sem Anúncios", icon: "🚫", free: false, pro: true },
+    { name: "Análises Ilimitadas", icon: <Zap className="w-4 h-4 text-orange-400" />, free: false, pro: true },
+    { name: "Análise Jaw Max", icon: <ScanFace className="w-4 h-4 text-zinc-400" />, free: false, pro: true },
+    { name: "Maximare Ultimate", icon: <Microscope className="w-4 h-4 text-zinc-400" />, free: false, pro: true },
+    { name: "Análise de Cores", icon: <Palette className="w-4 h-4 text-zinc-400" />, free: false, pro: true },
+    { name: "Plano Glow Up", icon: <Scissors className="w-4 h-4 text-zinc-400" />, free: false, pro: true },
+    { name: "Sem Anúncios", icon: <Ban className="w-4 h-4 text-red-400" />, free: false, pro: true },
   ];
 
   return (
@@ -175,32 +171,32 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
         </div>
 
         {/* Comparison Table */}
-        <div className="bg-zinc-900/80 backdrop-blur-md rounded-2xl p-4 mb-4 border border-white/5">
-          <div className="grid grid-cols-[1.5fr,1fr,1fr] gap-2 mb-4 text-xs font-semibold text-center items-center">
-            <div className="text-left pl-2 text-zinc-400">Serviço</div>
-            <div className="text-zinc-500">GRÁTIS</div>
-            <div className="bg-blue-500/20 text-blue-500 px-2 py-0.5 rounded text-[10px]">PRO</div>
+        <div className="bg-zinc-900 rounded-3xl p-6 mb-6 border border-zinc-800">
+          <div className="grid grid-cols-[1.5fr,1fr,1fr] gap-4 mb-6 text-xs font-bold uppercase tracking-wider text-center items-center">
+            <div className="text-left pl-2 text-zinc-500">SERVIÇO</div>
+            <div className="text-zinc-600">GRÁTIS</div>
+            <div className="bg-blue-600/20 text-blue-500 px-3 py-1 rounded-full text-[10px] mx-auto w-fit">PRO</div>
           </div>
           
-          <div className="space-y-4">
+          <div className="space-y-5">
             {features.map((feature, i) => (
-              <div key={i} className="grid grid-cols-[1.5fr,1fr,1fr] gap-2 items-center text-center">
-                <div className="flex items-center gap-2 text-sm font-medium text-left">
-                  <span className="text-lg">{feature.icon}</span>
-                  <span className="text-zinc-200 text-xs">{feature.name}</span>
+              <div key={i} className="grid grid-cols-[1.5fr,1fr,1fr] gap-4 items-center text-center group">
+                <div className="flex items-center gap-3 text-sm font-bold text-left">
+                  <span className="text-lg opacity-80 group-hover:opacity-100 transition-opacity">{feature.icon}</span>
+                  <span className="text-white text-xs leading-tight">{feature.name}</span>
                 </div>
                 <div className="flex justify-center">
                   {feature.free ? (
-                    <Check className="w-4 h-4 text-green-500" />
+                    <Check className="w-4 h-4 text-zinc-600" />
                   ) : (
-                    <X className="w-4 h-4 text-red-500/50" />
+                    <X className="w-4 h-4 text-red-500/30" />
                   )}
                 </div>
                 <div className="flex justify-center">
                   {feature.pro ? (
                     <Check className="w-4 h-4 text-blue-500" />
                   ) : (
-                    <X className="w-4 h-4 text-red-500/50" />
+                    <X className="w-4 h-4 text-red-500/30" />
                   )}
                 </div>
               </div>
@@ -209,7 +205,7 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
         </div>
 
         {/* Plans Selection */}
-        <div className="grid grid-cols-3 gap-2 mb-4">
+        <div className="grid grid-cols-3 gap-3 mb-6">
           {(['weekly', 'monthly', 'yearly'] as PlanType[]).map((key) => {
             const plan = PLAN_CONFIG.PLANS[key];
             const isSelected = selectedPlan === key;
@@ -219,23 +215,32 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
                 key={key}
                 onClick={() => setSelectedPlan(key)}
                 className={`
-                  relative rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer border-2 transition-all
+                  relative rounded-2xl p-4 flex flex-col items-center justify-center cursor-pointer border transition-all duration-300
                   ${isSelected 
-                    ? 'bg-zinc-800 border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]' 
-                    : 'bg-zinc-900/50 border-transparent hover:bg-zinc-800/80'}
+                    ? 'bg-zinc-900 border-blue-500 ring-1 ring-blue-500/50 shadow-[0_0_20px_rgba(37,99,235,0.3)]' 
+                    : 'bg-zinc-900/50 border-zinc-800 hover:bg-zinc-800 hover:border-zinc-700'}
                 `}
               >
+                {key === 'yearly' && (
+                  <div className="absolute -top-2.5 right-1/2 translate-x-1/2 bg-blue-500 text-white text-[8px] font-bold px-2 py-0.5 rounded-full z-10 uppercase tracking-wider shadow-lg">
+                    Economize 20%
+                  </div>
+                )}
+                
                 {isSelected && (
-                  <div className="absolute -top-2 -right-2 bg-blue-500 rounded-full p-0.5">
+                  <div className="absolute -top-2 -right-2 bg-blue-500 rounded-full p-1 shadow-lg shadow-blue-500/50">
                     <Check className="w-3 h-3 text-white" />
                   </div>
                 )}
                 
-                <span className="text-xs text-zinc-400 mb-1 font-medium">{plan.title}</span>
-                <span className="text-sm font-bold text-white mb-0.5">
-                  R$ {Math.floor(plan.price)},<span className="text-xs">{plan.price.toFixed(2).split('.')[1]}</span>
+                <span className={`text-[10px] uppercase tracking-wider mb-2 font-bold ${isSelected ? 'text-blue-400' : 'text-zinc-500'}`}>
+                  {plan.title}
                 </span>
-                <span className="text-[9px] text-zinc-500 leading-tight text-center px-1">
+                <div className="flex items-end gap-0.5 mb-1">
+                  <span className="text-lg font-bold text-white">R$ {Math.floor(plan.price)}</span>
+                  <span className="text-xs font-bold text-white/80 mb-1">,{plan.price.toFixed(2).split('.')[1]}</span>
+                </div>
+                <span className="text-[9px] text-zinc-500 font-medium">
                   {key === 'weekly' ? 'semana' : key === 'monthly' ? 'mês' : 'ano'}
                 </span>
               </div>
@@ -247,7 +252,7 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
         <Button 
           onClick={handleSubscribe}
           disabled={!!loading}
-          className="w-full bg-blue-500 hover:bg-blue-500/90 text-white rounded-xl py-6 text-lg font-bold shadow-lg shadow-blue-500/20 mb-4"
+          className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-2xl py-7 text-base font-bold shadow-xl shadow-blue-600/20 mb-6 uppercase tracking-wide transition-all active:scale-[0.98]"
         >
           {loading ? 'Processando...' : 'Atualizar para Pro'}
         </Button>

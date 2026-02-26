@@ -1,13 +1,14 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
-import { initMercadoPago, CardPayment } from '@mercadopago/sdk-react';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { Loader2, Copy, Check, CreditCard, QrCode, ShieldCheck } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { Payment, CardPayment, initMercadoPago } from '@mercadopago/sdk-react';
+import { Loader2, QrCode, Check, Copy, AlertTriangle, LifeBuoy, RefreshCw, ChevronLeft, CreditCard, Lock, ShieldCheck, Info } from 'lucide-react';
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useAuth } from "@/hooks/useAuth";
+import { logger } from "@/lib/logger";
 
 interface CheckoutPremiumProps {
   plan: 'weekly' | 'monthly' | 'yearly';
@@ -15,10 +16,6 @@ interface CheckoutPremiumProps {
   onSuccess: (email: string) => void;
   onCancel: () => void;
 }
-
-import { useAuth } from "@/hooks/useAuth";
-
-import { AlertTriangle, LifeBuoy, RefreshCw } from 'lucide-react';
 
 export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPremiumProps) => {
   const { refreshSession } = useAuth(); 
@@ -47,187 +44,168 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
 
   const [initialEmail, setInitialEmail] = useState('');
 
-  const initialization = useMemo(() => ({ amount: price }), [price]);
+  // Use a stable reference for initialization to prevent re-renders
+  // We ignore changes to email/price after mount to avoid resetting the form
+  const initialization = useMemo(() => ({ 
+    amount: price,
+    payer: {
+      email: 'customer@email.com', // Placeholder, real email is sent on submit
+      entity_type: 'individual',
+    }
+  }), []); // Empty dependency array = STABLE
+
   const customization = useMemo(() => ({
     paymentMethods: {
       maxInstallments: 12,
+      ticket: [],
+      bankTransfer: [],
+      atm: [],
+      creditCard: "all",
+      debitCard: [], // Remove debit card to skip selection
     },
     visual: {
-      style: {
-        theme: 'default',
-      } as const,
-      hidePaymentButton: false, 
+        style: {
+            theme: 'dark', 
+        },
+        hidePaymentButton: false,
     },
   }), []);
 
   useEffect(() => {
-    const publicKey = import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY;
-    if (publicKey) {
-      initMercadoPago(publicKey, { locale: 'pt-BR' });
-      setReady(true);
-    } else {
-      toast.error("Erro de configuração: Chave pública do Mercado Pago não encontrada.");
-    }
+    initMercadoPago(import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY || 'TEST-539d056c-2673-4566-a401-4475f82245c7', {
+        locale: 'pt-BR'
+    });
+  }, []);
 
-    const loadUser = async () => {
+  useEffect(() => {
+    const fetchUser = async () => {
       try {
-        // Timeout promise
-        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000));
-        const userPromise = supabase.auth.getUser();
-        
-        const { data: { user }, error } = await Promise.race([userPromise, timeout]) as any;
-
-        // If error is related to refresh token (AuthSessionMissingError or similar), we should ignore and treat as guest
-        if (error) {
-            console.warn("User load warning:", error.message);
-            // Proceed as guest, do not throw
-        }
-        
-        if (user?.email) {
-          setEmail(user.email);
-          setInitialEmail(user.email); 
-          const meta = user.user_metadata;
-          if (meta?.full_name) {
-            const parts = meta.full_name.split(' ');
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setEmail(user.email || '');
+          setInitialEmail(user.email || '');
+          
+          if (user.user_metadata?.full_name) {
+            const parts = user.user_metadata.full_name.split(' ');
             setFirstName(parts[0]);
             setLastName(parts.slice(1).join(' '));
           }
         }
       } catch (e) {
-        console.error("Error loading user:", e);
-        // Even on error, we should let the user try to checkout manually
+        console.error("Error fetching user", e);
       } finally {
         setLoadingUser(false);
         setReady(true);
       }
     };
-    loadUser();
+    fetchUser();
   }, []);
 
-  // Poll for payment approval (Realtime or Polling)
+  // Intelligent Polling with Backoff
+  const checkStatus = async () => {
+      // 1. Check RPC (if payment ID exists)
+      if (currentPaymentId || pixData?.payment_id) {
+           const payId = currentPaymentId || pixData?.payment_id;
+           logger.log("[Checkout]", "Checking payment status via RPC:", payId);
+           
+           try {
+              const { data: rpcData, error: rpcError } = await supabase.rpc('check_payment_status', { 
+                  payment_id_input: payId 
+              });
+
+              if (rpcData && rpcData.success) {
+                  logger.log("[Checkout]", "RPC Approved. Forcing session refresh...", rpcData);
+                  toast.success("Pagamento confirmado! Acesso liberado.");
+                  setVerifying(false);
+                  
+                  // 1. Force Refresh Session & Profile
+                  await refreshSession();
+                  
+                  // 2. Double check profile state after refresh (Optional, for logging)
+                  const { data: { user: updatedUser } } = await supabase.auth.getUser();
+                  if (updatedUser) {
+                      const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', updatedUser.id).single();
+                      logger.log("[Checkout]", "Final Profile State:", {
+                          is_premium: updatedProfile?.is_premium,
+                          status: updatedProfile?.subscription_status,
+                          plan: updatedProfile?.plan_type,
+                          expires: updatedProfile?.subscription_expires_at
+                      });
+                  }
+
+                  onSuccess(email);
+                  return true; // Stop polling
+              } else if (rpcData?.error && rpcData?.error.includes("Rate limit")) {
+                  logger.log("[Checkout]", "Rate limit hit, skipping cycle");
+              }
+           } catch (err) {
+               logger.error("[Checkout]", "Polling Error:", err);
+           }
+      }
+
+      // 2. Profile Polling (Backup)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+
+      const { data } = await supabase
+          .from('profiles')
+          .select('subscription_status, is_premium, payment_status')
+          .eq('id', user.id)
+          .maybeSingle();
+      
+      if (data?.subscription_status === 'active' || data?.is_premium) {
+          logger.log("[Checkout]", "Profile Polling found active status!");
+          toast.success("Pagamento confirmado! Acesso liberado.");
+          setVerifying(false);
+          await refreshSession(); // Ensure global state is synced
+          onSuccess(email);
+          return true;
+      }
+      return false;
+  };
+
+  if (pixData?.user_id || verifying) {
+      logger.log("[Checkout]", "Starting intelligent polling...");
+      if (!pollingStartTime) setPollingStartTime(Date.now());
+
+      let attempts = 0;
+      
+      const runPoll = async () => {
+          attempts++;
+          const done = await checkStatus();
+          if (done) return;
+
+          // Timeout Logic (60s)
+          const elapsed = Date.now() - (pollingStartTime || Date.now());
+          if (elapsed > 60000) {
+              setShowTimeoutFallback(true);
+              // Don't stop polling completely, just slow down significantly to 10s
+              // But UI changes to show fallback
+          }
+
+          // Backoff Strategy
+          let nextDelay = 3000; // Default 3s
+          if (attempts > 20) nextDelay = 5000; // After 1 min (20 * 3s), slow to 5s
+          
+          // Hard stop after 5 minutes of total failure
+          if (attempts > 100) { 
+              setVerifying(false);
+              toast.error("O tempo limite excedeu. Verifique se o pagamento foi debitado.");
+              return;
+          }
+
+          if (verifying || pixData?.user_id) {
+              setTimeout(runPoll, nextDelay);
+          }
+      };
+
+      runPoll();
+  }
+
+  // Effect to handle cleanup
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    let subscription: any;
-
-    const targetUserId = pixData?.user_id || (verifying && email ? (async () => {
-        // We need user ID to subscribe. If verifying card payment, we might need to fetch it or rely on polling by query?
-        // Actually, we can just poll 'profiles' if we have the ID.
-        // But we might not have the ID if we are guest?
-        // Wait, handleCardSubmit uses 'email' to identify user.
-        // If we are verifying, we should try to find the user.
-        return null; 
-    })() : null);
-
-    // If we have a user ID (from PIX or logged in), we can listen
-    // If not logged in, we rely on email... but we can't poll by email easily (RLS).
-    // But if the user is making a payment, they are likely logged in OR we have their session.
-    
-    // Let's simplify: Only poll if we have a way to identify the user.
-    // If the user is logged in, supabase.auth.getUser() gave us the user.
-    // We can use that ID.
-    
-    // Intelligent Polling with Backoff
-    const checkStatus = async () => {
-        // 1. Check RPC (if payment ID exists)
-        if (currentPaymentId || pixData?.payment_id) {
-             const payId = currentPaymentId || pixData?.payment_id;
-             console.log("Checking payment status via RPC:", payId);
-             
-             try {
-                const { data: rpcData, error: rpcError } = await supabase.rpc('check_payment_status', { 
-                    payment_id_input: payId 
-                });
-
-                if (rpcData && rpcData.success) {
-                    console.log("[Checkout] RPC Approved. Forcing session refresh...", rpcData);
-                    toast.success("Pagamento confirmado! Acesso liberado.");
-                    setVerifying(false);
-                    
-                    // 1. Force Refresh Session & Profile
-                    await refreshSession();
-                    
-                    // 2. Double check profile state after refresh (Optional, for logging)
-                    const { data: { user: updatedUser } } = await supabase.auth.getUser();
-                    if (updatedUser) {
-                        const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', updatedUser.id).single();
-                        console.log("[Checkout] Final Profile State:", {
-                            is_premium: updatedProfile?.is_premium,
-                            status: updatedProfile?.subscription_status,
-                            plan: updatedProfile?.plan_type,
-                            expires: updatedProfile?.subscription_expires_at
-                        });
-                    }
-
-                    onSuccess(email);
-                    return true; // Stop polling
-                } else if (rpcData?.error && rpcData?.error.includes("Rate limit")) {
-                    console.log("Rate limit hit, skipping cycle");
-                }
-             } catch (err) {
-                 console.error("Polling Error:", err);
-             }
-        }
-
-        // 2. Profile Polling (Backup)
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return false;
-
-        const { data } = await supabase
-            .from('profiles')
-            .select('subscription_status, is_premium, payment_status')
-            .eq('id', user.id)
-            .maybeSingle();
-        
-        if (data?.subscription_status === 'active' || data?.is_premium) {
-            toast.success("Pagamento confirmado! Acesso liberado.");
-            setVerifying(false);
-            onSuccess(email);
-            return true;
-        }
-        return false;
-    };
-
-    if (pixData?.user_id || verifying) {
-        console.log("Starting intelligent polling...");
-        if (!pollingStartTime) setPollingStartTime(Date.now());
-
-        let attempts = 0;
-        
-        const runPoll = async () => {
-            attempts++;
-            const done = await checkStatus();
-            if (done) return;
-
-            // Timeout Logic (60s)
-            const elapsed = Date.now() - (pollingStartTime || Date.now());
-            if (elapsed > 60000) {
-                setShowTimeoutFallback(true);
-                // Don't stop polling completely, just slow down significantly to 10s
-                // But UI changes to show fallback
-            }
-
-            // Backoff Strategy
-            let nextDelay = 3000; // Default 3s
-            if (attempts > 20) nextDelay = 5000; // After 1 min (20 * 3s), slow to 5s
-            
-            // Hard stop after 5 minutes of total failure
-            if (attempts > 100) { 
-                setVerifying(false);
-                toast.error("O tempo limite excedeu. Verifique se o pagamento foi debitado.");
-                return;
-            }
-
-            if (verifying || pixData?.user_id) {
-                interval = setTimeout(runPoll, nextDelay);
-            }
-        };
-
-        runPoll();
-    }
-
     return () => {
-        if (interval) clearTimeout(interval);
-        if (subscription) supabase.removeChannel(subscription);
+        // Cleanup if needed
     };
   }, [pixData, verifying, onSuccess, email, currentPaymentId]);
 
@@ -244,7 +222,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
             const { data: rpcData } = await supabase.rpc('check_payment_status', { payment_id_input: payId });
             
             if (rpcData && rpcData.success) {
-                console.log("[Checkout] Manual Check Approved.");
+                logger.log("[Checkout]", "Manual Check Approved.");
                 toast.success("Confirmado!");
                 setVerifying(false);
                 await refreshSession();
@@ -259,7 +237,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                  return;
             }
           } catch (err) {
-              console.error("Manual Check Error:", err);
+              logger.error("[Checkout]", "Manual Check Error:", err);
           }
       }
       
@@ -268,7 +246,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
       if (user) {
           const { data } = await supabase.from('profiles').select('subscription_status, is_premium').eq('id', user.id).maybeSingle();
           if (data?.subscription_status === 'active' || data?.is_premium) {
-              console.log("[Checkout] Manual Profile Check Approved.");
+              logger.log("[Checkout]", "Manual Profile Check Approved.");
               toast.success("Confirmado!");
               setVerifying(false);
               await refreshSession();
@@ -280,109 +258,89 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
   };
 
   const handleCardSubmit = async (formData: any) => {
-    setLoading(true);
-    setVerifying(false);
-    try {
-      const { token, issuer_id, payment_method_id, installments, payer } = formData;
-
-      // Timeout for Edge Function (15s)
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout')), 15000)
-      );
-
-      const functionPromise = supabase.functions.invoke('create-payment', {
-        body: {
-          token,
-          issuer_id,
-          payment_method_id,
-          installments,
-          payer: {
-            email: payer.email || email,
-            identification: payer.identification || { type: 'CPF', number: cpf },
-            first_name: firstName,
-            last_name: lastName
-          },
-          plan_id: plan
-        }
-      });
-
-      const result: any = await Promise.race([functionPromise, timeoutPromise]);
-      const { data, error } = result;
-
-      if (error) throw new Error(error.message || 'Erro ao processar pagamento.');
-      if (data?.error) throw new Error(data.error);
-
-      // Track Payment ID for polling
-      if (data?.payment_id) {
-          setCurrentPaymentId(data.payment_id.toString());
-          setPollingStartTime(Date.now());
-      }
-
-      if (data?.status === 'approved') {
-        toast.success("Pagamento aprovado!");
-        onSuccess(email);
-      } else if (data?.status === 'in_process' || data?.status === 'pending') {
-        toast.info("Pagamento em processamento. Aguarde a confirmação.");
-        setVerifying(true); // Start polling
-        setPollingStartTime(Date.now());
-      } else {
-        toast.error(`Pagamento não aprovado. Status: ${data?.status}`);
-      }
-
-    } catch (err: any) {
-      console.error('Payment error:', err);
-      // If timeout or 500, we switch to verification mode because payment might have been sent
-      if (err.message === 'Timeout' || err.message?.includes('500') || err.message?.includes('network')) {
-          toast.warning("A resposta do servidor demorou, mas seu pagamento pode ter sido processado. Verificando...");
-          setVerifying(true);
-      } else {
-          toast.error(err.message || "Ocorreu um erro ao processar o pagamento.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePixSubmit = async () => {
-    if (!email || !firstName || !lastName || !cpf) {
-        toast.error("Por favor, preencha todos os campos.");
-        return;
-    }
-
+    // Mercado Pago Brick handles card tokenization internally
+    // We just need to send the data to our backend
     setLoading(true);
     try {
+        const { data: { session } } = await supabase.auth.getSession();
         const { data, error } = await supabase.functions.invoke('create-payment', {
             body: {
-                payment_method_id: 'pix',
-                payer: {
-                    email,
-                    identification: { type: 'CPF', number: cpf.replace(/\D/g, '') },
-                    first_name: firstName,
-                    last_name: lastName
-                },
-                plan_id: plan
+                paymentMethodId: 'card', // Generic for Brick
+                email: email, // Use the state email, not the one from Brick (which might be hidden/initial)
+                amount: price,
+                token: formData.token,
+                issuer_id: formData.issuer_id,
+                payment_method_id: formData.payment_method_id,
+                transaction_amount: formData.transaction_amount,
+                installments: formData.installments,
+                payer: formData.payer,
+                plan: plan
             }
         });
 
-        if (error) throw new Error(error.message);
-        if (data?.error) throw new Error(data.error);
-
-        if (data.qr_code && data.qr_code_base64) {
-            setPixData({
-                qr_code: data.qr_code,
-                qr_code_base64: data.qr_code_base64,
-                ticket_url: data.ticket_url,
-                user_id: data.user_id,
-                payment_id: data.payment_id // Ensure backend returns this
-            });
-            toast.success("QR Code gerado! Realize o pagamento.");
-        } else {
-            throw new Error("Erro ao gerar QR Code PIX.");
+        if (error) throw error;
+        
+        // Track Payment ID for polling
+        if (data?.payment_id) {
+            setCurrentPaymentId(data.payment_id.toString());
+            setPollingStartTime(Date.now());
         }
 
-    } catch (err: any) {
-        console.error('PIX Error:', err);
-        toast.error(err.message || "Erro ao gerar PIX.");
+        if (data.status === 'approved') {
+            toast.success("Pagamento aprovado!");
+            await refreshSession();
+            onSuccess(email);
+        } else if (data.status === 'in_process') {
+            toast.info("Pagamento em processamento. Aguarde...");
+            setVerifying(true);
+        } else {
+            toast.error("Pagamento recusado. Verifique os dados.");
+        }
+
+    } catch (e: any) {
+        console.error(e);
+        toast.error(e.message || "Erro ao processar pagamento.");
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  const handlePix = async () => {
+    setLoading(true);
+    try {
+        // Validate inputs
+        if (!email || !firstName || !lastName || !cpf) {
+            toast.error("Preencha todos os dados para gerar o PIX.");
+            setLoading(false);
+            return;
+        }
+
+        const { data, error } = await supabase.functions.invoke('create-payment', {
+            body: {
+                paymentMethodId: 'pix',
+                email,
+                firstName,
+                lastName,
+                cpf,
+                amount: price,
+                plan: plan
+            }
+        });
+
+        if (error) throw error;
+        if (data.error) throw new Error(data.error);
+
+        setPixData(data);
+        
+        // Track Payment ID for polling
+        if (data?.payment_id) {
+            setCurrentPaymentId(data.payment_id.toString());
+            setPollingStartTime(Date.now());
+        }
+
+    } catch (e: any) {
+        console.error(e);
+        toast.error(e.message || "Erro ao gerar PIX.");
     } finally {
         setLoading(false);
     }
@@ -390,221 +348,326 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
 
   const copyToClipboard = () => {
     if (pixData?.qr_code) {
-        navigator.clipboard.writeText(pixData.qr_code);
-        setCopied(true);
-        toast.success("Código PIX copiado!");
-        setTimeout(() => setCopied(false), 2000);
+      navigator.clipboard.writeText(pixData.qr_code);
+      setCopied(true);
+      toast.success("Código PIX copiado!");
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  if (loadingUser || !ready) {
-    return <div className="text-center p-8"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /></div>;
-  }
-
-  if (verifying) {
+  if (loadingUser) {
     return (
-      <div className="w-full max-w-md mx-auto p-8 bg-white rounded-xl shadow-lg border border-gray-100 text-center space-y-6">
-        <div className="flex justify-center mb-4">
-            <div className="bg-blue-100 p-4 rounded-full animate-pulse">
-                <ShieldCheck className="h-10 w-10 text-blue-600" />
-            </div>
-        </div>
-        <h2 className="text-2xl font-bold text-gray-900">Verificando pagamento...</h2>
-        <p className="text-gray-500">Isso pode levar até 1 minuto. Por favor, não feche esta janela.</p>
-        
-        <div className="flex items-center justify-center gap-2 text-sm text-blue-600 bg-blue-50 p-4 rounded-lg">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span>Consultando status no servidor...</span>
-        </div>
-
-        <Button onClick={manualCheck} variant="outline" className="w-full mt-4">
-            Já realizei o pagamento (Recarregar)
-        </Button>
-
-        <p className="text-xs text-gray-400">Se você já recebeu a confirmação do banco, o acesso será liberado em instantes.</p>
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
-  // If PIX generated, show QR Code Screen
+  // --- RENDER PIX SCREEN ---
   if (pixData) {
       return (
-          <div className="w-full max-w-md mx-auto p-6 bg-white rounded-xl shadow-lg border border-gray-100 text-center space-y-6">
-              <div className="flex justify-center mb-4">
-                  <div className="bg-green-100 p-3 rounded-full">
-                      <QrCode className="h-8 w-8 text-green-600" />
+          <div className="flex flex-col h-full bg-background-light dark:bg-background-dark text-foreground">
+              {/* Header */}
+              <div className="px-6 pt-4 pb-2 flex items-center justify-between">
+                <button onClick={onCancel} className="p-2 -ml-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                <h1 className="text-lg font-bold text-gray-900 dark:text-white uppercase font-display tracking-tight">Pagamento PIX</h1>
+                <div className="w-10"></div>
+              </div>
+
+              {/* Progress Steps */}
+              <div className="px-8 mb-8">
+                <div className="flex items-center justify-between relative">
+                  <div className="flex flex-col items-center z-10">
+                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white mb-1 shadow-lg shadow-primary/30">
+                      <Check className="w-4 h-4" />
+                    </div>
+                    <span className="text-[10px] font-medium text-gray-500 uppercase tracking-widest">Análise</span>
                   </div>
-              </div>
-              
-              <h2 className="text-xl font-bold text-gray-900">Pagamento via PIX</h2>
-              <p className="text-sm text-gray-500">Escaneie o QR Code ou copie o código abaixo para pagar.</p>
-              
-              <div className="flex justify-center p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <img 
-                    src={`data:image/png;base64,${pixData.qr_code_base64}`} 
-                    alt="QR Code PIX" 
-                    className="w-48 h-48 object-contain"
-                  />
-              </div>
-
-              <div className="space-y-2">
-                  <Label className="text-xs uppercase text-gray-400 font-semibold tracking-wider">Código PIX Copia e Cola</Label>
-                  <div className="flex gap-2">
-                      <Input 
-                        value={pixData.qr_code} 
-                        readOnly 
-                        className="text-xs bg-gray-50 font-mono h-10" 
-                        onFocus={(e) => e.target.select()}
-                      />
-                      <Button size="icon" variant="outline" onClick={copyToClipboard} className="h-10 w-10 shrink-0">
-                          {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                      </Button>
+                  <div className="step-line h-[2px] flex-grow mx-2 bg-primary"></div>
+                  <div className="flex flex-col items-center z-10">
+                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white mb-1 shadow-lg shadow-primary/30">
+                       <Check className="w-4 h-4" />
+                    </div>
+                    <span className="text-[10px] font-medium text-gray-500 uppercase tracking-widest">Plano</span>
                   </div>
+                  <div className="step-line h-[2px] flex-grow mx-2 bg-primary"></div>
+                  <div className="flex flex-col items-center z-10">
+                     <div className="w-8 h-8 rounded-full border-2 border-primary flex items-center justify-center text-primary bg-background-light dark:bg-background-dark mb-1 shadow-lg shadow-primary/20">
+                      <div className="w-2 h-2 rounded-full bg-primary"></div>
+                    </div>
+                    <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Pagamento</span>
+                  </div>
+                </div>
               </div>
 
-              <div className="flex items-center justify-center gap-2 text-sm text-blue-600 bg-blue-50 p-3 rounded-lg animate-pulse">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Aguardando confirmação automática...</span>
-              </div>
+              <div className="flex-1 overflow-y-auto px-6 pb-32">
+                  {showTimeoutFallback ? (
+                        <div className="w-full p-6 bg-white dark:bg-slate-card rounded-2xl shadow-lg border border-yellow-200/50 text-center space-y-4 animate-fade-in">
+                            <div className="flex justify-center">
+                                <div className="bg-yellow-500/10 p-3 rounded-full">
+                                    <AlertTriangle className="h-8 w-8 text-yellow-600" />
+                                </div>
+                            </div>
+                            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Confirmação demorando...</h2>
+                            <p className="text-gray-500 dark:text-gray-400 text-xs">
+                                A confirmação do pagamento está demorando um pouco mais que o normal.
+                            </p>
+                            
+                            <div className="space-y-2 pt-2">
+                                <Button onClick={manualCheck} className="w-full bg-primary hover:bg-blue-700 text-white h-10 text-sm">
+                                    <RefreshCw className="mr-2 h-3 w-3" /> Tentar Novamente
+                                </Button>
+                                <Button variant="outline" className="w-full h-10 text-sm border-gray-200 dark:border-gray-700" asChild>
+                                    <a href="mailto:suporte@maximare.com.br" target="_blank" rel="noopener noreferrer">
+                                        <LifeBuoy className="mr-2 h-3 w-3" /> Falar com Suporte
+                                    </a>
+                                </Button>
+                            </div>
+                        </div>
+                  ) : (
+                      <div className="space-y-6">
+                          <div className="bg-white dark:bg-slate-card rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col items-center text-center">
+                              <div className="bg-white p-2 rounded-xl shadow-sm mb-4">
+                                  <img 
+                                    src={`data:image/jpeg;base64,${pixData.qr_code_base64}`} 
+                                    alt="QR Code PIX" 
+                                    className="w-48 h-48 object-contain"
+                                  />
+                              </div>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Escaneie o QR Code com seu app de banco</p>
+                          </div>
 
-              <Button variant="ghost" onClick={onCancel} className="text-gray-400 hover:text-gray-600">
-                  Cancelar
-              </Button>
+                          <div className="space-y-2">
+                              <Label className="text-xs uppercase text-gray-400 font-bold tracking-wider pl-1">Código PIX Copia e Cola</Label>
+                              <div className="flex gap-2">
+                                  <Input 
+                                    value={pixData.qr_code} 
+                                    readOnly 
+                                    className="text-xs bg-gray-50 dark:bg-graphite font-mono h-12 border-gray-200 dark:border-gray-800" 
+                                    onFocus={(e) => e.target.select()}
+                                  />
+                                  <Button size="icon" variant="outline" onClick={copyToClipboard} className="h-12 w-12 shrink-0 border-gray-200 dark:border-gray-800 bg-white dark:bg-slate-card">
+                                      {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                                  </Button>
+                              </div>
+                          </div>
+
+                          <div className="flex items-center justify-center gap-2 text-xs text-primary bg-primary/10 p-3 rounded-lg animate-pulse">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              <span>Aguardando confirmação automática...</span>
+                          </div>
+                          
+                          <Button onClick={manualCheck} variant="ghost" className="w-full text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                              Já realizei o pagamento
+                          </Button>
+                      </div>
+                  )}
+              </div>
           </div>
       );
   }
 
+  // --- RENDER MAIN CHECKOUT SCREEN ---
   return (
-    <div className="w-full max-w-md mx-auto p-4 bg-white rounded-xl shadow-lg border border-gray-100">
-      <div className="mb-6 text-center">
-        <h2 className="text-xl font-bold text-gray-900">Checkout Seguro</h2>
-        <div className="flex items-center justify-center gap-2 text-sm text-green-600 mt-1">
-            <ShieldCheck className="h-4 w-4" />
-            <span>Ambiente Criptografado</span>
-        </div>
-        <p className="text-sm text-gray-500 mt-2">Plano {plan === 'weekly' ? 'Semanal' : plan === 'monthly' ? 'Mensal' : 'Anual'} - R$ {price.toFixed(2)}</p>
+    <div className="flex flex-col h-full bg-background-light dark:bg-background-dark text-foreground">
+      
+      {/* Header */}
+      <div className="px-6 pt-4 pb-2 flex items-center justify-between">
+        <button onClick={onCancel} className="p-2 -ml-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+          <ChevronLeft className="w-6 h-6" />
+        </button>
+        <h1 className="text-lg font-bold text-gray-900 dark:text-white uppercase font-display tracking-tight">Pagamento</h1>
+        <button className="p-2 -mr-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+          <Info className="w-6 h-6" />
+        </button>
       </div>
 
-      <Tabs defaultValue="card" onValueChange={(v) => setPaymentMethod(v as 'card' | 'pix')} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-6">
-          <TabsTrigger value="card" className="flex items-center gap-2">
-            <CreditCard className="h-4 w-4" /> Cartão
-          </TabsTrigger>
-          <TabsTrigger value="pix" className="flex items-center gap-2">
-            <QrCode className="h-4 w-4" /> PIX
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Common Personal Info Fields (Needed for both, but Card Brick handles its own sometimes) */}
-        {/* Actually, for Transparent Checkout, we usually need to send Payer info to MP for fraud prevention */}
-        <div className="space-y-4 mb-6">
-             <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label htmlFor="firstName">Nome</Label>
-                    <Input 
-                        id="firstName" 
-                        value={firstName} 
-                        onChange={(e) => setFirstName(e.target.value)} 
-                        placeholder="Seu nome"
-                    />
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="lastName">Sobrenome</Label>
-                    <Input 
-                        id="lastName" 
-                        value={lastName} 
-                        onChange={(e) => setLastName(e.target.value)} 
-                        placeholder="Sobrenome"
-                    />
-                </div>
+      {/* Progress Steps */}
+      <div className="px-8 mb-6">
+        <div className="flex items-center justify-between relative">
+          <div className="flex flex-col items-center z-10">
+            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white mb-1 shadow-lg shadow-primary/30">
+              <Check className="w-4 h-4" />
             </div>
-            <div className="space-y-2">
-                <Label htmlFor="email">E-mail</Label>
-                <Input 
-                    id="email" 
-                    type="email" 
-                    value={email} 
-                    onChange={(e) => setEmail(e.target.value)} 
-                    placeholder="seu@email.com"
-                />
-            </div>
-             <div className="space-y-2">
-                <Label htmlFor="cpf">CPF (apenas números)</Label>
-                <Input 
-                    id="cpf" 
-                    value={cpf} 
-                    onChange={(e) => setCpf(e.target.value)} 
-                    placeholder="000.000.000-00"
-                    maxLength={14}
-                />
-            </div>
-        </div>
-
-        <TabsContent value="card" className="mt-0">
-          <div className="payment-brick-container min-h-[300px]">
-            {ready && (
-            <CardPayment
-              key={remountKey}
-              initialization={initialization}
-              customization={customization}
-              onReady={(controller) => {
-                cardPaymentBrickController.current = controller;
-              }}
-              onSubmit={async (formData) => {
-                // Mercado Pago Brick returns formData directly with token, etc.
-                await handleCardSubmit(formData);
-              }}
-              onError={(error) => {
-                 console.error("MP Brick Error:", error);
-                 // Only show toast for critical errors, ignore trivial ones during setup
-                 if (error?.type === 'critical') {
-                    // toast.error("Erro no formulário de pagamento. Tente recarregar.");
-                    console.log("Ignored critical error during init (common with empty email)");
-                    // Force remount to recover from critical error
-                    setRemountKey(prev => prev + 1);
-                 }
-              }}
-            />
-            )}
+            <span className="text-[10px] font-medium text-gray-500 uppercase tracking-widest">Análise</span>
           </div>
-        </TabsContent>
-
-        <TabsContent value="pix" className="mt-0 space-y-4">
-            <Alert className="bg-green-50 border-green-200">
-                <QrCode className="h-4 w-4 text-green-600" />
-                <AlertTitle className="text-green-800">Pagamento Instantâneo</AlertTitle>
-                <AlertDescription className="text-green-700 text-xs">
-                    Liberação imediata após o pagamento.
-                </AlertDescription>
-            </Alert>
-            
-            <Button 
-                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-6"
-                onClick={handlePixSubmit}
-                disabled={loading}
-            >
-                {loading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <QrCode className="h-5 w-5 mr-2" />}
-                {loading ? "Gerando PIX..." : "Gerar Código PIX"}
-            </Button>
-        </TabsContent>
-      </Tabs>
-      
-      {!pixData && (
-        <div className="mt-4 text-center">
-            <Button variant="ghost" onClick={onCancel} disabled={loading} className="text-sm">
-                Cancelar
-            </Button>
+          <div className="step-line h-[2px] flex-grow mx-2 bg-primary"></div>
+          <div className="flex flex-col items-center z-10">
+            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white mb-1 shadow-lg shadow-primary/30">
+               <Check className="w-4 h-4" />
+            </div>
+            <span className="text-[10px] font-medium text-gray-500 uppercase tracking-widest">Plano</span>
+          </div>
+          <div className="step-line h-[2px] flex-grow mx-2 bg-primary"></div>
+          <div className="flex flex-col items-center z-10">
+             <div className="w-8 h-8 rounded-full border-2 border-primary flex items-center justify-center text-primary bg-background-light dark:bg-background-dark mb-1 shadow-lg shadow-primary/20">
+              <div className="w-2 h-2 rounded-full bg-primary"></div>
+            </div>
+            <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Pagamento</span>
+          </div>
         </div>
-      )}
-      
-      {loading && !pixData && (
-        <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-50 rounded-xl">
-            <div className="text-center">
-                <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-2" />
-                <p className="text-sm font-medium">Processando...</p>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-6 pb-32">
+        
+        {/* Security Badge */}
+        <div className="mb-8">
+            <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-3 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                    <ShieldCheck className="text-primary h-5 w-5" />
+                </div>
+                <div>
+                    <p className="text-[11px] uppercase tracking-widest text-blue-500 font-bold">Criptografia Segura</p>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400">Proteção de dados AES-256 Bit</p>
+                </div>
             </div>
         </div>
-      )}
+
+        {/* Method Selection - Cards Style */}
+        <div className="space-y-4 mb-8">
+            <p className="text-[12px] uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 font-semibold px-1">Método de Pagamento</p>
+            
+            <div className="grid grid-cols-1 gap-3">
+                <button 
+                    onClick={() => setPaymentMethod('card')}
+                    className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${
+                        paymentMethod === 'card' 
+                        ? 'bg-white dark:bg-slate-card border-blue-500 shadow-lg shadow-blue-500/20' 
+                        : 'bg-white dark:bg-slate-card border-transparent hover:border-gray-200 dark:hover:border-gray-700'
+                    }`}
+                >
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 flex items-center justify-center bg-gray-900 dark:bg-black rounded-xl text-white">
+                            <CreditCard className="w-6 h-6" />
+                        </div>
+                        <div className="text-left">
+                            <p className="font-bold text-sm text-gray-900 dark:text-white">Cartão de Crédito</p>
+                            <p className="text-[10px] text-gray-500">Aprovação imediata</p>
+                        </div>
+                    </div>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        paymentMethod === 'card' ? 'border-blue-500 bg-blue-500' : 'border-gray-300 dark:border-gray-600'
+                    }`}>
+                        {paymentMethod === 'card' && <div className="w-2 h-2 rounded-full bg-white" />}
+                    </div>
+                </button>
+
+                <button 
+                    onClick={() => setPaymentMethod('pix')}
+                    className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${
+                        paymentMethod === 'pix' 
+                        ? 'bg-white dark:bg-slate-card border-blue-500 shadow-lg shadow-blue-500/20' 
+                        : 'bg-white dark:bg-slate-card border-transparent hover:border-gray-200 dark:hover:border-gray-700'
+                    }`}
+                >
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 flex items-center justify-center bg-gray-900 dark:bg-black rounded-xl text-white">
+                            <QrCode className="w-6 h-6" />
+                        </div>
+                        <div className="text-left">
+                            <p className="font-bold text-sm text-gray-900 dark:text-white">PIX</p>
+                            <p className="text-[10px] text-gray-500">Instantâneo e seguro</p>
+                        </div>
+                    </div>
+                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        paymentMethod === 'pix' ? 'border-blue-500 bg-blue-500' : 'border-gray-300 dark:border-gray-600'
+                    }`}>
+                        {paymentMethod === 'pix' && <div className="w-2 h-2 rounded-full bg-white" />}
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        {/* Form Fields - Always Visible */}
+        <div className="space-y-6">
+            <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label className="text-xs text-gray-500">Nome</Label>
+                        <Input 
+                            value={firstName} 
+                            onChange={(e) => setFirstName(e.target.value)} 
+                            className="bg-gray-50 dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-800 rounded-xl h-12 text-gray-900 dark:text-white focus:ring-primary/50"
+                            placeholder="Seu nome"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="text-xs text-gray-500">Sobrenome</Label>
+                        <Input 
+                            value={lastName} 
+                            onChange={(e) => setLastName(e.target.value)} 
+                            className="bg-gray-50 dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-800 rounded-xl h-12 text-gray-900 dark:text-white focus:ring-primary/50"
+                            placeholder="Seu sobrenome"
+                        />
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    <Label className="text-xs text-gray-500">Email</Label>
+                    <Input 
+                        value={email} 
+                        onChange={(e) => setEmail(e.target.value)} 
+                        className="bg-gray-50 dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-800 rounded-xl h-12 text-gray-900 dark:text-white focus:ring-primary/50"
+                        placeholder="seu@email.com"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label className="text-xs text-gray-500">CPF (apenas números)</Label>
+                    <Input 
+                        value={cpf} 
+                        onChange={(e) => setCpf(e.target.value)} 
+                        className="bg-gray-50 dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-800 rounded-xl h-12 text-gray-900 dark:text-white focus:ring-primary/50"
+                        placeholder="000.000.000-00"
+                    />
+                </div>
+            </div>
+
+            <div className="h-[1px] bg-gray-100 dark:bg-zinc-800 my-4"></div>
+            
+            {paymentMethod === 'pix' ? (
+                <div className="space-y-4 animate-fade-in">
+                    <div className="bg-blue-500/10 rounded-xl p-4 flex items-start gap-3">
+                        <div className="bg-blue-500 rounded-full p-1 mt-0.5">
+                            <Check className="w-3 h-3 text-white" />
+                        </div>
+                        <div>
+                            <p className="text-sm font-bold text-blue-500">Pagamento Instantâneo</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Seu acesso será liberado imediatamente após o pagamento.
+                            </p>
+                        </div>
+                    </div>
+
+                    <Button 
+                        onClick={handlePix} 
+                        disabled={loading}
+                        className="w-full bg-primary hover:bg-blue-600 text-white font-bold py-6 rounded-xl shadow-lg shadow-blue-500/20 mt-4 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                        {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : `Gerar PIX de R$ ${price.toFixed(2)}`}
+                    </Button>
+                </div>
+            ) : (
+                <div className="space-y-4 animate-fade-in">
+                     <p className="text-sm font-bold text-gray-900 dark:text-white mb-2">Cartão de crédito ou débito</p>
+                    {/* Card Form handled by Brick */}
+                    <div className="bg-transparent dark:bg-transparent rounded-2xl p-1 border-none">
+                        <CardPayment
+                            initialization={initialization}
+                            customization={customization}
+                            onSubmit={handleCardSubmit}
+                            onReady={() => setReady(true)}
+                            onError={(error) => {
+                                console.error('Brick Error:', error);
+                                toast.error("Erro no formulário de pagamento.");
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
+        </div>
+
+      </div>
     </div>
   );
 };
