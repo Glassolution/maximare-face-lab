@@ -1,32 +1,51 @@
 import { useState } from "react";
-import { useFriends } from "@/hooks/useFriends";
-import { useFriendRequests } from "@/hooks/useFriendRequests";
+import { useFriends, useFriendRequests } from "@/hooks/useFriendSystem";
+import { useUserSearch } from "@/hooks/useUserSearch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { UserPlus, UserX, Search, X, Check } from "lucide-react";
+import { Search } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { FriendActionButtons } from "@/components/friends/FriendActionButtons";
+import { FriendProfile } from "@/types/friendship";
 
 export default function Friends() {
-  const { friends, loading: friendsLoading, removeFriend } = useFriends();
-  const { incomingRequests, outgoingRequests, loading: requestsLoading, sendRequest, respondRequest, cancelRequest } = useFriendRequests();
-  const [searchUsername, setSearchUsername] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
+  const { friends, loading: friendsLoading, refetch: refetchFriends } = useFriends();
+  const { incoming, outgoing, loading: requestsLoading, refetch: refetchRequests } = useFriendRequests();
+  const { query, setQuery, results, loading: searchLoading, search } = useUserSearch();
 
-  const handleSendRequest = async () => {
-    if (!searchUsername.trim()) return;
-    setIsSearching(true);
-    try {
-      // Remove @ if present
-      const username = searchUsername.trim().replace(/^@/, '');
-      await sendRequest(username);
-      setSearchUsername("");
-    } finally {
-      setIsSearching(false);
-    }
+  const handleActionComplete = () => {
+    refetchFriends();
+    refetchRequests();
+    // Re-run search if active to update button states
+    if (query) search(query);
   };
+
+  const renderUserItem = (user: FriendProfile, context: 'friend' | 'request' | 'search') => (
+    <div key={user.id} className="flex items-center justify-between p-3 border rounded-lg bg-card/50 hover:bg-card/80 transition-colors">
+      <div className="flex items-center gap-3">
+        <Avatar className="h-10 w-10 border border-border">
+          <AvatarImage src={user.avatar_url || undefined} />
+          <AvatarFallback>{user.username?.substring(0, 2).toUpperCase() || "??"}</AvatarFallback>
+        </Avatar>
+        <div>
+          <p className="font-medium text-sm">
+            {user.display_name || user.username}
+          </p>
+          <div className="flex items-center gap-2">
+             {user.username && <p className="text-xs text-muted-foreground">@{user.username}</p>}
+             {user.short_id && <span className="text-[10px] bg-muted px-1 rounded text-muted-foreground">#{user.short_id}</span>}
+          </div>
+        </div>
+      </div>
+      <FriendActionButtons 
+        profile={user} 
+        onActionComplete={handleActionComplete} 
+        compact={true}
+      />
+    </div>
+  );
 
   return (
     <div className="container mx-auto pb-24 pt-6 px-4">
@@ -34,65 +53,31 @@ export default function Friends() {
 
       <Tabs defaultValue="list" className="w-full">
         <TabsList className="grid w-full grid-cols-3 mb-6">
-          <TabsTrigger value="list">Seus Amigos</TabsTrigger>
-          <TabsTrigger value="requests">Solicitações</TabsTrigger>
-          <TabsTrigger value="search">Adicionar</TabsTrigger>
+          <TabsTrigger value="list">Amigos ({friends.length})</TabsTrigger>
+          <TabsTrigger value="requests">Solicitações ({incoming.length})</TabsTrigger>
+          <TabsTrigger value="search">Buscar</TabsTrigger>
         </TabsList>
 
         <TabsContent value="list">
           <Card>
             <CardHeader>
-              <CardTitle>Seus Amigos ({friends.length})</CardTitle>
+              <CardTitle>Seus Amigos</CardTitle>
               <CardDescription>Gerencie suas conexões.</CardDescription>
             </CardHeader>
             <CardContent>
               {friendsLoading ? (
-                <div className="text-center py-4">Carregando...</div>
+                <div className="text-center py-8 text-muted-foreground">Carregando...</div>
               ) : friends.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Você ainda não tem amigos.
+                <div className="text-center py-12 text-muted-foreground bg-muted/20 rounded-lg border border-dashed">
+                  <p>Você ainda não tem amigos.</p>
+                  <Button variant="link" onClick={() => document.querySelector<HTMLElement>('[data-value="search"]')?.click()}>
+                    Buscar pessoas
+                  </Button>
                 </div>
               ) : (
-                <ScrollArea className="h-[400px]">
-                  <div className="space-y-4">
-                    {friends.map((friend) => (
-                      <div key={friend.friend_id} className="flex items-center justify-between p-2 border rounded-lg">
-                        <div className="flex items-center gap-3">
-                            <Avatar>
-                                <AvatarImage src={friend.profile?.avatar_url || undefined} />
-                                <AvatarFallback>{friend.profile?.username?.substring(0, 2).toUpperCase() || "??"}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                                <p className="font-medium">{friend.profile?.display_name || friend.profile?.username}</p>
-                                <p className="text-xs text-muted-foreground">@{friend.profile?.username}</p>
-                                <div className="flex gap-2 mt-1">
-                                    {friend.profile?.plan_type && friend.profile.plan_type !== 'free' && (
-                                        <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">
-                                            {friend.profile.plan_type.toUpperCase()}
-                                        </span>
-                                    )}
-                                    {friend.profile?.last_analysis_score !== null && friend.profile?.visibility_score !== 'private' && (
-                                        <span className="text-[10px] bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded">
-                                            GER: {friend.profile.last_analysis_score.toFixed(1)}
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="text-destructive hover:text-destructive/90 hover:bg-destructive/10"
-                            onClick={() => {
-                                if (confirm("Tem certeza que deseja remover este amigo?")) {
-                                    removeFriend(friend.friend_id);
-                                }
-                            }}
-                        >
-                            <UserX className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
+                <ScrollArea className="h-[500px] pr-4">
+                  <div className="space-y-3">
+                    {friends.map(friend => renderUserItem(friend, 'friend'))}
                   </div>
                 </ScrollArea>
               )}
@@ -102,117 +87,72 @@ export default function Friends() {
 
         <TabsContent value="requests">
           <div className="space-y-6">
-             {/* Incoming Requests */}
-             <Card>
-                <CardHeader>
-                  <CardTitle>Recebidas ({incomingRequests.length})</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {requestsLoading ? (
-                        <div>Carregando...</div>
-                    ) : incomingRequests.length === 0 ? (
-                        <div className="text-sm text-muted-foreground">Nenhuma solicitação pendente.</div>
-                    ) : (
-                        <div className="space-y-3">
-                            {incomingRequests.map(req => (
-                                <div key={req.id} className="flex items-center justify-between p-2 border rounded-lg">
-                                    <div className="flex items-center gap-3">
-                                        <Avatar className="h-10 w-10 border border-border">
-                                            <AvatarImage 
-                                                src={req.requester?.avatar_url || undefined} 
-                                                alt={req.requester?.display_name || "User"}
-                                            />
-                                            <AvatarFallback>{req.requester?.username?.substring(0, 2).toUpperCase() || "??"}</AvatarFallback>
-                                        </Avatar>
-                                        <div className="flex flex-col">
-                                            <p className="font-medium flex items-center gap-2">
-                                                {req.requester?.display_name || req.requester?.username}
-                                                {req.requester?.username && (
-                                                    <span className="text-xs text-muted-foreground font-normal">@{req.requester.username}</span>
-                                                )}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button size="sm" variant="default" onClick={() => respondRequest(req.id, 'accepted')}>
-                                            <Check className="h-4 w-4 mr-1" /> Aceitar
-                                        </Button>
-                                        <Button size="sm" variant="outline" onClick={() => respondRequest(req.id, 'rejected')}>
-                                            <X className="h-4 w-4 mr-1" /> Recusar
-                                        </Button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </CardContent>
-             </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Recebidas ({incoming.length})</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {requestsLoading ? (
+                  <div className="text-sm text-muted-foreground">Carregando...</div>
+                ) : incoming.length === 0 ? (
+                  <div className="text-sm text-muted-foreground italic">Nenhuma solicitação pendente.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {incoming.map(req => renderUserItem(req, 'request'))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-             {/* Outgoing Requests */}
-             <Card>
+            {outgoing.length > 0 && (
+              <Card>
                 <CardHeader>
-                  <CardTitle>Enviadas ({outgoingRequests.length})</CardTitle>
+                  <CardTitle>Enviadas ({outgoing.length})</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {requestsLoading ? (
-                        <div>Carregando...</div>
-                    ) : outgoingRequests.length === 0 ? (
-                        <div className="text-sm text-muted-foreground">Nenhuma solicitação enviada.</div>
-                    ) : (
-                        <div className="space-y-3">
-                            {outgoingRequests.map(req => (
-                                <div key={req.id} className="flex items-center justify-between p-2 border rounded-lg">
-                                    <div className="flex items-center gap-3">
-                                        <Avatar className="h-10 w-10 border border-border">
-                                            <AvatarImage 
-                                                src={req.addressee?.avatar_url || undefined} 
-                                                alt={req.addressee?.display_name || "User"}
-                                                onLoadingStatusChange={(status) => console.log("Avatar loading:", status, req.addressee?.avatar_url)}
-                                            />
-                                            <AvatarFallback>{req.addressee?.username?.substring(0, 2).toUpperCase() || "??"}</AvatarFallback>
-                                        </Avatar>
-                                        <div className="flex flex-col">
-                                            <p className="font-medium flex items-center gap-2">
-                                                {req.addressee?.display_name || req.addressee?.username}
-                                                {req.addressee?.username && (
-                                                    <span className="text-xs text-muted-foreground font-normal">@{req.addressee.username}</span>
-                                                )}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <Button size="sm" variant="ghost" onClick={() => cancelRequest(req.id)}>
-                                        Cancelar
-                                    </Button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                  <div className="space-y-3">
+                    {outgoing.map(req => renderUserItem(req, 'request'))}
+                  </div>
                 </CardContent>
-             </Card>
+              </Card>
+            )}
           </div>
         </TabsContent>
 
         <TabsContent value="search">
-          <Card>
+          <Card className="h-full">
             <CardHeader>
               <CardTitle>Adicionar Amigo</CardTitle>
-              <CardDescription>Busque por nome de usuário (ex: @joao) ou ID.</CardDescription>
+              <CardDescription>Busque por @username, nome ou ID.</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                        placeholder="Nome de usuário (@user) ou ID (4 dígitos)" 
-                        className="pl-8" 
-                        value={searchUsername}
-                        onChange={(e) => setSearchUsername(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSendRequest()}
-                    />
-                </div>
-                <Button onClick={handleSendRequest} disabled={isSearching || !searchUsername}>
-                    {isSearching ? "Enviando..." : <><UserPlus className="mr-2 h-4 w-4" /> Adicionar</>}
-                </Button>
+            <CardContent className="space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Buscar..." 
+                  className="pl-9" 
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  autoFocus
+                />
+              </div>
+
+              <div className="min-h-[300px]">
+                {searchLoading ? (
+                  <div className="text-center py-8 text-muted-foreground">Buscando...</div>
+                ) : results.length > 0 ? (
+                  <div className="space-y-3">
+                    {results.map(user => renderUserItem(user, 'search'))}
+                  </div>
+                ) : query ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Nenhum usuário encontrado para "{query}".
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-muted-foreground bg-muted/20 rounded-lg">
+                    Digite para buscar usuários.
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
