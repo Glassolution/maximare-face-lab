@@ -1,190 +1,109 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/hooks/use-toast';
-
-export interface BattleProfile {
-  user_id: string;
-  username: string;
-  display_name: string | null;
-  avatar_url: string | null;
-}
-
-export interface Battle {
-  id: string;
-  challenger_id: string;
-  opponent_id: string;
-  status: 'pending' | 'accepted' | 'rejected' | 'waiting_upload' | 'analyzing' | 'finished' | 'canceled';
-  challenger_photo_url: string | null;
-  opponent_photo_url: string | null;
-  challenger_score: number | null;
-  opponent_score: number | null;
-  winner_id: string | null;
-  loser_id: string | null;
-  win_reason: string | null;
-  created_at: string;
-  finished_at: string | null;
-  challenger?: BattleProfile;
-  opponent?: BattleProfile;
-}
+import { Battle, BattleStatus, EnrichedBattle } from '@/types/battle';
+import { toast } from 'sonner';
 
 export function useBattles() {
   const { user } = useAuth();
-  const { toast } = useToast();
-  const [battles, setBattles] = useState<Battle[]>([]);
+  const [battles, setBattles] = useState<EnrichedBattle[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const fetchBattles = async () => {
     if (!user) return;
     setLoading(true);
-    setError(null);
     try {
+      // Fetch battles where user is creator or opponent
       const { data, error } = await supabase
         .from('battles')
         .select('*')
-        .or(`challenger_id.eq.${user.id},opponent_id.eq.${user.id}`)
-        .order('updated_at', { ascending: false });
+        .or(`created_by.eq.${user.id},opponent_id.eq.${user.id}`)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
       if (data && data.length > 0) {
-        // ... (existing logic)
+        // Enrich with opponent profile
         const userIds = new Set<string>();
         data.forEach(b => {
-            userIds.add(b.challenger_id);
-            userIds.add(b.opponent_id);
+          if (b.created_by) userIds.add(b.created_by);
+          if (b.opponent_id) userIds.add(b.opponent_id);
         });
 
-        const { data: profiles, error: profilesError } = await supabase
-            .from('profiles')
-            .select('id, username, display_name, avatar_url')
-            .in('id', Array.from(userIds));
-        
-        if (profilesError) throw profilesError;
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, username, display_name, avatar_url')
+          .in('id', Array.from(userIds));
 
-        const enrichedBattles = data.map(b => ({
+        const enriched = data.map(b => {
+          const isCreator = b.created_by === user.id;
+          const opponentId = isCreator ? b.opponent_id : b.created_by;
+          const opponent = profiles?.find(p => p.id === opponentId);
+          
+          return {
             ...b,
-            challenger: profiles?.find(p => p.id === b.challenger_id),
-            opponent: profiles?.find(p => p.id === b.opponent_id)
-        })) as Battle[];
+            opponent_profile: opponent,
+            is_creator: isCreator
+          };
+        });
 
-        setBattles(enrichedBattles);
+        setBattles(enriched);
       } else {
         setBattles([]);
       }
-    } catch (error: any) {
-      console.error('Error fetching battles:', error);
-      // Specifically catch missing table error
-      if (error.code === 'PGRST205' || error.message?.includes('does not exist')) {
-          setError('SETUP_REQUIRED');
-      } else {
-          setError(error.message);
-          toast({
-            title: 'Erro ao carregar duelos',
-            description: error.message,
-            variant: 'destructive',
-          });
-      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error('Erro ao carregar batalhas');
     } finally {
       setLoading(false);
     }
   };
 
-  const createBattle = async (opponentId: string): Promise<boolean> => {
-    if (!user) return false;
-    
+  const createBattle = async (opponentId: string) => {
     try {
-      const { error } = await supabase
-        .from('battles')
-        .insert({
-          challenger_id: user.id,
-          opponent_id: opponentId,
-          status: 'pending'
-        });
+      const { data, error } = await supabase.rpc('create_battle_challenge_v2', {
+        target_opponent_id: opponentId,
+        battle_mode: 'front_lateral'
+      });
 
       if (error) throw error;
-
-      toast({
-        title: "Desafio enviado!",
-        description: "Aguarde seu amigo aceitar o duelo.",
-      });
+      if (!data.success) throw new Error(data.error);
       
+      toast.success('Desafio criado!');
       fetchBattles();
       return true;
-    } catch (error: any) {
-      console.error('Error creating battle:', error);
-      toast({
-        title: "Erro ao criar duelo",
-        description: error.message,
-        variant: "destructive"
-      });
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao criar desafio');
       return false;
     }
   };
 
-  const respondBattle = async (battleId: string, action: 'accepted' | 'rejected') => {
-    if (!user) return;
-
+  const acceptBattle = async (battleId: string) => {
     try {
-      const newStatus = action === 'accepted' ? 'waiting_upload' : 'rejected';
-      
-      const { error } = await supabase
-        .from('battles')
-        .update({ status: newStatus })
-        .eq('id', battleId);
+      const { data, error } = await supabase.rpc('accept_battle_challenge_v2', {
+        p_battle_id: battleId
+      });
 
       if (error) throw error;
+      if (!data.success) throw new Error(data.error);
 
-      toast({
-        title: action === 'accepted' ? "Desafio aceito!" : "Desafio recusado",
-        description: action === 'accepted' ? "Prepare-se para enviar sua foto." : undefined,
-      });
-
-      fetchBattles();
-    } catch (error: any) {
-      console.error('Error responding to battle:', error);
-      toast({
-        title: "Erro ao responder",
-        description: error.message,
-        variant: "destructive"
-      });
+      toast.success('Desafio aceito! Redirecionando...');
+      return true;
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao aceitar desafio');
+      return false;
     }
   };
 
   useEffect(() => {
-    if (user) {
-        fetchBattles();
-        
-        // Realtime subscription (only if no critical setup error)
-        if (error !== 'SETUP_REQUIRED') {
-            const channel = supabase
-                .channel('battles_changes')
-                .on(
-                    'postgres_changes',
-                    {
-                        event: '*',
-                        schema: 'public',
-                        table: 'battles',
-                        filter: `challenger_id=eq.${user.id}`,
-                    },
-                    () => fetchBattles()
-                )
-                .on(
-                    'postgres_changes',
-                    {
-                        event: '*',
-                        schema: 'public',
-                        table: 'battles',
-                        filter: `opponent_id=eq.${user.id}`,
-                    },
-                    () => fetchBattles()
-                )
-                .subscribe();
-            return () => { supabase.removeChannel(channel); };
-        }
-    }
+    fetchBattles();
   }, [user]);
 
-  return { battles, loading, error, fetchBattles, createBattle, respondBattle };
+  return {
+    battles,
+    loading,
+    fetchBattles,
+    createBattle,
+    acceptBattle
+  };
 }

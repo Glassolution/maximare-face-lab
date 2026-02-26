@@ -14,6 +14,7 @@ import ProgressPage from "@/pages/Progress";
 import Trends from "@/pages/Trends";
 import Friends from "@/pages/Friends";
 import Battles from "@/pages/Battles";
+import BattleRoom from "@/pages/BattleRoom";
 import Profile from "@/pages/Profile";
 import LookAlike from "@/pages/LookAlike";
 import NotFound from "@/pages/NotFound";
@@ -130,6 +131,7 @@ function Layout() {
         <Route path="/trends" element={<Trends />} />
         <Route path="/friends" element={<Friends />} />
         <Route path="/battles" element={<Battles />} />
+        <Route path="/battle/:id" element={<BattleRoom />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/look-alike" element={<LookAlike />} />
         <Route path="/login" element={<Login />} />
