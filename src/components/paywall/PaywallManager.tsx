@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAnalysisLimit } from "@/hooks/useAnalysisLimit";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Check, ShieldCheck, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 interface PaywallManagerProps {
   children: React.ReactNode;
@@ -53,6 +54,10 @@ export function PaywallManager() {
   return (
     <Dialog open={showPaywall} onOpenChange={setShowPaywall}>
       <DialogContent className="w-[90%] max-w-[380px] p-6 rounded-[2rem] border border-white/10 bg-[#0a0a0a] text-white backdrop-blur-xl shadow-2xl">
+        <VisuallyHidden>
+            <DialogTitle>Desbloqueie seu Potencial</DialogTitle>
+            <DialogDescription>Escolha um plano para acessar todos os recursos.</DialogDescription>
+        </VisuallyHidden>
         
         {/* Header */}
         <div className="text-center mb-6 space-y-2">
