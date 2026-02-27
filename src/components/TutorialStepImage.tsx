@@ -6,44 +6,38 @@ interface TutorialCarouselProps {
   steps: { text: string; detail?: string }[];
 }
 
-// Mapeamento de protocolos para keywords do Unsplash
-const PROTOCOL_KEYWORDS: Record<string, string> = {
+// Map protocols to consistent seeds for Picsum Photos
+// We use intervention IDs directly as seeds or map to specific ones for consistency
+const PROTOCOL_SEEDS: Record<string, string> = {
   // Mandíbula / Estrutura
-  "mewing-basic": "man,jawline,profile,portrait",
-  "chewing-hypertrophy": "gum,chewing,man,eating",
+  "mewing-basic": "jawline",
+  "chewing-hypertrophy": "chewing",
   
   // Gordura / Inchaço
-  "sodium-flush": "water,drinking,healthy,man",
-  "lymphatic-drainage": "facial,massage,spa,skincare",
-  "caloric-deficit": "healthy,food,salad,man,fitness",
+  "sodium-flush": "water",
+  "lymphatic-drainage": "massage",
+  "caloric-deficit": "healthy",
   
   // Pele
-  "basic-skincare": "skincare,face,wash,man,cream",
-  "retinol-protocol": "serum,skincare,bottle,night",
+  "basic-skincare": "skincare",
+  "retinol-protocol": "retinol",
   
   // Olhos
-  "ice-eyes": "ice,cube,face,cold",
-  "volufiline-eyes": "eye,cream,serum,cosmetic",
+  "ice-eyes": "ice",
+  "volufiline-eyes": "eyes",
   
   // Pescoço / Postura
-  "neck-training": "neck,workout,gym,man,fitness",
-  "chin-tucks": "posture,neck,man,standing",
-
-  // Fallbacks genéricos
-  "skincare": "skincare,routine,face,wash",
-  "exercicio": "fitness,workout,gym,man",
-  "habito": "meditation,calm,man,lifestyle",
-  "procedimento": "clinic,aesthetic,treatment"
+  "neck-training": "neck",
+  "chin-tucks": "posture",
 };
 
 export function TutorialCarousel({ interventionType, steps }: TutorialCarouselProps) {
-  // Get keywords from map or fallback to interventionType
-  const keywords = PROTOCOL_KEYWORDS[interventionType] || 
-                   interventionType.replace(/_/g, ',').replace(/-/g, ',') + ",facial,aesthetic";
+  // Get seed from map or fallback to interventionType
+  const seed = PROTOCOL_SEEDS[interventionType] || interventionType;
   
-  // Unsplash Source URL (random image based on keywords)
-  // Using 800x600 for good resolution
-  const imageUrl = `https://source.unsplash.com/800x600/?${keywords}`;
+  // Picsum Photos URL with seed for consistency
+  // https://picsum.photos/seed/{seed}/{width}/{height}
+  const imageUrl = `https://picsum.photos/seed/${seed}/800/600`;
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -76,7 +70,7 @@ export function TutorialCarousel({ interventionType, steps }: TutorialCarouselPr
           className={`w-full h-full object-cover transition-opacity duration-500 ${loading ? 'opacity-0' : 'opacity-100'}`}
           onLoad={() => setLoading(false)}
           onError={() => {
-            console.warn("Failed to load Unsplash image:", imageUrl);
+            console.warn("Failed to load Picsum image:", imageUrl);
             setLoading(false);
             setError(true);
           }}
