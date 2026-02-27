@@ -10,6 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { BattleProcessingOverlay } from '@/components/battle/BattleProcessingOverlay';
 import { LoserRevealOverlay } from '@/components/battle/LoserRevealOverlay';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function BattleRoom() {
   const { id } = useParams<{ id: string }>();
@@ -19,20 +20,35 @@ export default function BattleRoom() {
   const [frontFile, setFrontFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showResultScreen, setShowResultScreen] = useState(false);
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
-  // Effect to handle navigation after reveal animation
+  // Timer for minimum processing duration (7s)
   useEffect(() => {
-    if (battle?.status === 'completed') {
-        // Add 1.5s delay for drama before showing results
-        const timer = setTimeout(() => {
-            setShowResultScreen(true);
-        }, 1500);
-        return () => clearTimeout(timer);
+    if (battle?.status === 'processing') {
+        const serverStartTime = new Date(battle.result_ready_at || battle.matched_at || Date.now()).getTime(); // Should ideally be processing_start_at
+        const now = Date.now();
+        const timeElapsed = now - serverStartTime;
+        
+        if (timeElapsed >= 7000) {
+            setMinTimeElapsed(true);
+        } else {
+            const timer = setTimeout(() => {
+                setMinTimeElapsed(true);
+            }, 7000 - timeElapsed);
+            return () => clearTimeout(timer);
+        }
+    } else if (battle?.status === 'completed' && !showResultScreen) {
+        setMinTimeElapsed(true);
     }
-  }, [battle?.status]);
+  }, [battle?.status, showResultScreen, battle?.matched_at, battle?.result_ready_at]);
 
   const handleRevealComplete = () => {
       setShowResultScreen(true);
+  };
+
+  const getPhotoUrl = (path: string | null) => {
+      if (!path) return null;
+      return supabase.storage.from('battles').getPublicUrl(path).data.publicUrl;
   };
 
   if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-8 w-8" /></div>;
@@ -136,19 +152,44 @@ export default function BattleRoom() {
       );
   }
 
-  // Status: Processing OR Completed (waiting for delay)
+  // Status: Processing OR Completed (waiting for animation)
   if (battle.status === 'processing' || (battle.status === 'completed' && !showResultScreen)) {
+      const mySubmission = submissions.find(s => s.user_id === userProfile?.id);
+      const opponentSubmission = submissions.find(s => s.user_id !== userProfile?.id);
+      
+      const myAvatar = getPhotoUrl(mySubmission?.front_photo_path) || userProfile?.avatar_url;
+      const opponentAvatar = getPhotoUrl(opponentSubmission?.front_photo_path) || opponentProfile?.avatar_url;
+
+      const isReady = battle.status === 'completed' && minTimeElapsed;
+      
+      // Use matched_at as a fallback for start time if processing started immediately after match
+      // Ideally we would have a 'processing_started_at' field, but matched_at + photo submission time is close enough for sync
+      const startTime = battle.matched_at ? new Date(battle.matched_at).getTime() : undefined;
+
       return (
         <BattleProcessingOverlay 
-            userAvatar={userProfile?.avatar_url} 
-            opponentAvatar={opponentProfile?.avatar_url} 
+            userAvatar={myAvatar} 
+            opponentAvatar={opponentAvatar} 
+            isReady={isReady}
+            onComplete={() => setShowResultScreen(true)}
+            startTime={startTime}
         />
       );
   }
 
   // Status: Reveal Loser (Animation)
   if (battle.status === 'reveal_loser' && !showResultScreen) {
-      return <LoserRevealOverlay result={result} onComplete={handleRevealComplete} />;
+      // Determine my photo for background
+      const mySubmission = submissions.find(s => s.user_id === userProfile?.id);
+      const myPhoto = getPhotoUrl(mySubmission?.front_photo_path) || userProfile?.avatar_url;
+
+      return (
+        <LoserRevealOverlay 
+            result={result} 
+            userPhoto={myPhoto}
+            onComplete={handleRevealComplete} 
+        />
+      );
   }
 
   // Status: Completed or Show Result Screen
@@ -171,13 +212,14 @@ export default function BattleRoom() {
                           {result.verdict_label_winner} 🏆
                       </div>
                       <div className="pt-8 pb-4 px-2 text-center bg-card">
-                          <div className="h-20 w-20 mx-auto rounded-full border-4 border-amber-500 overflow-hidden mb-2 bg-muted">
-                              {/* Ideally show the battle photo here */}
-                              <div className="w-full h-full flex items-center justify-center text-xl font-bold">
-                                  {result.winner_score}
-                              </div>
+                          <div className="h-20 w-20 mx-auto rounded-full border-4 border-amber-500 overflow-hidden mb-2 bg-muted relative">
+                                <Avatar className="h-full w-full">
+                                    <AvatarImage src={result.winner_id === userProfile?.id ? getPhotoUrl(submissions.find(s => s.user_id === userProfile?.id)?.front_photo_path) || userProfile?.avatar_url : getPhotoUrl(submissions.find(s => s.user_id !== userProfile?.id)?.front_photo_path) || opponentProfile?.avatar_url} />
+                                    <AvatarFallback>WIN</AvatarFallback>
+                                </Avatar>
                           </div>
-                          <p className="font-bold text-lg leading-tight">{result.winner_id === opponentProfile?.id ? opponentProfile.display_name : 'Você'}</p>
+                          <div className="text-2xl font-black text-amber-500 mb-1">{result.winner_score}</div>
+                          <p className="font-bold text-sm leading-tight truncate">{result.winner_id === opponentProfile?.id ? opponentProfile.display_name : 'Você'}</p>
                       </div>
                   </div>
 
@@ -187,12 +229,14 @@ export default function BattleRoom() {
                           {result.verdict_label_loser} 💀
                       </div>
                       <div className="pt-8 pb-4 px-2 text-center bg-card">
-                           <div className="h-20 w-20 mx-auto rounded-full border-2 border-muted overflow-hidden mb-2 bg-muted">
-                              <div className="w-full h-full flex items-center justify-center text-xl font-bold text-muted-foreground">
-                                  {result.loser_score}
-                              </div>
+                           <div className="h-20 w-20 mx-auto rounded-full border-2 border-muted overflow-hidden mb-2 bg-muted relative">
+                                <Avatar className="h-full w-full">
+                                    <AvatarImage src={result.loser_id === userProfile?.id ? getPhotoUrl(submissions.find(s => s.user_id === userProfile?.id)?.front_photo_path) || userProfile?.avatar_url : getPhotoUrl(submissions.find(s => s.user_id !== userProfile?.id)?.front_photo_path) || opponentProfile?.avatar_url} />
+                                    <AvatarFallback>RIP</AvatarFallback>
+                                </Avatar>
                           </div>
-                          <p className="font-bold text-lg leading-tight text-muted-foreground">{result.loser_id === opponentProfile?.id ? opponentProfile.display_name : 'Você'}</p>
+                          <div className="text-2xl font-bold text-muted-foreground mb-1">{result.loser_score}</div>
+                          <p className="font-bold text-sm leading-tight text-muted-foreground truncate">{result.loser_id === opponentProfile?.id ? opponentProfile.display_name : 'Você'}</p>
                       </div>
                   </div>
               </div>

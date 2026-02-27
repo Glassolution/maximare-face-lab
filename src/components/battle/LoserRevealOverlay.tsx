@@ -5,90 +5,114 @@ import { useAuth } from "@/hooks/useAuth";
 
 interface LoserRevealOverlayProps {
   result: BattleResult | null;
+  userPhoto?: string | null;
   onComplete: () => void;
 }
 
-export function LoserRevealOverlay({ result, onComplete }: LoserRevealOverlayProps) {
+export function LoserRevealOverlay({ result, userPhoto, onComplete }: LoserRevealOverlayProps) {
   const { user } = useAuth();
-  const [show, setShow] = useState(true);
-
-  // Check if trash talk is enabled via Env Var (default false if not set)
-  const enableTrashTalk = import.meta.env.VITE_BATTLE_TRASH_TALK === 'true';
+  const [step, setStep] = useState<'suspense' | 'reveal'>('suspense');
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setShow(false);
-      setTimeout(onComplete, 500); // Allow exit animation
-    }, 3500); // Show for 3.5 seconds
+    // Phase 1: Suspense (Black screen, heartbeat)
+    const suspenseTimer = setTimeout(() => {
+      setStep('reveal');
+    }, 2000);
 
-    return () => clearTimeout(timer);
+    // Phase 2: Reveal (Photo + Text) -> Exit
+    const revealTimer = setTimeout(() => {
+      onComplete();
+    }, 6000); // 2s suspense + 4s reveal
+
+    return () => {
+      clearTimeout(suspenseTimer);
+      clearTimeout(revealTimer);
+    };
   }, [onComplete]);
 
   if (!result || !user) return null;
 
   const amILoser = result.loser_id === user.id;
-  const label = amILoser 
-    ? (enableTrashTalk ? "MOGGADO" : "DERROTADO") 
-    : "VENCEDOR";
-  
-  const color = amILoser ? "text-red-600" : "text-amber-500";
-  const bg = amILoser ? "bg-red-500/10" : "bg-amber-500/10";
+  const label = amILoser ? "MOGGADO" : "ASCENDEU";
+  const color = amILoser ? "text-red-600" : "text-amber-400";
+  const shadowColor = amILoser ? "rgba(220, 38, 38, 0.5)" : "rgba(251, 191, 36, 0.5)";
 
   return (
-    <AnimatePresence>
-      {show && (
+    <AnimatePresence mode="wait">
+      {step === 'suspense' && (
         <motion.div
+          key="suspense"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black overflow-hidden"
+          className="fixed inset-0 z-[60] bg-black flex items-center justify-center"
         >
-          {/* Glitch Effect Background */}
-          <div className={`absolute inset-0 ${bg} mix-blend-overlay animate-pulse`} />
-          
           <motion.div
-            initial={{ scale: 0.5, opacity: 0 }}
-            animate={{ scale: [0.5, 1.2, 1], opacity: 1 }}
-            transition={{ duration: 0.5, type: "spring" }}
-            className="relative z-10 text-center"
+            animate={{ scale: [1, 1.2, 1] }}
+            transition={{ repeat: Infinity, duration: 0.8 }}
+            className="w-4 h-4 bg-white rounded-full shadow-[0_0_20px_rgba(255,255,255,0.8)]"
+          />
+        </motion.div>
+      )}
+
+      {step === 'reveal' && (
+        <motion.div
+          key="reveal"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black overflow-hidden"
+        >
+          {/* Background Photo */}
+          {userPhoto && (
+            <motion.div 
+              initial={{ scale: 1.2, opacity: 0 }}
+              animate={{ scale: 1, opacity: 0.4 }}
+              transition={{ duration: 0.5 }}
+              className="absolute inset-0 z-0"
+            >
+              <img src={userPhoto} className="w-full h-full object-cover grayscale opacity-50" alt="Background" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+            </motion.div>
+          )}
+
+          {/* Text Reveal with Impact */}
+          <motion.div
+            initial={{ scale: 2, opacity: 0, y: 50 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            transition={{ 
+              type: "spring", 
+              stiffness: 300, 
+              damping: 20,
+              delay: 0.2 
+            }}
+            className="relative z-10 text-center px-4"
           >
-            <h1 className={`text-6xl md:text-8xl font-black ${color} tracking-tighter uppercase drop-shadow-[0_0_15px_rgba(0,0,0,0.8)]`}
-                style={{ fontFamily: 'Impact, sans-serif' }}
+            <h1 
+              className={`text-6xl md:text-9xl font-black ${color} tracking-tighter uppercase`}
+              style={{ 
+                fontFamily: 'Impact, sans-serif',
+                textShadow: `0 0 30px ${shadowColor}, 0 0 10px black`
+              }}
             >
               {label}
             </h1>
             
-            {amILoser && enableTrashTalk && (
-                <motion.p 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    delay={0.5}
-                    className="text-white/50 text-sm mt-4 uppercase tracking-widest"
-                >
-                    Não foi dessa vez...
-                </motion.p>
-            )}
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: "100%" }}
+              transition={{ delay: 0.5, duration: 0.5 }}
+              className={`h-2 mx-auto mt-2 ${amILoser ? 'bg-red-600' : 'bg-amber-400'}`}
+            />
           </motion.div>
 
-          {/* Screen Shake Effect for Loser */}
-          {amILoser && (
-             <style>{`
-                @keyframes shake {
-                  0% { transform: translate(1px, 1px) rotate(0deg); }
-                  10% { transform: translate(-1px, -2px) rotate(-1deg); }
-                  20% { transform: translate(-3px, 0px) rotate(1deg); }
-                  30% { transform: translate(3px, 2px) rotate(0deg); }
-                  40% { transform: translate(1px, -1px) rotate(1deg); }
-                  50% { transform: translate(-1px, 2px) rotate(-1deg); }
-                  60% { transform: translate(-3px, 1px) rotate(0deg); }
-                  70% { transform: translate(3px, 1px) rotate(-1deg); }
-                  80% { transform: translate(-1px, -1px) rotate(1deg); }
-                  90% { transform: translate(1px, 2px) rotate(0deg); }
-                  100% { transform: translate(1px, -2px) rotate(-1deg); }
-                }
-                body { animation: shake 0.5s; animation-iteration-count: 1; }
-             `}</style>
-          )}
+          {/* Flash Effect on Entry */}
+          <motion.div
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="absolute inset-0 bg-white z-20 pointer-events-none"
+          />
         </motion.div>
       )}
     </AnimatePresence>

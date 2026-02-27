@@ -7,34 +7,40 @@ import { Swords } from "lucide-react";
 interface BattleProcessingOverlayProps {
   userAvatar?: string | null;
   opponentAvatar?: string | null;
+  isReady?: boolean;
+  onComplete?: () => void;
+  startTime?: number; // Server-synced start time
 }
 
 const STAGES = [
-  { text: "Mapeando estrutura facial...", duration: 8000 },
-  { text: "Analisando pontos biométricos...", duration: 10000 },
-  { text: "Calculando scores de simetria...", duration: 10000 },
-  { text: "Comparando resultados...", duration: 10000 },
+  { text: "Mapeando estrutura facial...", duration: 2000 },
+  { text: "Analisando pontos biométricos...", duration: 2000 },
+  { text: "Calculando scores de simetria...", duration: 2000 },
+  { text: "Comparando resultados...", duration: 1000 },
   { text: "Determinando o vencedor...", duration: 999999 }, // Até terminar
 ];
 
-export function BattleProcessingOverlay({ userAvatar, opponentAvatar }: BattleProcessingOverlayProps) {
+export function BattleProcessingOverlay({ userAvatar, opponentAvatar, isReady, onComplete, startTime }: BattleProcessingOverlayProps) {
   const [stageIndex, setStageIndex] = useState(0);
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
     let currentStage = 0;
-    let startTime = Date.now();
+    // Use server provided startTime if available, otherwise fallback to local Date.now()
+    const processingStart = startTime || Date.now();
     
-    // Total estimated time roughly matches sum of durations, but progress bar is linear-ish
-    // We can simulate progress based on total expected time (~38s)
-    const TOTAL_ESTIMATED_TIME = 38000; 
+    // Minimum duration 7s, but we simulate up to 10s normally
+    const TOTAL_ESTIMATED_TIME = 10000; 
 
     const interval = setInterval(() => {
-      const elapsed = Date.now() - startTime;
+      // If ready, we handle progress differently (fast forward to 100)
+      if (isReady) return;
+
+      const elapsed = Date.now() - processingStart;
       
       // Update Progress
-      const newProgress = Math.min((elapsed / TOTAL_ESTIMATED_TIME) * 100, 95); // Cap at 95% until done
-      setProgress(newProgress);
+      const newProgress = Math.min((elapsed / TOTAL_ESTIMATED_TIME) * 100, 95); // Cap at 95% until ready
+      setProgress(Math.max(0, newProgress)); // Ensure not negative if clock skew
 
       // Update Stage Text
       let accumulatedTime = 0;
@@ -51,10 +57,25 @@ export function BattleProcessingOverlay({ userAvatar, opponentAvatar }: BattlePr
            setStageIndex(STAGES.length - 1);
         }
       }
-    }, 100);
+    }, 50);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isReady, startTime]);
+
+  // Handle completion
+  useEffect(() => {
+    if (isReady) {
+      // Fast forward progress to 100%
+      setProgress(100);
+      setStageIndex(STAGES.length - 1); // Ensure "Determinando o vencedor" or similar is shown
+      
+      // Wait a bit at 100% then call onComplete
+      const timer = setTimeout(() => {
+        onComplete?.();
+      }, 1500); // 1.5s delay at 100% for impact
+      return () => clearTimeout(timer);
+    }
+  }, [isReady, onComplete]);
 
   const isFinalStage = stageIndex === STAGES.length - 1;
 
