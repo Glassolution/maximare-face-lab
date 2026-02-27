@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Battle, BattleStatus, EnrichedBattle } from '@/types/battle';
+import { EnrichedBattle } from '@/types/battle';
 import { toast } from 'sonner';
 
 export function useBattles() {
@@ -23,26 +23,38 @@ export function useBattles() {
       if (error) throw error;
 
       if (data && data.length > 0) {
-        // Enrich with opponent profile
+        // Collect all user IDs needed (both creators and opponents)
         const userIds = new Set<string>();
         data.forEach(b => {
           if (b.created_by) userIds.add(b.created_by);
           if (b.opponent_id) userIds.add(b.opponent_id);
         });
 
+        // Fetch profile data for all involved users
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('id, username, display_name, avatar_url')
+          .select('id, username, display_name, full_name, avatar_url, public_id, short_id')
           .in('id', Array.from(userIds));
 
         const enriched = data.map(b => {
           const isCreator = b.created_by === user.id;
-          const opponentId = isCreator ? b.opponent_id : b.created_by;
-          const opponent = profiles?.find(p => p.id === opponentId);
+          // Determine who is the "other" person to show
+          const otherId = isCreator ? b.opponent_id : b.created_by;
+          const otherProfile = profiles?.find(p => p.id === otherId);
+
+          // Normalize avatar
+          let avatarUrl = otherProfile?.avatar_url;
+          if (avatarUrl && !avatarUrl.startsWith('http') && !avatarUrl.startsWith('data:')) {
+             const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(avatarUrl);
+             avatarUrl = publicUrlData.publicUrl + `?t=${Date.now()}`;
+          }
           
+          // Normalize display name
+          const displayName = otherProfile ? (otherProfile.display_name || otherProfile.full_name || otherProfile.username || `User ${otherProfile.short_id}`) : 'Desconhecido';
+
           return {
             ...b,
-            opponent_profile: opponent,
+            opponent_profile: otherProfile ? { ...otherProfile, avatar_url: avatarUrl, display_name: displayName } : undefined,
             is_creator: isCreator
           };
         });
@@ -88,9 +100,30 @@ export function useBattles() {
       if (!data.success) throw new Error(data.error);
 
       toast.success('Desafio aceito! Redirecionando...');
+      fetchBattles();
       return true;
     } catch (err: any) {
       toast.error(err.message || 'Erro ao aceitar desafio');
+      return false;
+    }
+  };
+
+  const rejectBattle = async (battleId: string) => {
+    try {
+      // Just update status to canceled/rejected
+      const { error } = await supabase
+        .from('battles')
+        .update({ status: 'canceled' })
+        .eq('id', battleId)
+        .eq('opponent_id', user.id); // Security check
+
+      if (error) throw error;
+
+      toast.info('Desafio recusado.');
+      fetchBattles();
+      return true;
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao recusar desafio');
       return false;
     }
   };
@@ -104,6 +137,7 @@ export function useBattles() {
     loading,
     fetchBattles,
     createBattle,
-    acceptBattle
+    acceptBattle,
+    rejectBattle
   };
 }

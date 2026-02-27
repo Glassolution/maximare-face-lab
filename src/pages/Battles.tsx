@@ -17,7 +17,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export default function Battles() {
-  const { battles, loading, createBattle, acceptBattle } = useBattles();
+  const { battles, loading, createBattle, acceptBattle, rejectBattle } = useBattles();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("active");
@@ -28,15 +28,8 @@ export default function Battles() {
 
   const handleBattleClick = (battle: EnrichedBattle) => {
     if (battle.status === 'waiting_for_opponent' && !battle.is_creator) {
-       acceptBattle(battle.id).then(success => {
-           if(success) {
-             // PostHog: track battle accepted
-             trackEvent(user.id, 'battle_accepted', {
-               battle_id: battle.id,
-             });
-             navigate(`/battle/${battle.id}`);
-           }
-       });
+       // If pending and I am opponent, don't navigate, let them use buttons
+       return;
     } else {
        navigate(`/battle/${battle.id}`);
     }
@@ -63,26 +56,31 @@ export default function Battles() {
         <TabsContent value="active" className="space-y-4">
             {loading ? <div className="text-center p-4"><Loader2 className="animate-spin mx-auto"/></div> : 
              activeBattles.length === 0 ? <p className="text-center text-muted-foreground py-8">Nenhum duelo ativo.</p> :
-             activeBattles.map(b => <BattleCard key={b.id} battle={b} onClick={() => handleBattleClick(b)} />)}
+             activeBattles.map(b => <BattleCard key={b.id} battle={b} onClick={() => handleBattleClick(b)} onAccept={acceptBattle} onReject={rejectBattle} />)}
         </TabsContent>
 
         <TabsContent value="pending" className="space-y-4">
             {loading ? <div className="text-center p-4"><Loader2 className="animate-spin mx-auto"/></div> : 
              pendingBattles.length === 0 ? <p className="text-center text-muted-foreground py-8">Nenhum convite pendente.</p> :
-             pendingBattles.map(b => <BattleCard key={b.id} battle={b} onClick={() => handleBattleClick(b)} />)}
+             pendingBattles.map(b => <BattleCard key={b.id} battle={b} onClick={() => handleBattleClick(b)} onAccept={acceptBattle} onReject={rejectBattle} />)}
         </TabsContent>
 
         <TabsContent value="history" className="space-y-4">
             {loading ? <div className="text-center p-4"><Loader2 className="animate-spin mx-auto"/></div> : 
              historyBattles.length === 0 ? <p className="text-center text-muted-foreground py-8">Histórico vazio.</p> :
-             historyBattles.map(b => <BattleCard key={b.id} battle={b} onClick={() => handleBattleClick(b)} />)}
+             historyBattles.map(b => <BattleCard key={b.id} battle={b} onClick={() => handleBattleClick(b)} onAccept={acceptBattle} onReject={rejectBattle} />)}
         </TabsContent>
       </Tabs>
     </div>
   );
 }
 
-function BattleCard({ battle, onClick }: { battle: EnrichedBattle, onClick: () => void }) {
+function BattleCard({ battle, onClick, onAccept, onReject }: { 
+    battle: EnrichedBattle, 
+    onClick: () => void,
+    onAccept?: (id: string) => Promise<boolean>,
+    onReject?: (id: string) => Promise<boolean>
+}) {
     const isPending = battle.status === 'waiting_for_opponent';
     const opponentName = battle.opponent_profile?.display_name || 'Aguardando...';
 
@@ -120,9 +118,21 @@ function BattleCard({ battle, onClick }: { battle: EnrichedBattle, onClick: () =
                         </p>
                     </div>
                 </div>
-                <Button size="sm" variant={isPending && !battle.is_creator ? "default" : "secondary"}>
-                    {isPending && !battle.is_creator ? "Aceitar" : "Ver"}
-                </Button>
+                
+                {isPending && !battle.is_creator ? (
+                    <div className="flex gap-2" onClick={e => e.stopPropagation()}>
+                         <Button size="sm" variant="outline" className="text-red-500 hover:text-red-600" onClick={() => onReject && onReject(battle.id)}>
+                            Recusar
+                        </Button>
+                        <Button size="sm" variant="default" onClick={() => onAccept && onAccept(battle.id)}>
+                            Aceitar
+                        </Button>
+                    </div>
+                ) : (
+                    <Button size="sm" variant="secondary">
+                        Ver
+                    </Button>
+                )}
             </CardContent>
         </Card>
     );
