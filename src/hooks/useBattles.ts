@@ -121,6 +121,7 @@ export function useBattles() {
         .eq('opponent_id', user.id); // Security check
 
       if (error) {
+        console.error('Error rejecting battle:', error);
         // Rollback if error
         fetchBattles();
         throw error;
