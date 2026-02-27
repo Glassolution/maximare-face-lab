@@ -102,8 +102,11 @@ function BattleCard({ battle, onClick, onAccept, onReject }: {
             <CardContent className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="relative">
-                        <Avatar className="h-10 w-10 border-2 border-background">
-                            <AvatarImage src={battle.opponent_profile?.avatar_url || undefined} />
+                        <Avatar className="h-[48px] w-[48px] border-2 border-background rounded-full">
+                            <AvatarImage 
+                                src={battle.opponent_profile?.avatar_url || undefined} 
+                                className="object-cover object-center w-full h-full"
+                            />
                             <AvatarFallback>?</AvatarFallback>
                         </Avatar>
                         <div className={`absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-background ${

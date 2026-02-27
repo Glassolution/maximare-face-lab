@@ -110,6 +110,9 @@ export function useBattles() {
 
   const rejectBattle = async (battleId: string) => {
     try {
+      // Optimistic update: Remove from list immediately
+      setBattles(prev => prev.filter(b => b.id !== battleId));
+
       // Just update status to canceled/rejected
       const { error } = await supabase
         .from('battles')
@@ -117,10 +120,15 @@ export function useBattles() {
         .eq('id', battleId)
         .eq('opponent_id', user.id); // Security check
 
-      if (error) throw error;
+      if (error) {
+        // Rollback if error
+        fetchBattles();
+        throw error;
+      }
 
       toast.info('Desafio recusado.');
-      fetchBattles();
+      // No need to fetch again if optimistic update worked, but we can do it silently
+      // fetchBattles(); 
       return true;
     } catch (err: any) {
       toast.error(err.message || 'Erro ao recusar desafio');
