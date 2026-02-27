@@ -1,51 +1,54 @@
 /**
- * PostHog Analytics Client
+ * PostHog Analytics Client (Browser/React)
  *
- * Singleton PostHog Node.js client for server-side analytics tracking.
- * Uses environment variables for configuration — never hardcode keys.
+ * Uses posthog-js for proper browser support (SPA tracking, session replay, etc).
+ * Replaces the node/edge client to fix build issues with 'path' module.
  */
 
-import { PostHog } from 'posthog-node';
+import posthog from 'posthog-js';
 
-function initializePosthog(): PostHog | null {
-  const apiKey = import.meta.env.VITE_POSTHOG_API_KEY;
+function initializePosthog() {
+  const apiKey = import.meta.env.VITE_POSTHOG_API_KEY as string | undefined;
+  const apiHost = (import.meta.env.VITE_POSTHOG_HOST as string | undefined) || 'https://us.i.posthog.com';
 
   if (!apiKey) {
     console.warn('WARNING: PostHog not configured (VITE_POSTHOG_API_KEY not set)');
-    console.warn('         App will work but analytics will not be tracked');
     return null;
   }
 
-  const client = new PostHog(apiKey, {
-    host: import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
-    enableExceptionAutocapture: true,
-    // In a browser-like long-running context, batch events automatically.
-    // For short-lived server processes you would set flushAt: 1, flushInterval: 0.
+  // Initialize PostHog
+  posthog.init(apiKey, {
+    api_host: apiHost,
+    person_profiles: 'identified_only', // Optimized for privacy/performance
+    capture_pageview: false, // We handle pageviews manually in SPA if needed, or set to true for auto
+    autocapture: true,
   });
 
-  return client;
+  return posthog;
 }
 
-export const posthog = initializePosthog();
+// Initialize immediately (side-effect)
+const client = initializePosthog();
+
+export { posthog };
 
 /**
  * Capture a PostHog event.
- * @param distinctId - The user's unique identifier (Supabase user ID or 'anonymous')
+ * @param distinctId - Optional distinct ID (ignored in JS client if user is identified, uses internal ID)
  * @param event - The event name
  * @param properties - Optional event properties
  */
 export function trackEvent(
-  distinctId: string,
+  distinctId: string, // Kept for compatibility with previous interface, but posthog-js handles ID internally
   event: string,
   properties: Record<string, unknown> = {}
 ): void {
-  if (!posthog) return;
-
-  posthog.capture({
-    distinctId,
-    event,
-    properties,
-  });
+  if (!client) return;
+  
+  // In posthog-js, we just call capture. The user ID is handled by identify().
+  // If distinctId is provided and different from current, we might need to identify, 
+  // but usually trackEvent is called after identify.
+  posthog.capture(event, properties);
 }
 
 /**
@@ -57,12 +60,9 @@ export function identifyUser(
   distinctId: string,
   properties: Record<string, unknown> = {}
 ): void {
-  if (!posthog) return;
+  if (!client) return;
 
-  posthog.identify({
-    distinctId,
-    properties,
-  });
+  posthog.identify(distinctId, properties);
 }
 
 /**
@@ -76,7 +76,14 @@ export function captureException(
   distinctId?: string,
   additionalProperties?: Record<string, unknown>
 ): void {
-  if (!posthog) return;
-
-  posthog.captureException(error, distinctId, additionalProperties);
+  if (!client) return;
+  
+  // posthog-js doesn't have explicit captureException like node, 
+  // but we can track an error event manually.
+  console.error('[PostHog] Capturing exception:', error);
+  
+  posthog.capture('exception', {
+    error: String(error),
+    ...additionalProperties
+  });
 }
