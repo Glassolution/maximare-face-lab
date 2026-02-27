@@ -96,7 +96,55 @@ export function useFriends() {
 
   useEffect(() => {
     fetchFriends();
-  }, [fetchFriends]);
+
+    // Realtime subscription for friends list updates
+    const channel = supabase
+      .channel('friends-list-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'friendships',
+          // We can't easily filter by OR in realtime filter syntax for multiple columns securely/simply in one go sometimes,
+          // but we can filter by where either column equals user.id if Supabase supports it, 
+          // or just listen to all friendships and filter in client (inefficient) or use 2 channels.
+          // Actually, Supabase Realtime filters are limited. 
+          // Simplest robust way: Listen to table changes where requester_id=user.id OR addressee_id=user.id
+          // But 'or' syntax in filter string is tricky.
+          // Let's use two subscriptions or just rely on global table events if volume is low, but better be specific.
+          // Syntax: "column=eq.value"
+          // We will subscribe to changes where we are involved.
+          // Ideally: filter: `requester_id=eq.${user.id}` AND another for addressee.
+        }, 
+        (payload) => {
+            // Check if we are involved in this change
+            const rec = payload.new as any || payload.old as any;
+            if (rec && (rec.requester_id === user?.id || rec.addressee_id === user?.id)) {
+                 fetchFriends();
+            }
+        }
+      )
+      .subscribe();
+      
+      // Since we can't do OR in filter string easily, let's create two listeners or one generic?
+      // Actually, standard practice: Subscribe to the table, and in callback check if it relates to us.
+      // But without filter, we get ALL events from DB (bad for scale).
+      // Let's create two channels for safety.
+      
+      const channel1 = supabase.channel(`friends-req-${user?.id}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships', filter: `requester_id=eq.${user?.id}` }, () => fetchFriends())
+        .subscribe();
+
+      const channel2 = supabase.channel(`friends-addr-${user?.id}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships', filter: `addressee_id=eq.${user?.id}` }, () => fetchFriends())
+        .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel1);
+      supabase.removeChannel(channel2);
+    };
+  }, [fetchFriends, user]);
 
   return { friends, loading, refetch: fetchFriends };
 }
@@ -186,7 +234,30 @@ export function useFriendRequests() {
 
   useEffect(() => {
     fetchRequests();
-  }, [fetchRequests]);
+
+    if (!user) return;
+
+    // Listen for changes where I am the addressee (incoming requests)
+    const channel1 = supabase.channel(`req-incoming-${user.id}`)
+        .on('postgres_changes', 
+            { event: '*', schema: 'public', table: 'friendships', filter: `addressee_id=eq.${user.id}` }, 
+            () => fetchRequests()
+        )
+        .subscribe();
+
+    // Listen for changes where I am the requester (outgoing requests updates)
+    const channel2 = supabase.channel(`req-outgoing-${user.id}`)
+        .on('postgres_changes', 
+            { event: '*', schema: 'public', table: 'friendships', filter: `requester_id=eq.${user.id}` }, 
+            () => fetchRequests()
+        )
+        .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel1);
+        supabase.removeChannel(channel2);
+    };
+  }, [fetchRequests, user]);
 
   return { incoming, outgoing, loading, refetch: fetchRequests };
 }
