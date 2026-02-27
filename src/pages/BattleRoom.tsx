@@ -4,7 +4,7 @@ import { useBattleRoom } from '@/hooks/useBattleRoom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Camera, Upload, Trophy, Skull } from 'lucide-react';
+import { Loader2, Camera, Upload, Trophy, Skull, CheckCircle2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
@@ -20,29 +20,23 @@ export default function BattleRoom() {
   const [frontFile, setFrontFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showResultScreen, setShowResultScreen] = useState(false);
-  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+  
+  // Controls if the processing animation has finished its mandatory cycle (7s minimum)
+  const [processingAnimationComplete, setProcessingAnimationComplete] = useState(false);
+  
+  // Controls if the "Reveal" animation (MOGGADO/ASCENDEU) has finished
+  const [revealAnimationComplete, setRevealAnimationComplete] = useState(false);
 
   // Timer for minimum processing duration (7s)
-  useEffect(() => {
-    if (battle?.status === 'processing') {
-        const serverStartTime = new Date(battle.result_ready_at || battle.matched_at || Date.now()).getTime(); // Should ideally be processing_start_at
-        const now = Date.now();
-        const timeElapsed = now - serverStartTime;
-        
-        if (timeElapsed >= 7000) {
-            setMinTimeElapsed(true);
-        } else {
-            const timer = setTimeout(() => {
-                setMinTimeElapsed(true);
-            }, 7000 - timeElapsed);
-            return () => clearTimeout(timer);
-        }
-    } else if (battle?.status === 'completed' && !showResultScreen) {
-        setMinTimeElapsed(true);
-    }
-  }, [battle?.status, showResultScreen, battle?.matched_at, battle?.result_ready_at]);
+  // This logic is now handled internally by BattleProcessingOverlay via onComplete callback
+  // We just need to ensure we don't unmount it until it calls onComplete.
+
+  const handleProcessingComplete = () => {
+      setProcessingAnimationComplete(true);
+  };
 
   const handleRevealComplete = () => {
+      setRevealAnimationComplete(true);
       setShowResultScreen(true);
   };
 
@@ -68,102 +62,28 @@ export default function BattleRoom() {
     );
   }
 
-  // Status: Submission (or matched)
-  if (battle.status === 'matched' || battle.status === 'photo_submission') {
-      return (
-          <div className="container max-w-lg mx-auto py-6 px-4 space-y-6">
-              <header className="flex items-center justify-between">
-                  <h1 className="text-xl font-bold">Sala de Batalha</h1>
-                  <span className="text-xs bg-blue-500/10 text-blue-500 px-2 py-1 rounded-full uppercase font-bold tracking-wider">
-                      {battle.status === 'matched' ? 'Preparando...' : 'Envie sua foto'}
-                  </span>
-              </header>
+  // --- LOGIC FOR DECIDING WHICH SCREEN TO SHOW ---
 
-              {/* Opponent Status */}
-              <Card>
-                  <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground uppercase">Oponente</CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex items-center gap-4">
-                      <Avatar className="h-12 w-12">
-                          <AvatarImage src={opponentProfile?.avatar_url} />
-                          <AvatarFallback>?</AvatarFallback>
-                      </Avatar>
-                      <div>
-                          <p className="font-bold">{opponentProfile?.display_name || 'Oponente'}</p>
-                          <p className="text-xs text-muted-foreground">
-                              {submissions.find(s => s.user_id === battle.opponent_id) ? 'Foto enviada ✅' : 'Aguardando foto...'}
-                          </p>
-                      </div>
-                  </CardContent>
-              </Card>
+  const mySubmission = submissions.find(s => s.user_id === userProfile?.id);
+  const opponentSubmission = submissions.find(s => s.user_id !== userProfile?.id);
 
-              {/* My Submission Area */}
-              <Card className="border-dashed border-2">
-                  <CardContent className="pt-6 text-center space-y-4">
-                      {!frontFile ? (
-                          <div className="py-8 space-y-4">
-                              <div className="h-20 w-20 bg-muted rounded-full flex items-center justify-center mx-auto">
-                                  <Camera className="h-8 w-8 text-muted-foreground" />
-                              </div>
-                              <p className="text-sm text-muted-foreground">Tire uma foto frontal clara e iluminada</p>
-                              <div className="flex justify-center gap-2">
-                                  <Button onClick={() => document.getElementById('file-upload')?.click()}>
-                                      <Upload className="mr-2 h-4 w-4" /> Upload
-                                  </Button>
-                                  <input 
-                                      id="file-upload" 
-                                      type="file" 
-                                      accept="image/*" 
-                                      className="hidden" 
-                                      onChange={(e) => e.target.files?.[0] && setFrontFile(e.target.files[0])}
-                                  />
-                              </div>
-                          </div>
-                      ) : (
-                          <div className="relative aspect-[3/4] max-w-[200px] mx-auto rounded-lg overflow-hidden border">
-                              <img src={URL.createObjectURL(frontFile)} alt="Preview" className="w-full h-full object-cover" />
-                              <Button 
-                                  variant="destructive" 
-                                  size="sm" 
-                                  className="absolute top-2 right-2"
-                                  onClick={() => setFrontFile(null)}
-                              >
-                                  Trocar
-                              </Button>
-                          </div>
-                      )}
+  // 1. PROCESSING OVERLAY (Highest Priority during processing phase)
+  // Show if:
+  // - Status is 'processing'
+  // - OR Status is advanced ('reveal_loser' or 'completed') BUT animation hasn't finished yet
+  // - AND both users have submitted (to be safe)
+  const shouldShowProcessing = 
+      (battle.status === 'processing') || 
+      (!processingAnimationComplete && ['reveal_loser', 'completed'].includes(battle.status) && !!mySubmission && !!opponentSubmission);
 
-                      <Button 
-                          className="w-full" 
-                          disabled={!frontFile || uploading} 
-                          onClick={async () => {
-                              if (!frontFile) return;
-                              setUploading(true);
-                              await submitPhotos(frontFile);
-                              setUploading(false);
-                          }}
-                      >
-                          {uploading ? <Loader2 className="animate-spin mr-2" /> : 'Enviar Foto & Lutar'}
-                      </Button>
-                  </CardContent>
-              </Card>
-          </div>
-      );
-  }
-
-  // Status: Processing OR Completed (waiting for animation)
-  if (battle.status === 'processing' || (battle.status === 'completed' && !showResultScreen)) {
-      const mySubmission = submissions.find(s => s.user_id === userProfile?.id);
-      const opponentSubmission = submissions.find(s => s.user_id !== userProfile?.id);
-      
+  if (shouldShowProcessing) {
       const myAvatar = getPhotoUrl(mySubmission?.front_photo_path) || userProfile?.avatar_url;
       const opponentAvatar = getPhotoUrl(opponentSubmission?.front_photo_path) || opponentProfile?.avatar_url;
-
-      const isReady = battle.status === 'completed' && minTimeElapsed;
       
-      // Use matched_at as a fallback for start time if processing started immediately after match
-      // Ideally we would have a 'processing_started_at' field, but matched_at + photo submission time is close enough for sync
+      // We tell the overlay to finish ONLY if the real status is completed/reveal_loser
+      const isReady = ['reveal_loser', 'completed'].includes(battle.status);
+      
+      // Use matched_at as a fallback for start time
       const startTime = battle.matched_at ? new Date(battle.matched_at).getTime() : undefined;
 
       return (
@@ -171,16 +91,23 @@ export default function BattleRoom() {
             userAvatar={myAvatar} 
             opponentAvatar={opponentAvatar} 
             isReady={isReady}
-            onComplete={() => setShowResultScreen(true)}
+            onComplete={handleProcessingComplete}
             startTime={startTime}
         />
       );
   }
 
-  // Status: Reveal Loser (Animation)
-  if (battle.status === 'reveal_loser' && !showResultScreen) {
-      // Determine my photo for background
-      const mySubmission = submissions.find(s => s.user_id === userProfile?.id);
+  // 2. REVEAL OVERLAY (Intermediate Phase)
+  // Show if:
+  // - Status is 'reveal_loser' (or completed if we skipped reveal_loser in DB but want to show it)
+  // - AND Processing animation finished
+  // - AND Reveal animation NOT finished
+  const shouldShowReveal = 
+      processingAnimationComplete && 
+      !revealAnimationComplete && 
+      ['reveal_loser', 'completed'].includes(battle.status);
+
+  if (shouldShowReveal) {
       const myPhoto = getPhotoUrl(mySubmission?.front_photo_path) || userProfile?.avatar_url;
 
       return (
@@ -192,9 +119,9 @@ export default function BattleRoom() {
       );
   }
 
-  // Status: Completed or Show Result Screen
+  // 3. FINAL RESULT SCREEN
   if (showResultScreen && result) {
-      // Logic to determine labels and colors based on winner/loser
+       // Logic to determine labels and colors based on winner/loser
       // Assuming user logged in is viewing
       return (
           <div className="container max-w-lg mx-auto py-8 px-4 space-y-8 animate-in fade-in duration-500">
@@ -265,6 +192,114 @@ export default function BattleRoom() {
                   <Button className="flex-1" onClick={() => navigate('/battles')}>Nova Batalha</Button>
                   <Button variant="outline" className="flex-1">Compartilhar</Button>
               </div>
+          </div>
+      );
+  }
+
+  // 4. SUBMISSION FORM (Default if not waiting opponent, processing, or revealing)
+  // Only show if status is matched/photo_submission
+  if (battle.status === 'matched' || battle.status === 'photo_submission') {
+      const hasSubmitted = !!mySubmission;
+
+      return (
+          <div className="container max-w-lg mx-auto py-6 px-4 space-y-6">
+              <header className="flex items-center justify-between">
+                  <h1 className="text-xl font-bold">Sala de Batalha</h1>
+                  <span className="text-xs bg-blue-500/10 text-blue-500 px-2 py-1 rounded-full uppercase font-bold tracking-wider">
+                      {hasSubmitted ? 'Aguardando...' : 'Envie sua foto'}
+                  </span>
+              </header>
+
+              {/* Opponent Status */}
+              <Card>
+                  <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground uppercase">Oponente</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex items-center gap-4">
+                      <Avatar className="h-12 w-12">
+                          <AvatarImage src={opponentProfile?.avatar_url} />
+                          <AvatarFallback>?</AvatarFallback>
+                      </Avatar>
+                      <div>
+                          <p className="font-bold">{opponentProfile?.display_name || 'Oponente'}</p>
+                          <p className="text-xs text-muted-foreground">
+                              {opponentSubmission ? 'Foto enviada ✅' : 'Aguardando foto...'}
+                          </p>
+                      </div>
+                  </CardContent>
+              </Card>
+
+              {/* My Submission Area */}
+              <Card className={`border-2 ${hasSubmitted ? 'border-green-500/20 bg-green-500/5' : 'border-dashed'}`}>
+                  <CardContent className="pt-6 text-center space-y-4">
+                      {hasSubmitted ? (
+                          <div className="py-8 space-y-4">
+                              <div className="h-20 w-20 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto">
+                                  <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
+                              </div>
+                              <h3 className="text-lg font-bold text-green-700 dark:text-green-400">Foto Enviada!</h3>
+                              <p className="text-sm text-muted-foreground">
+                                  Aguardando {opponentProfile?.display_name || 'oponente'} enviar a foto para iniciar a batalha...
+                              </p>
+                              <div className="relative aspect-[3/4] max-w-[150px] mx-auto rounded-lg overflow-hidden border shadow-sm opacity-80">
+                                  <img 
+                                    src={getPhotoUrl(mySubmission.front_photo_path) || ''} 
+                                    alt="Minha foto" 
+                                    className="w-full h-full object-cover" 
+                                  />
+                              </div>
+                          </div>
+                      ) : (
+                          <>
+                              {!frontFile ? (
+                                  <div className="py-8 space-y-4">
+                                      <div className="h-20 w-20 bg-muted rounded-full flex items-center justify-center mx-auto">
+                                          <Camera className="h-8 w-8 text-muted-foreground" />
+                                      </div>
+                                      <p className="text-sm text-muted-foreground">Tire uma foto frontal clara e iluminada</p>
+                                      <div className="flex justify-center gap-2">
+                                          <Button onClick={() => document.getElementById('file-upload')?.click()}>
+                                              <Upload className="mr-2 h-4 w-4" /> Upload
+                                          </Button>
+                                          <input 
+                                              id="file-upload" 
+                                              type="file" 
+                                              accept="image/*" 
+                                              className="hidden" 
+                                              onChange={(e) => e.target.files?.[0] && setFrontFile(e.target.files[0])}
+                                          />
+                                      </div>
+                                  </div>
+                              ) : (
+                                  <div className="relative aspect-[3/4] max-w-[200px] mx-auto rounded-lg overflow-hidden border">
+                                      <img src={URL.createObjectURL(frontFile)} alt="Preview" className="w-full h-full object-cover" />
+                                      <Button 
+                                          variant="destructive" 
+                                          size="sm" 
+                                          className="absolute top-2 right-2"
+                                          onClick={() => setFrontFile(null)}
+                                      >
+                                          Trocar
+                                      </Button>
+                                  </div>
+                              )}
+
+                              <Button 
+                                  className="w-full" 
+                                  disabled={!frontFile || uploading} 
+                                  onClick={async () => {
+                                      if (!frontFile) return;
+                                      setUploading(true);
+                                      await submitPhotos(frontFile);
+                                      setUploading(false);
+                                  }}
+                              >
+                                  {uploading ? <Loader2 className="animate-spin mr-2" /> : 'Enviar Foto & Lutar'}
+                              </Button>
+                          </>
+                      )}
+                  </CardContent>
+              </Card>
           </div>
       );
   }
