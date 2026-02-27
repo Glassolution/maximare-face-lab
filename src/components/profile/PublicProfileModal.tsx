@@ -13,7 +13,7 @@ interface PublicProfileModalProps {
 }
 
 export function PublicProfileModal({ isOpen, onClose, profile }: PublicProfileModalProps) {
-  const { removeFriend } = useFriendActions();
+  const { unfriend } = useFriendActions();
   const navigate = useNavigate();
 
   if (!profile) return null;
@@ -79,13 +79,13 @@ export function PublicProfileModal({ isOpen, onClose, profile }: PublicProfileMo
               <Share2 className="mr-2 h-4 w-4" /> Compartilhar Perfil
            </Button>
            
-           {profile.status === 'accepted' && (
+           {profile.friendship_status === 'accepted' && (
                <Button 
                 variant="ghost" 
                 className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-500/10"
                 onClick={async () => {
                     if (confirm("Tem certeza que deseja remover este amigo?")) {
-                        await removeFriend(profile.id);
+                        await unfriend(profile.id);
                         onClose();
                     }
                 }}

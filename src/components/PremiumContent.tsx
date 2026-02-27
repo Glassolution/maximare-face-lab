@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import faceScanHero from "@/assets/face-scan-hero.jpg";
 import { logPaywallEvent, PaywallContext } from "@/lib/paywall";
+import { trackEvent } from "@/lib/posthog";
 import { CheckoutPremium } from "./CheckoutPremium";
 import { PlanConfirmation } from "./PlanConfirmation";
 
@@ -127,6 +128,14 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
       const { data: { session } } = await supabase.auth.getSession();
       
       await logPaywallEvent(session?.user?.id || 'guest', 'checkout_started', { plan: selectedPlan });
+
+      // PostHog: track checkout started
+      trackEvent(session?.user?.id || 'anonymous', 'checkout_started', {
+        plan: selectedPlan,
+        trigger: context?.trigger,
+        price: PLAN_CONFIG.PLANS[selectedPlan].price,
+      });
+
       // Change to confirmation step
       setStep('confirmation');
 

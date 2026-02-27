@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { logger } from "@/lib/logger";
 import { PLAN_CONFIG } from "@/config/plans";
+import { trackEvent, captureException } from "@/lib/posthog";
 import { motion } from "framer-motion";
 
 interface CheckoutPremiumProps {
@@ -357,8 +358,18 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
             setPollingStartTime(Date.now());
         }
 
+        // PostHog: track payment outcome
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        const distinctId = currentUser?.id || 'anonymous';
+
         if (data.status === 'approved') {
             toast.success("Pagamento aprovado!");
+            trackEvent(distinctId, 'payment_completed', {
+              plan,
+              price,
+              payment_method: 'card',
+              payment_id: data?.payment_id,
+            });
             await refreshSession();
             onSuccess(email);
         } else if (data.status === 'in_process') {
@@ -366,11 +377,18 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
             setVerifying(true);
         } else {
             toast.error("Pagamento recusado. Verifique os dados.");
+            trackEvent(distinctId, 'payment_failed', {
+              plan,
+              price,
+              payment_method: 'card',
+              status: data.status,
+            });
         }
 
     } catch (e: any) {
         console.error(e);
         toast.error(e.message || "Erro ao processar pagamento.");
+        captureException(e, undefined, { context: 'card_payment', plan, price });
     } finally {
         setLoading(false);
     }
@@ -422,6 +440,15 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
     } catch (e: any) {
         console.error(e);
         toast.error(e.message || "Erro ao gerar PIX.");
+        // PostHog: track PIX payment failure
+        const { data: { user: currentUser } } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+        trackEvent(currentUser?.id || 'anonymous', 'payment_failed', {
+          plan,
+          price,
+          payment_method: 'pix',
+          error_message: e.message,
+        });
+        captureException(e, currentUser?.id, { context: 'pix_payment', plan, price });
     } finally {
         setLoading(false);
     }

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { trackEvent } from "@/lib/posthog";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
@@ -738,7 +739,15 @@ export default function Onboarding() {
       setStep((s) => s - 1);
     }
   };
-  const finish = () => navigate("/login");
+  const finish = () => {
+    // PostHog: track onboarding completed
+    trackEvent('anonymous', 'onboarding_completed', {
+      age: userData.age,
+      goal: GOALS[userData.goal]?.title || userData.goal,
+      gender: userData.gender,
+    });
+    navigate("/login");
+  };
 
   // Render StepAge in full screen mode without the default wrapper
   if (step === 0) {

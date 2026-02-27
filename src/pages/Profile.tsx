@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Crown, ChevronRight, Settings, Shield, Zap, Star, TrendingUp, Search, LogOut, Moon, Sun, CreditCard, Copy, Upload, Camera } from "lucide-react";
 import { getAnalysisHistory } from "@/lib/mockData";
 import { toast } from "sonner";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { getTier, getNextTier, ExtendedAnalysisResult } from "@/lib/rankingSystem";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ export default function Profile() {
   const { user, profile } = useAuth();
   const { isPremium, subscriptionStatus, expiresAt, planType } = usePremiumStatus();
   const navigate = useNavigate();
+  const location = useLocation();
   const history = getAnalysisHistory();
   const lastAnalysis = history.length > 0 ? (history[0] as unknown as ExtendedAnalysisResult) : null;
   const { theme, setTheme } = useTheme();
@@ -250,8 +251,6 @@ export default function Profile() {
                  
                  {avatarUrl ? (
                      <img src={avatarUrl} alt="User" className="w-full h-full object-cover" />
-                 ) : lastAnalysis?.photoUrl ? (
-                     <img src={lastAnalysis.photoUrl} alt="User" className="w-full h-full object-cover" />
                  ) : (
                      <span className="font-heading text-2xl font-bold text-gradient">
                         {displayName ? displayName.substring(0, 1).toUpperCase() : "M"}

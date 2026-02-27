@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useBattles } from '@/hooks/useBattles';
 import { useAuth } from '@/hooks/useAuth';
+import { trackEvent } from '@/lib/posthog';
 import { useFriends } from '@/hooks/useFriendSystem';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,11 +28,14 @@ export default function Battles() {
 
   const handleBattleClick = (battle: EnrichedBattle) => {
     if (battle.status === 'waiting_for_opponent' && !battle.is_creator) {
-       // Need to accept first? Or just go to room and accept there?
-       // Let's accept here for simplicity or redirect to room where they can accept.
-       // The prompt says "Aceitar desafio + animação".
        acceptBattle(battle.id).then(success => {
-           if(success) navigate(`/battle/${battle.id}`);
+           if(success) {
+             // PostHog: track battle accepted
+             trackEvent(user.id, 'battle_accepted', {
+               battle_id: battle.id,
+             });
+             navigate(`/battle/${battle.id}`);
+           }
        });
     } else {
        navigate(`/battle/${battle.id}`);
@@ -139,7 +143,13 @@ function CreateBattleModal({ onCreate }: { onCreate: (id: string) => Promise<boo
         setSending(friendId);
         const success = await onCreate(friendId);
         setSending(null);
-        if (success) setOpen(false);
+        if (success) {
+          // PostHog: track battle created
+          trackEvent('user', 'battle_created', {
+            opponent_id: friendId,
+          });
+          setOpen(false);
+        }
     };
 
     return (

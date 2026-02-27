@@ -1,4 +1,4 @@
-export type FriendshipStatus = 'pending' | 'accepted' | 'rejected' | 'canceled' | 'blocked' | 'none';
+export type FriendshipStatus = 'pending' | 'accepted' | 'rejected' | 'canceled' | 'blocked' | 'none' | 'pending_sent' | 'pending_received';
 
 export interface FriendProfile {
   id: string;

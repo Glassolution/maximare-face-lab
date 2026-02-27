@@ -26,6 +26,7 @@ import { generatePersonalizedPlan } from "@/lib/smartTrendsEngine";
 import faceScanHero from "@/assets/clark.png";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { trackEvent, captureException } from "@/lib/posthog";
 
 function CircularScore({ score, delta, ringColor }: { score: number; delta: number; ringColor: string }) {
   const springValue = useSpring(0, { stiffness: 40, damping: 20 });
@@ -396,6 +397,14 @@ export default function Analysis() {
     lastAttemptRef.current = now;
     setErrorMsg(null);
     setCaptureStep("analyzing");
+
+    // PostHog: track analysis started
+    const distinctId = user?.id || 'anonymous';
+    trackEvent(distinctId, 'face_analysis_started', {
+      has_front_photo: !!frontPhoto,
+      has_side_photo: !!sidePhoto,
+      is_premium: isPremium,
+    });
     
     if (!frontPhoto || !sidePhoto) {
         setErrorMsg("Erro: Fotos faltando. Por favor, forneça ambas as fotos.");
@@ -511,7 +520,15 @@ export default function Analysis() {
         if (sidePhoto) result.photoSideUrl = sidePhoto;
         
         await saveAnalysis(result);
-        
+
+        // PostHog: track analysis completed
+        trackEvent(distinctId, 'face_analysis_completed', {
+          ger: result.ger,
+          tier: result.tier,
+          overall_score: result.overallScore,
+          is_premium: isPremium,
+        });
+
         // Handle Battle Context
         const battleId = searchParams.get("battleId");
         if (battleId && user) {
@@ -579,7 +596,12 @@ export default function Analysis() {
 
     } catch (error: unknown) {
         console.error("Erro na análise:", error);
-        // ... error handling
+        // PostHog: track analysis failure and capture exception
+        trackEvent(distinctId, 'face_analysis_failed', {
+          error_message: error instanceof Error ? error.message : String(error),
+          is_premium: isPremium,
+        });
+        captureException(error, distinctId, { context: 'face_analysis' });
     } finally {
         if (captureStep === "analyzing") {
           // Log Event after successful analysis

@@ -38,7 +38,7 @@ export default function Friends() {
         onClick={() => setSelectedProfile(user)}
       >
         <Avatar className="h-10 w-10 border border-border">
-          <AvatarImage src={user.avatar_url || undefined} />
+          <AvatarImage src={user.avatar_url || undefined} className="object-cover" />
           <AvatarFallback>{initials}</AvatarFallback>
         </Avatar>
         <div>

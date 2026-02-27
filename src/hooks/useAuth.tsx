@@ -39,6 +39,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const USERNAME_DOMAIN = "@maximare.local";
 
 import { logger } from "@/lib/logger";
+import { trackEvent, identifyUser, captureException } from "@/lib/posthog";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -190,11 +191,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (existing) return { error: "Esse username já está em uso." };
 
     const email = `${clean}${USERNAME_DOMAIN}`;
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { data: signUpData, error } = await supabase.auth.signUp({ email, password });
 
     if (error) {
       if (error.message.includes("already registered")) return { error: "Esse username já está em uso." };
       return { error: error.message };
+    }
+
+    // PostHog: identify and track new sign-up
+    if (signUpData?.user) {
+      identifyUser(signUpData.user.id, {
+        username: clean,
+        $set_once: { first_sign_up: new Date().toISOString() },
+      });
+      trackEvent(signUpData.user.id, 'user_signed_up', {
+        username: clean,
+      });
     }
 
     return { error: null };
@@ -205,16 +217,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!clean || !password) return { error: "Preencha todos os campos." };
 
     const email = `${clean}${USERNAME_DOMAIN}`;
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
       return { error: "Username ou senha incorretos." };
+    }
+
+    // PostHog: identify and track login
+    if (signInData?.user) {
+      identifyUser(signInData.user.id, {
+        username: clean,
+        last_login: new Date().toISOString(),
+      });
+      trackEvent(signInData.user.id, 'user_logged_in', {
+        username: clean,
+      });
     }
 
     return { error: null };
   };
 
   const signOut = async () => {
+    // PostHog: track sign-out before clearing user state
+    if (user) {
+      trackEvent(user.id, 'user_logged_out');
+    }
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);

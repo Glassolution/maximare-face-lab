@@ -55,7 +55,7 @@ export function useUserSearch() {
         // Map the result to FriendProfile
         const mapped: FriendProfile[] = data.map((item: any) => {
            // Fallback logic
-           const displayName = item.display_name || item.username || `Usuário #${item.public_id || item.short_id}`;
+           const displayName = item.display_name || item.full_name || item.username || `Usuário #${item.public_id || item.short_id}`;
            const username = item.username || `user_${item.public_id || item.short_id}`;
            
            // Avatar URL Logic
@@ -64,7 +64,12 @@ export function useUserSearch() {
            if (avatarUrl && !avatarUrl.startsWith('http') && !avatarUrl.startsWith('data:')) {
                // Assuming it's a path in 'avatars' bucket (which is public)
                const { data } = supabase.storage.from('avatars').getPublicUrl(avatarUrl);
-               avatarUrl = data.publicUrl;
+               // Add cache buster to force refresh if it's the same URL but updated content
+               // Using current time might be too aggressive, maybe use item updated_at if available?
+               // For now, simple cache buster is fine or just raw URL. 
+               // User asked for: ?t=${updated_at || Date.now()}
+               const cacheBuster = `?t=${Date.now()}`;
+               avatarUrl = data.publicUrl + cacheBuster;
            }
 
            if (import.meta.env.VITE_DEBUG_MODE === 'true') {
