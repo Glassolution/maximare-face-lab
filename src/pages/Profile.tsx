@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/theme/ThemeProvider";
 import { usePremiumStatus } from "@/hooks/usePremiumStatus";
+import { CancelSubscriptionWizard } from "@/components/CancelSubscriptionWizard";
 import { avatarService } from "@/services/avatarService";
 
 type MenuItem = {
@@ -32,6 +33,7 @@ export default function Profile() {
   const { theme, setTheme } = useTheme();
   const [showPreferences, setShowPreferences] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
+  const [showCancelWizard, setShowCancelWizard] = useState(false);
   const [earnedBadges, setEarnedBadges] = useState<string[]>([]);
   
   const [shortId, setShortId] = useState<string | null>(null);
@@ -601,9 +603,17 @@ export default function Profile() {
               >
                 Ir para Mercado Pago
               </Button>
+              <Button 
+                variant="destructive" 
+                className="w-full"
+                onClick={() => { setShowSubscription(false); setShowCancelWizard(true); }}
+              >
+                Cancelar assinatura
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
+        <CancelSubscriptionWizard open={showCancelWizard} onOpenChange={setShowCancelWizard} />
       </div>
     </div>
   );
