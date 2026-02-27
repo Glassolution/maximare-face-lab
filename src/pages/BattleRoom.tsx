@@ -124,7 +124,7 @@ export default function BattleRoom() {
        // Logic to determine labels and colors based on winner/loser
       // Assuming user logged in is viewing
       return (
-          <div className="container max-w-lg mx-auto py-8 px-4 space-y-8 animate-in fade-in duration-500">
+          <div className="container max-w-lg mx-auto py-8 px-4 space-y-8 animate-in fade-in duration-500 pb-32">
               <div className="text-center space-y-2">
                   <h1 className="text-3xl font-heading font-black text-primary uppercase tracking-tighter">
                       Resultado Final

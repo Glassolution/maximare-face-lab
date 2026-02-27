@@ -134,7 +134,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
       bankTransfer: [],
       atm: [],
       creditCard: "all",
-      debitCard: [], // Remove debit card to skip selection
+      debitCard: "all",
     },
     visual: {
         style: {
@@ -712,22 +712,24 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
             </div>
 
             {/* Card Section */}
-            <div className={paymentMethod === 'card' ? 'block space-y-4 animate-fade-in' : 'hidden'}>
+            {paymentMethod === 'card' && (
+                <div className="space-y-4 animate-fade-in">
                     <p className="text-sm font-bold text-gray-900 dark:text-white mb-2">Cartão de crédito ou débito</p>
-                {/* Card Form handled by Brick */}
-                <div className="bg-transparent dark:bg-transparent rounded-2xl p-1 border-none">
-                    <CardPayment
-                        initialization={initialization}
-                        customization={customization}
-                        onSubmit={handleCardSubmit}
-                        onReady={() => setReady(true)}
-                        onError={(error) => {
-                            console.error('Brick Error:', error);
-                            // toast.error("Erro no formulário de pagamento.");
-                        }}
-                    />
+                    {/* Card Form handled by Brick */}
+                    <div className="bg-transparent dark:bg-transparent rounded-2xl p-1 border-none min-h-[300px]">
+                        <CardPayment
+                            initialization={initialization}
+                            customization={customization}
+                            onSubmit={handleCardSubmit}
+                            onReady={() => setReady(true)}
+                            onError={(error) => {
+                                console.error('Brick Error:', error);
+                                toast.error("Erro ao carregar formulário de pagamento.");
+                            }}
+                        />
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
 
       </div>
