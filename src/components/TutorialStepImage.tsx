@@ -46,9 +46,11 @@ export function TutorialCarousel({ interventionType, steps }: TutorialCarouselPr
           className={`w-full h-full object-cover transition-opacity duration-500 ${loading ? 'opacity-0' : 'opacity-100'}`}
           onLoad={() => setLoading(false)}
           onError={() => {
+            console.warn("Failed to load Pollinations image:", imageUrl);
             setLoading(false);
             setError(true);
           }}
+          crossOrigin="anonymous"
         />
       )}
       
