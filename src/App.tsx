@@ -30,6 +30,8 @@ import { syncHistoryWithSupabase } from "@/lib/mockData";
 
 import UpdatePassword from "@/pages/UpdatePassword";
 
+import { usePaywallStore } from "@/lib/paywallStore";
+
 const queryClient = new QueryClient();
 
 function Layout() {
@@ -39,6 +41,7 @@ function Layout() {
   const hideNav = ["/", "/onboarding", "/login", "/premium", "/landing", "/update-password", "/subscription"].includes(location.pathname);
 
   const { user, loading } = useAuth();
+  const { openPopup } = usePaywallStore();
   
   const { checkGate, PaywallDialog } = usePaywallGate();
 
@@ -57,7 +60,7 @@ function Layout() {
       // Only check on main tabs to avoid spamming while navigating sub-pages
       const mainTabs = ["/analysis", "/profile", "/trends", "/progress"];
       if (mainTabs.some(path => location.pathname.startsWith(path))) {
-         await checkGate({ trigger: 'app_open' });
+         // await checkGate({ trigger: 'app_open' }); // Disabled as per user request
       }
     };
     
@@ -75,21 +78,6 @@ function Layout() {
        navigate(location.pathname, { replace: true, state: {} });
     }
   }, [user, loading, location, checkGate, navigate]);
-
-  // Periodic Paywall Force (every 3 minutes)
-  useEffect(() => {
-    if (!user || loading) return;
-
-    const interval = setInterval(() => {
-      // Don't show if already on premium page or login
-      if (location.pathname === "/premium" || location.pathname === "/login" || location.pathname === "/update-password") return;
-      
-      console.log("[App] Triggering periodic paywall check");
-      checkGate({ trigger: 'periodic_force' });
-    }, 3 * 60 * 1000); // 3 minutes
-
-    return () => clearInterval(interval);
-  }, [user, loading, location.pathname, checkGate]);
 
   if (loading) {
     return (

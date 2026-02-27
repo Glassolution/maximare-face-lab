@@ -1,31 +1,31 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PaywallContext, shouldShowPaywall, recordPaywallShow, recordPaywallDismiss, logPaywallEvent } from '@/lib/paywall';
-import PaywallModal from '@/components/PaywallModal';
+import { usePaywallStore } from '@/lib/paywallStore';
 import { supabase } from '@/integrations/supabase/client';
+import { PaywallModal } from '@/components/PaywallModal';
 
 export function usePaywallGate() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [context, setContext] = useState<PaywallContext | undefined>(undefined);
   const navigate = useNavigate();
+  const { openMain, closeMain, isMainOpen, mainContext } = usePaywallStore();
 
   const closePaywall = useCallback(async () => {
-    setIsOpen(false);
+    closeMain();
     // Record dismiss when user closes the modal
     const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-      await recordPaywallDismiss(session.user.id, context);
+    if (session?.user && mainContext) {
+      await recordPaywallDismiss(session.user.id, mainContext);
     }
-  }, [context]);
+  }, [mainContext, closeMain]);
 
   const handleUpgrade = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-      await logPaywallEvent(session.user.id, 'paywall_cta_clicked', context);
+    if (session?.user && mainContext) {
+      await logPaywallEvent(session.user.id, 'paywall_cta_clicked', mainContext);
     }
-    setIsOpen(false);
-    navigate('/premium', { state: { context } });
-  }, [navigate, context]);
+    closeMain();
+    navigate('/premium', { state: { context: mainContext } });
+  }, [navigate, mainContext, closeMain]);
 
   const checkGate = useCallback(async (triggerContext: PaywallContext): Promise<boolean> => {
     try {
@@ -43,9 +43,8 @@ export function usePaywallGate() {
            navigate('/premium', { state: { context: triggerContext } });
            return false; // Block action
         } else {
-           // Soft gate: Show modal
-           setContext(triggerContext);
-           setIsOpen(true);
+           // Soft gate: Show modal via Global Store
+           openMain(triggerContext);
            return false; // Block action (or indicate paywall shown)
         }
       }
@@ -55,21 +54,23 @@ export function usePaywallGate() {
       console.error("Error checking paywall gate:", error);
       return true; // Fail safe: allow access if error
     }
-  }, [navigate]);
+  }, [navigate, openMain]);
 
+  // Wrapper component to render the modal controlled by this hook
   const PaywallDialog = useCallback(() => (
     <PaywallModal 
-      open={isOpen} 
+      open={isMainOpen} 
       onClose={closePaywall} 
       onUpgrade={handleUpgrade}
-      context={context}
+      context={mainContext}
     />
-  ), [isOpen, closePaywall, handleUpgrade, context]);
+  ), [isMainOpen, closePaywall, handleUpgrade, mainContext]);
 
   return {
     checkGate,
     PaywallDialog,
-    isPaywallOpen: isOpen,
-    closePaywall
+    isPaywallOpen: isMainOpen,
+    closePaywall,
+    handleUpgrade
   };
 }

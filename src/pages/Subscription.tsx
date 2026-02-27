@@ -1,16 +1,25 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, ShieldCheck, ArrowRight, ArrowLeft, Loader2, Trophy, BarChart2, Dumbbell } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Check, ArrowRight, ArrowLeft, Loader2, Trophy, BarChart2, Dumbbell } from "lucide-react";
 import { toast } from "sonner";
+import { CheckoutPremium } from "@/components/CheckoutPremium";
+import { PLAN_CONFIG } from "@/config/plans";
+import { supabase } from "@/integrations/supabase/client";
+import { PaymentSuccess } from "@/components/PaymentSuccess";
 
 export default function Subscription() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const initialPlan = searchParams.get("plan") as 'weekly' | 'monthly' | 'annual' || 'weekly';
-  const [selectedPlan, setSelectedPlan] = useState(initialPlan);
-  const [processing, setProcessing] = useState(false);
+  // Map 'annual' to 'yearly' for compatibility with CheckoutPremium
+  const rawPlan = searchParams.get("plan") || 'weekly';
+  const initialPlan = (rawPlan === 'annual' ? 'yearly' : rawPlan) as 'weekly' | 'monthly' | 'yearly';
+  
+  const [selectedPlan] = useState(initialPlan);
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successEmail, setSuccessEmail] = useState<string | undefined>(undefined);
 
   const PLANS = {
     weekly: {
@@ -27,7 +36,7 @@ export default function Subscription() {
       description: "Evolução contínua",
       features: ["Acesso Imediato ao Relatório Completo", "Acompanhamento Mensal"]
     },
-    annual: {
+    yearly: { // Changed key to match initialPlan normalized value
       name: "Anual",
       price: "R$ 499,90",
       period: "por ano",
@@ -37,16 +46,50 @@ export default function Subscription() {
   };
 
   const currentPlan = PLANS[selectedPlan];
+  const price = PLAN_CONFIG.PLANS[selectedPlan].price;
 
-  const handlePayment = () => {
-    setProcessing(true);
-    // Simulate payment processing
-    setTimeout(() => {
-      setProcessing(false);
-      toast.success(`Pagamento do plano ${currentPlan.name} iniciado!`);
-      // Here you would redirect to Stripe/Gateway
-    }, 2000);
+  const handlePaymentStart = () => {
+    setShowCheckout(true);
   };
+
+  const handlePaymentSuccess = (email?: string) => {
+    setSuccessEmail(email);
+    setShowSuccess(true);
+  };
+
+  const handleFinalRedirect = async () => {
+    // Check if user is logged in
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (session) {
+        navigate('/profile', { state: { premiumActivated: true } }); 
+    } else {
+        // Guest User
+        if (successEmail) {
+            toast.success("Verifique seu e-mail para acessar sua conta!");
+        }
+        navigate('/login');
+    }
+  };
+
+  if (showSuccess) {
+    return <PaymentSuccess onContinue={handleFinalRedirect} />;
+  }
+
+  if (showCheckout) {
+    return (
+      <div className="fixed inset-0 z-50 bg-[#0a0a0a] flex flex-col items-center justify-center overflow-hidden">
+        <div className="w-full h-full max-w-md bg-[#0a0a0a] relative shadow-2xl">
+            <CheckoutPremium 
+                plan={selectedPlan} 
+                price={price} 
+                onSuccess={handlePaymentSuccess}
+                onCancel={() => setShowCheckout(false)}
+            />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col">
@@ -171,14 +214,9 @@ export default function Subscription() {
         <div className="max-w-md mx-auto space-y-3">
           <Button 
             className="w-full h-14 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg shadow-lg shadow-blue-600/30 transition-all active:scale-[0.98]"
-            onClick={handlePayment}
-            disabled={processing}
+            onClick={handlePaymentStart}
           >
-            {processing ? <Loader2 className="animate-spin" /> : (
-              <>
-                Continuar para Pagamento <ArrowRight className="ml-2 h-5 w-5" />
-              </>
-            )}
+            Continuar para Pagamento <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
           
           <p className="text-[10px] text-center text-zinc-500 leading-tight px-4">

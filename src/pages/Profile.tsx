@@ -51,9 +51,12 @@ export default function Profile() {
         
         if (profile.avatar_url) {
             setAvatarUrl(avatarService.getAvatarPublicUrl(profile.avatar_url));
+        } else if (lastAnalysis?.image_url) {
+            // Fallback: Use last analysis image if no custom avatar set
+            setAvatarUrl(lastAnalysis.image_url);
         }
     }
-  }, [profile]);
+  }, [profile, lastAnalysis]);
   
   const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
       if (!event.target.files || event.target.files.length === 0) {

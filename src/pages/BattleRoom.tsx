@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useBattleRoom } from '@/hooks/useBattleRoom';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Camera, Upload, Trophy, Skull } from 'lucide-react';
@@ -13,6 +14,7 @@ import { LoserRevealOverlay } from '@/components/battle/LoserRevealOverlay';
 export default function BattleRoom() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { profile: userProfile } = useAuth();
   const { battle, opponentProfile, submissions, result, loading, error, submitPhotos } = useBattleRoom(id!);
   const [frontFile, setFrontFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -21,7 +23,11 @@ export default function BattleRoom() {
   // Effect to handle navigation after reveal animation
   useEffect(() => {
     if (battle?.status === 'completed') {
-        setShowResultScreen(true);
+        // Add 1.5s delay for drama before showing results
+        const timer = setTimeout(() => {
+            setShowResultScreen(true);
+        }, 1500);
+        return () => clearTimeout(timer);
     }
   }, [battle?.status]);
 
@@ -130,9 +136,14 @@ export default function BattleRoom() {
       );
   }
 
-  // Status: Processing
-  if (battle.status === 'processing') {
-      return <BattleProcessingOverlay />;
+  // Status: Processing OR Completed (waiting for delay)
+  if (battle.status === 'processing' || (battle.status === 'completed' && !showResultScreen)) {
+      return (
+        <BattleProcessingOverlay 
+            userAvatar={userProfile?.avatar_url} 
+            opponentAvatar={opponentProfile?.avatar_url} 
+        />
+      );
   }
 
   // Status: Reveal Loser (Animation)

@@ -1,9 +1,13 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Crown, Check } from "lucide-react";
 import { PaywallContext } from "@/lib/paywall";
 import PremiumContent from "@/components/PremiumContent";
+import { usePaywallStore } from "@/lib/paywallStore";
+import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { logPaywallEvent } from "@/lib/paywall";
+import { useNavigate } from "react-router-dom";
 
 interface Props {
   open: boolean;
@@ -64,53 +68,66 @@ const CONTEXT_CONFIG: Record<string, { title: string; description: string; benef
   }
 };
 
-export default function PaywallModal({ open, onClose, onUpgrade, context }: Props) {
-  const isScreenVariant = context?.variant === 'screen' || context?.trigger === 'periodic_force';
+export const PaywallModal = ({ open, onClose, onUpgrade, context }: Props) => {
+  // Use Global Store to manage visibility of second modal
+  const { isPopupOpen, closePopup, popupContext } = usePaywallStore();
+  const navigate = useNavigate();
 
-  if (isScreenVariant && open) {
-    return (
+  // If Main modal is open, Popup modal should be closed by store logic
+  // Here we just render Popup if state says so
+
+  const handlePopupUpgrade = async () => {
+     const { data: { session } } = await supabase.auth.getSession();
+     if (session?.user) {
+        await logPaywallEvent(session.user.id, 'paywall_cta_clicked', popupContext);
+     }
+     closePopup();
+     navigate('/premium');
+  };
+
+  return (
+    <>
+      {/* MODAL 1: Main (High Priority) - Controlled by props (usePaywallGate) */}
       <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-        <DialogContent className="max-w-none w-full h-full p-0 border-0 bg-black overflow-y-auto [&>button]:hidden">
+        <DialogContent className="max-w-none w-full h-full p-0 border-0 bg-black overflow-y-auto [&>button]:hidden z-[100]">
            <PremiumContent onClose={onClose} context={context} isModal />
         </DialogContent>
       </Dialog>
-    );
-  }
 
-  const trigger = context?.trigger || 'manual';
-  const config = CONTEXT_CONFIG[trigger] || {
-      title: "Desbloqueie o Premium",
-      description: "Desbloqueie todo o potencial do Maximare",
-      benefits: DEFAULT_BENEFITS
-  };
-
-  const benefits = config.benefits || DEFAULT_BENEFITS;
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="rounded-2xl border-border/50 bg-card max-w-sm">
-        <DialogHeader className="text-center items-center">
-          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-            <Crown className="h-6 w-6 text-primary" />
+      {/* MODAL 2: Popup (Low Priority) - Controlled by Global Store */}
+      <Dialog open={isPopupOpen} onOpenChange={(v) => !v && closePopup()}>
+        <DialogContent className="rounded-2xl border-border/50 bg-card max-w-sm z-[50]">
+          <DialogHeader className="text-center items-center">
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+              <Crown className="h-6 w-6 text-primary" />
+            </div>
+            <DialogTitle className="font-heading text-xl">
+               {CONTEXT_CONFIG[popupContext?.trigger || 'app_open']?.title || "Progrida mais rápido"}
+            </DialogTitle>
+            <DialogDescription>
+               {CONTEXT_CONFIG[popupContext?.trigger || 'app_open']?.description || "Acelere seus resultados com o plano personalizado."}
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="space-y-3 my-4">
+            {DEFAULT_BENEFITS.slice(0, 3).map((b) => (
+              <li key={b} className="flex items-center gap-3 text-sm text-foreground">
+                <Check className="h-4 w-4 text-primary shrink-0" />
+                {b}
+              </li>
+            ))}
+          </ul>
+          <div className="flex flex-col gap-2">
+            <Button className="rounded-xl w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={handlePopupUpgrade}>
+              Ver planos
+            </Button>
+            <Button variant="ghost" className="rounded-xl text-muted-foreground w-full" onClick={closePopup}>
+              Agora não
+            </Button>
           </div>
-          <DialogTitle className="font-heading text-xl">{config.title}</DialogTitle>
-          <DialogDescription>{config.description}</DialogDescription>
-        </DialogHeader>
-        <ul className="space-y-3 my-4">
-          {benefits.map((b) => (
-            <li key={b} className="flex items-center gap-3 text-sm text-foreground">
-              <Check className="h-4 w-4 text-primary shrink-0" />
-              {b}
-            </li>
-          ))}
-        </ul>
-        <div className="flex flex-col gap-2">
-          <Button className="rounded-xl w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={onUpgrade}>Ver planos</Button>
-          <Button variant="ghost" className="rounded-xl text-muted-foreground w-full" onClick={onClose}>
-            Agora não
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
+
+export default PaywallModal;

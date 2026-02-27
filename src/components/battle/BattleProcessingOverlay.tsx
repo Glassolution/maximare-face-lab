@@ -1,64 +1,151 @@
 import { motion } from "framer-motion";
-import { Loader2 } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
 import { useEffect, useState } from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Progress } from "@/components/ui/progress";
+import { Swords } from "lucide-react";
 
-const LOADING_TEXTS = [
-  "Calculando simetria facial...",
-  "Analisando estrutura óssea...",
-  "Comparando proporção áurea...",
-  "Avaliando textura da pele...",
-  "Gerando veredito final..."
+interface BattleProcessingOverlayProps {
+  userAvatar?: string | null;
+  opponentAvatar?: string | null;
+}
+
+const STAGES = [
+  { text: "Mapeando estrutura facial...", duration: 8000 },
+  { text: "Analisando pontos biométricos...", duration: 10000 },
+  { text: "Calculando scores de simetria...", duration: 10000 },
+  { text: "Comparando resultados...", duration: 10000 },
+  { text: "Determinando o vencedor...", duration: 999999 }, // Até terminar
 ];
 
-export function BattleProcessingOverlay() {
-  const [textIndex, setTextIndex] = useState(0);
+export function BattleProcessingOverlay({ userAvatar, opponentAvatar }: BattleProcessingOverlayProps) {
+  const [stageIndex, setStageIndex] = useState(0);
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    const textInterval = setInterval(() => {
-      setTextIndex((prev) => (prev + 1) % LOADING_TEXTS.length);
-    }, 2000);
+    let currentStage = 0;
+    let startTime = Date.now();
+    
+    // Total estimated time roughly matches sum of durations, but progress bar is linear-ish
+    // We can simulate progress based on total expected time (~38s)
+    const TOTAL_ESTIMATED_TIME = 38000; 
 
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => Math.min(prev + 1, 95));
-    }, 50);
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      
+      // Update Progress
+      const newProgress = Math.min((elapsed / TOTAL_ESTIMATED_TIME) * 100, 95); // Cap at 95% until done
+      setProgress(newProgress);
 
-    return () => {
-      clearInterval(textInterval);
-      clearInterval(progressInterval);
-    };
+      // Update Stage Text
+      let accumulatedTime = 0;
+      for (let i = 0; i < STAGES.length; i++) {
+        accumulatedTime += STAGES[i].duration;
+        if (elapsed < accumulatedTime) {
+          if (currentStage !== i) {
+            currentStage = i;
+            setStageIndex(i);
+          }
+          break;
+        } else if (i === STAGES.length - 2) {
+           // If we passed all defined times, stay on last one
+           setStageIndex(STAGES.length - 1);
+        }
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
   }, []);
 
+  const isFinalStage = stageIndex === STAGES.length - 1;
+
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm px-6"
-    >
-      <div className="relative mb-8">
-        <div className="absolute inset-0 bg-blue-500/20 blur-2xl rounded-full animate-pulse"></div>
-        <div className="relative z-10 bg-black/50 p-6 rounded-full border border-blue-500/30 shadow-[0_0_30px_rgba(59,130,246,0.3)]">
-            <Loader2 className="h-16 w-16 animate-spin text-blue-500" />
+    <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center overflow-hidden">
+      
+      {/* Background Particles/Glow Effect */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/10 blur-[100px] rounded-full animate-pulse" />
+      </div>
+
+      <div className="relative w-full max-w-4xl px-4 flex items-center justify-between gap-4 sm:gap-12 z-10">
+        
+        {/* User Avatar (Left) */}
+        <motion.div 
+            animate={{ 
+                x: isFinalStage ? 20 : 0,
+                x: [0, -2, 2, -2, 2, 0],
+            }}
+            transition={{ 
+                x: isFinalStage ? { duration: 1 } : { repeat: Infinity, duration: 0.2, repeatDelay: 3 } // Shake periodically
+            }}
+            className="flex flex-col items-center gap-4"
+        >
+            <div className="relative">
+                <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full" />
+                <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-blue-500/30 shadow-[0_0_20px_rgba(59,130,246,0.4)]">
+                    <AvatarImage src={userAvatar || undefined} className="object-cover" />
+                    <AvatarFallback className="bg-zinc-900 text-zinc-500">YOU</AvatarFallback>
+                </Avatar>
+            </div>
+            <span className="text-blue-500 font-bold tracking-widest text-sm uppercase">Você</span>
+        </motion.div>
+
+        {/* Center Swords */}
+        <div className="flex flex-col items-center justify-center shrink-0">
+            <motion.div
+                animate={{ scale: [0.9, 1.1, 0.9] }}
+                transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+                className="relative"
+            >
+                {/* Particles emitting from center */}
+                <div className="absolute inset-0 bg-blue-500/40 blur-xl rounded-full animate-ping" />
+                
+                <div className="relative bg-black border border-blue-500/50 p-4 rounded-full shadow-[0_0_30px_rgba(59,130,246,0.5)] z-20">
+                    <Swords className="h-10 w-10 sm:h-12 sm:w-12 text-blue-500 fill-blue-500/20" />
+                </div>
+            </motion.div>
+        </div>
+
+        {/* Opponent Avatar (Right) */}
+        <motion.div 
+            animate={{ 
+                x: isFinalStage ? -20 : 0,
+                x: [0, 2, -2, 2, -2, 0],
+            }}
+            transition={{ 
+                x: isFinalStage ? { duration: 1 } : { repeat: Infinity, duration: 0.2, repeatDelay: 3, delay: 0.1 } // Shake periodically
+            }}
+            className="flex flex-col items-center gap-4"
+        >
+            <div className="relative">
+                <div className="absolute inset-0 bg-red-500/20 blur-xl rounded-full" />
+                <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-red-500/30 shadow-[0_0_20px_rgba(239,68,68,0.4)]">
+                    <AvatarImage src={opponentAvatar || undefined} className="object-cover" />
+                    <AvatarFallback className="bg-zinc-900 text-zinc-500">VS</AvatarFallback>
+                </Avatar>
+            </div>
+            <span className="text-red-500 font-bold tracking-widest text-sm uppercase">Oponente</span>
+        </motion.div>
+
+      </div>
+
+      {/* Progress Section */}
+      <div className="absolute bottom-20 inset-x-0 px-8 flex flex-col items-center z-10">
+        <motion.p 
+            key={stageIndex}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="text-white font-bold text-lg sm:text-xl mb-6 text-center h-8"
+        >
+            {STAGES[stageIndex].text}
+        </motion.p>
+        
+        <div className="w-full max-w-md relative">
+            <Progress value={progress} className="h-2 bg-zinc-900" indicatorClassName="bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.8)]" />
+            <p className="text-right text-xs text-zinc-500 mt-2 font-mono">{Math.floor(progress)}%</p>
         </div>
       </div>
 
-      <motion.h2
-        key={textIndex}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -10 }}
-        className="text-2xl font-bold text-center mb-2 min-h-[32px]"
-      >
-        {LOADING_TEXTS[textIndex]}
-      </motion.h2>
-
-      <p className="text-muted-foreground text-sm mb-8">A IA está decidindo o vencedor.</p>
-
-      <div className="w-full max-w-xs">
-        <Progress value={progress} className="h-2" />
-      </div>
-    </motion.div>
+    </div>
   );
 }

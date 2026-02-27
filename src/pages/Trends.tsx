@@ -5,322 +5,333 @@ import {
   Zap, Clock, TrendingUp, ChevronDown, AlertTriangle,
   Eye, Droplets, Target, Scan, Sparkles, Scissors, Diamond,
   ShieldCheck, Smartphone, FlaskConical, RotateCcw, Camera,
-  BookOpen, CheckCircle2, XCircle, ThumbsUp, ImageIcon
+  BookOpen, CheckCircle2, XCircle, ThumbsUp, Activity, User, Waves, Leaf, TestTube
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { TutorialCarousel } from "@/components/TutorialStepImage";
 import { generatePersonalizedPlan, type SmartTrend, type FacialBottleneck } from "@/lib/smartTrendsEngine";
 import { getAnalysisHistory } from "@/lib/mockData";
 import { ExtendedAnalysisResult } from "@/lib/rankingSystem";
 import { usePaywallGate } from "@/hooks/usePaywallGate";
+import { cn } from "@/lib/utils";
 
-const iconMap: Record<string, React.ElementType> = {
-  Eye, Droplets, Target, Scan, Sparkles, Scissors, Diamond, Zap,
+// Icon mapping based on protocol type
+const getProtocolIcon = (category: string, id: string) => {
+  if (id.includes("retinol")) return TestTube;
+  if (id.includes("mewing")) return Activity; // Represents jaw/bone
+  if (id.includes("chin")) return User; // Posture silhouette
+  if (id.includes("neck")) return User;
+  if (category === "skincare") return Leaf;
+  if (category === "exercicio") return Activity;
+  if (id.includes("lymphatic")) return Waves;
+  if (id.includes("ice")) return Waves;
+  return Sparkles; // Default generic
 };
 
-const priorityConfig = {
-  critica: { label: "Prioridade Crítica", color: "bg-destructive/15 text-destructive", border: "border-destructive/20" },
-  alta: { label: "Prioridade Alta", color: "bg-warning/15 text-warning", border: "border-warning/20" },
-  media: { label: "Prioridade Média", color: "bg-primary/15 text-primary", border: "border-primary/20" },
-};
-
-const validationConfig: Record<string, { label: string; icon: React.ElementType; color: string }> = {
-  Alta: { label: "Evidência Científica Alta", icon: ShieldCheck, color: "text-success" },
-  Moderada: { label: "Evidência Moderada", icon: FlaskConical, color: "text-warning" },
-  Baixa: { label: "Evidência Limitada", icon: Smartphone, color: "text-orange-400" },
-  // Backwards compatibility if needed
-  cientifica: { label: "Cientificamente validada", icon: ShieldCheck, color: "text-success" },
-  viral: { label: "Viral & Tendência", icon: Smartphone, color: "text-orange-400" },
-  experimental: { label: "Experimental", icon: FlaskConical, color: "text-purple-400" },
-};
-
-const benefitConfig: Record<string, { label: string; color: string }> = {
-  Estrutural: { label: "Benefício Estrutural", color: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
-  Temporário: { label: "Efeito Temporário", color: "bg-purple-500/10 text-purple-500 border-purple-500/20" },
-  Comportamental: { label: "Hábito/Comportamental", color: "bg-green-500/10 text-green-500 border-green-500/20" },
+// Translation map for tabs
+const TAB_LABELS: Record<string, string> = {
+  "All Protocols": "Todos",
+  "Skin": "Pele",
+  "Structure": "Estrutura",
+  "Posture": "Postura"
 };
 
 export default function Trends() {
   const navigate = useNavigate();
   const [expandedTrend, setExpandedTrend] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("All Protocols");
   const { checkGate, PaywallDialog } = usePaywallGate();
 
   const plan = useMemo(() => {
     const history = getAnalysisHistory();
-    // Get the most recent analysis
     const latest = history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
     return generatePersonalizedPlan(latest as unknown as ExtendedAnalysisResult);
   }, []);
 
-  // ─── No Analysis State ───
+  // Filter trends based on active tab
+  const filteredTrends = useMemo(() => {
+    if (activeTab === "All Protocols") return plan.trends;
+    if (activeTab === "Skin") return plan.trends.filter(t => t.category === "skincare");
+    if (activeTab === "Structure") return plan.trends.filter(t => ["exercicio", "habito", "procedimento"].includes(t.category) && !t.id.includes("posture") && !t.id.includes("neck"));
+    if (activeTab === "Posture") return plan.trends.filter(t => t.id.includes("neck") || t.id.includes("chin") || t.id.includes("posture"));
+    return plan.trends;
+  }, [plan.trends, activeTab]);
+
+  // Scores for header
+  const scores = useMemo(() => {
+    // Helper to get score safely
+    const getScore = (id: string) => {
+        const bottleneck = plan.bottlenecks.find(b => b.area.toLowerCase().includes(id));
+        return bottleneck ? Math.round(bottleneck.score) : 85; // Default fallback
+    };
+    
+    return [
+        { label: "Pele", score: getScore("pele") },
+        { label: "Mandíbula", score: getScore("mandíbula") || getScore("projecao") },
+        { label: "Simetria", score: getScore("simetria") }
+    ];
+  }, [plan.bottlenecks]);
+
+
   if (!plan.hasAnalysis) {
     return (
-      <div className="min-h-screen pt-6 pb-28 px-4">
-        <div className="container max-w-lg mx-auto flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center">
-          <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center">
-            <Scan className="h-10 w-10 text-primary" />
-          </div>
-          <div>
-            <h1 className="font-heading text-2xl font-bold text-foreground mb-2">Plano Personalizado</h1>
-            <p className="text-muted-foreground max-w-xs mb-4">
-            Faça sua primeira análise de Aura para receber recomendações baseadas na sua estrutura facial única.
-          </p>
-          <Button onClick={() => navigate("/analysis")} className="mt-2 rounded-2xl py-6 px-8 glow-primary">
-            <Camera className="h-5 w-5 mr-2" /> Fazer Análise de Aura
-          </Button>
+      <div className="min-h-screen bg-[#0A0A0F] pt-6 pb-20 px-4 flex flex-col items-center justify-center">
+        <div className="h-20 w-20 rounded-full bg-white/5 flex items-center justify-center mb-6">
+          <Scan className="h-10 w-10 text-white" />
         </div>
+        <h1 className="font-bold text-2xl text-white mb-2">Plano Estrutural</h1>
+        <p className="text-white/60 text-center max-w-xs mb-6">
+          Faça sua análise para desbloquear seu plano personalizado.
+        </p>
+        <Button onClick={() => navigate("/analysis")} className="rounded-full bg-white text-black hover:bg-gray-200">
+          <Camera className="h-4 w-4 mr-2" /> Iniciar Análise
+        </Button>
       </div>
-    </div>
     );
   }
 
   return (
-    <div className="min-h-screen pt-6 pb-28 px-4">
-      <div className="container max-w-lg mx-auto">
+    <div className="min-h-screen bg-[#0A0A0F] pt-8 pb-24 overflow-x-hidden">
+      <div className="container max-w-md mx-auto px-4">
+        
         {/* Header */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-          <div className="flex items-center gap-2 mb-1">
-            <Zap className="h-5 w-5 text-primary" />
-            <h1 className="font-heading text-xl font-bold text-foreground">Plano de Evolução Facial</h1>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Recomendações baseadas na sua estrutura facial • Aura {plan.gerScore}
-          </p>
-        </motion.div>
-
-        {/* Bottleneck Summary */}
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.03 }}
-          className="rounded-2xl glass-strong p-4 mb-6"
-        >
-          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">
-            Áreas Identificadas para Melhoria
-          </h3>
-          <div className="space-y-2">
-            {plan.bottlenecks.slice(0, 4).map((b) => {
-              const Icon = iconMap[b.icon] || Zap;
-              const cfg = priorityConfig[b.priority];
-              return (
-                <div key={b.id} className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-lg bg-secondary flex items-center justify-center shrink-0">
-                    <Icon className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-xs font-medium text-foreground truncate">{b.area}</span>
-                      <span className="text-xs font-bold text-foreground">{Math.round(b.score)}</span>
+        <div className="mb-8">
+            <h1 className="text-3xl font-bold text-white mb-6 leading-tight">
+                Plano de<br/>Melhoria Estrutural
+            </h1>
+            
+            <div className="grid grid-cols-3 gap-3">
+                {scores.map((s, i) => (
+                    <div key={i} className="bg-[#12121A] border border-white/[0.08] rounded-2xl p-3 flex flex-col items-center">
+                        <span className="text-white/40 text-[10px] uppercase font-bold tracking-wider mb-1">{s.label}</span>
+                        <span className="text-white text-xl font-bold mb-2">{s.score}</span>
+                        <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                            <div 
+                                className="h-full bg-[#3B82F6] rounded-full transition-all duration-1000 ease-out" 
+                                style={{ width: `${s.score}%` }}
+                            />
+                        </div>
                     </div>
-                    <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${b.score >= 80 ? 'bg-success' : b.score >= 65 ? 'bg-warning' : b.score >= 50 ? 'bg-orange-400' : 'bg-destructive'}`}
-                        style={{ width: `${b.score}%` }}
-                      />
-                    </div>
-                  </div>
-                  <span className={`shrink-0 px-2 py-0.5 rounded-full text-[9px] font-bold ${cfg.color}`}>
-                    {b.priority === "critica" ? "!" : b.priority === "alta" ? "▲" : "—"}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </motion.div>
-
-        {/* Personalized Trends */}
-        <div className="space-y-3">
-          {plan.trends.map((trend, i) => {
-            const isOpen = expandedTrend === trend.id;
-            const areaPriority = plan.bottlenecks.find((b) => b.id === trend.area);
-            const pConfig = areaPriority ? priorityConfig[areaPriority.priority] : priorityConfig.media;
-            const vConfig = validationConfig[trend.validation] || validationConfig.experimental;
-            const VIcon = vConfig.icon;
-            const bConfig = trend.benefit_type ? benefitConfig[trend.benefit_type] : null;
-
-            return (
-              <motion.div key={trend.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.05 + i * 0.03 }}
-                className={`rounded-2xl glass overflow-hidden border ${isOpen ? pConfig.border : "border-transparent"}`}
-              >
-                {/* Card Header */}
-                <button className="w-full p-4 text-left" onClick={async () => {
-                    const next = isOpen ? null : trend.id;
-                    setExpandedTrend(next);
-                    if (next) {
-                        // Check soft gate on expand (don't block, just show if needed)
-                        await checkGate({ trigger: 'report_view' });
-                    }
-                }}>
-                  <div className="flex items-start gap-3">
-                    <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                      <TrendingUp className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                        <span className="font-semibold text-sm text-foreground">{trend.title}</span>
-                        <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[9px] font-bold ${pConfig.color}`}>
-                          {areaPriority ? `${areaPriority.area}` : trend.area}
-                        </span>
-                        {bConfig && (
-                           <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[9px] font-bold border ${bConfig.color}`}>
-                             {bConfig.label}
-                           </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground line-clamp-2">{trend.subtitle}</p>
-                      <div className="flex items-center gap-3 mt-2 text-[10px] text-muted-foreground">
-                        <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {trend.duration}</span>
-                        <span className="flex items-center gap-1"><Zap className="h-3 w-3 text-primary" /> Impacto {trend.impactEstimate}/10</span>
-                        <span className={`flex items-center gap-1 ${vConfig.color}`}><VIcon className="h-3 w-3" /> {vConfig.label}</span>
-                      </div>
-                    </div>
-                    <ChevronDown className={`h-4 w-4 text-muted-foreground shrink-0 mt-1 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
-                  </div>
-                </button>
-
-                {/* Expanded Tutorial */}
-                <AnimatePresence>
-                  {isOpen && (
-                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                      <div className="px-4 pb-4 border-t border-border/20 pt-4 space-y-4">
-
-                        {/* Why You Need This (Justificativa Personalizada) */}
-                        <div className="rounded-xl bg-primary/5 border border-primary/10 p-3">
-                          <h4 className="text-xs font-bold text-primary mb-1 flex items-center gap-1">
-                            <Target className="h-3 w-3" /> Por que você precisa disso
-                          </h4>
-                          <p className="text-xs text-muted-foreground">{trend.reason}</p>
-                          <p className="text-[10px] text-foreground/60 mt-1">
-                            Score atual: <span className="font-bold text-foreground">{Math.round(trend.areaScore)}/99</span>
-                          </p>
-                        </div>
-
-                        {/* Scientific Explanation */}
-                        <div className="rounded-xl bg-secondary/30 p-3">
-                          <h4 className="text-xs font-bold text-foreground mb-1.5 flex items-center gap-1">
-                            <BookOpen className="h-3 w-3" /> Base científica
-                          </h4>
-                          <p className="text-xs text-muted-foreground">{trend.science}</p>
-                          <div className="mt-2 flex items-center gap-1.5">
-                            <VIcon className={`h-3 w-3 ${vConfig.color}`} />
-                            <span className={`text-[10px] font-semibold ${vConfig.color}`}>{vConfig.label}</span>
-                          </div>
-                        </div>
-
-                        {/* Visual Tutorial */}
-                        <div className="rounded-xl overflow-hidden">
-                          <div className="flex items-center gap-1.5 mb-2">
-                            <ImageIcon className="h-3 w-3 text-primary" />
-                            <h4 className="text-xs font-bold text-foreground">Tutorial Visual</h4>
-                          </div>
-                          <TutorialCarousel
-                            interventionType={trend.id}
-                            steps={trend.steps}
-                          />
-                        </div>
-
-                        {/* Steps */}
-                        <div>
-                          <h4 className="text-xs font-bold text-foreground mb-2 flex items-center gap-1">
-                            <CheckCircle2 className="h-3 w-3 text-success" /> Passo a passo
-                          </h4>
-                          <ol className="space-y-2">
-                            {trend.steps.map((s, j) => (
-                              <li key={j} className="flex gap-2">
-                                <span className="text-primary font-bold text-xs mt-0.5">{j + 1}.</span>
-                                <div>
-                                  <p className="text-xs text-foreground font-medium">{s.text}</p>
-                                  {s.detail && <p className="text-[10px] text-muted-foreground mt-0.5">{s.detail}</p>}
-                                </div>
-                              </li>
-                            ))}
-                          </ol>
-                        </div>
-
-                        {/* Common Errors */}
-                        {trend.common_errors && trend.common_errors.length > 0 && (
-                          <div className="rounded-xl bg-destructive/5 border border-destructive/10 p-3">
-                            <h4 className="text-xs font-bold text-destructive mb-2 flex items-center gap-1">
-                              <XCircle className="h-3 w-3" /> Erros Comuns
-                            </h4>
-                            <ul className="space-y-1.5">
-                              {trend.common_errors.map((error, idx) => (
-                                <li key={idx} className="flex gap-2 text-xs text-muted-foreground">
-                                  <span className="text-destructive/60">•</span>
-                                  <span>{error}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                         {/* Success Signs */}
-                         {trend.success_signs && trend.success_signs.length > 0 && (
-                          <div className="rounded-xl bg-green-500/5 border border-green-500/10 p-3">
-                            <h4 className="text-xs font-bold text-green-600 mb-2 flex items-center gap-1">
-                              <ThumbsUp className="h-3 w-3" /> Sinais de Sucesso
-                            </h4>
-                            <ul className="space-y-1.5">
-                              {trend.success_signs.map((sign, idx) => (
-                                <li key={idx} className="flex gap-2 text-xs text-muted-foreground">
-                                  <span className="text-green-500/60">•</span>
-                                  <span>{sign}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {/* Duration & Frequency */}
-                        <div className="flex gap-3">
-                          <div className="flex-1 rounded-xl bg-muted/30 p-3 text-center">
-                            <p className="text-[10px] text-muted-foreground mb-0.5">Duração</p>
-                            <p className="text-sm font-bold text-foreground">{trend.session_duration || trend.duration}</p>
-                          </div>
-                          <div className="flex-1 rounded-xl bg-muted/30 p-3 text-center">
-                            <p className="text-[10px] text-muted-foreground mb-0.5">Frequência</p>
-                            <p className="text-sm font-bold text-foreground">{trend.frequency}</p>
-                          </div>
-                        </div>
-
-                        {/* Tags */}
-                        <div className="flex flex-wrap gap-1.5">
-                          {trend.tags.map((tag) => (
-                            <Badge key={tag} variant="secondary" className="text-[10px] rounded-lg glass border-0">{tag}</Badge>
-                          ))}
-                        </div>
-
-                        {/* Disclaimer */}
-                        <div className="flex items-start gap-2 text-[10px] text-muted-foreground/70">
-                          <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
-                          <p>{trend.disclaimer}</p>
-                        </div>
-
-                        {/* CTA */}
-                        <Button onClick={() => navigate("/analysis")} variant="outline" className="mt-3 w-full rounded-xl glass border-primary/20 text-primary hover:text-primary">
-                          <RotateCcw className="h-4 w-4 mr-2" /> Reanalisar esta área
-                        </Button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            );
-          })}
+                ))}
+            </div>
         </div>
 
-        {/* Footer disclaimer */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
-          className="mt-8 text-center px-4"
-        >
-          <p className="text-[10px] text-muted-foreground/50 leading-relaxed">
-            ⚠️ Este conteúdo é informativo e baseado em padrões visuais. Não substitui orientação médica ou dermatológica profissional.
-            Resultados podem variar individualmente.
-          </p>
-        </motion.div>
+        {/* Tabs */}
+        <div className="flex gap-2 overflow-x-auto pb-4 mb-2 no-scrollbar">
+            {["All Protocols", "Skin", "Structure", "Posture"].map((tab) => (
+                <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={cn(
+                        "whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold transition-all border",
+                        activeTab === tab 
+                            ? "bg-[#3B82F6] text-white border-[#3B82F6]" 
+                            : "bg-transparent text-white/60 border-white/10 hover:border-white/30"
+                    )}
+                >
+                    {TAB_LABELS[tab]}
+                </button>
+            ))}
+        </div>
+
+        {/* Protocols Carousel */}
+        <div className="flex gap-4 overflow-x-auto pb-8 pt-2 px-1 snap-x no-scrollbar">
+            {filteredTrends.map((trend) => {
+                const Icon = getProtocolIcon(trend.category, trend.id);
+                const isHighEvidence = trend.validation === "Alta";
+                
+                return (
+                    <motion.div 
+                        key={trend.id}
+                        layoutId={trend.id}
+                        onClick={async () => {
+                            setExpandedTrend(trend.id);
+                            await checkGate({ trigger: 'report_view' });
+                        }}
+                        className="relative flex-shrink-0 w-[220px] h-[300px] bg-[#12121A] border border-white/[0.08] rounded-[24px] p-5 flex flex-col justify-between snap-center cursor-pointer hover:border-white/20 transition-colors group overflow-hidden"
+                    >
+                        {/* Background Gradient Subtle */}
+                        <div className="absolute inset-0 bg-gradient-to-b from-[#3B82F6]/[0.05] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                        <div>
+                            <div className="flex justify-between items-start mb-4">
+                                <div className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center border border-white/5">
+                                    <Icon className="h-5 w-5 text-[#3B82F6]" />
+                                </div>
+                                <Badge 
+                                    variant="outline" 
+                                    className={cn(
+                                        "text-[9px] font-bold border-0 px-2 py-0.5 rounded-full",
+                                        isHighEvidence ? "bg-[#1D4ED8] text-white" : "bg-white/10 text-white/60"
+                                    )}
+                                >
+                                    {isHighEvidence ? "ALTA EVIDÊNCIA" : "EVIDÊNCIA MODERADA"}
+                                </Badge>
+                            </div>
+                            
+                            <h3 className="text-white font-bold text-lg leading-tight mb-2">{trend.title}</h3>
+                            <p className="text-white/50 text-xs line-clamp-3">{trend.subtitle}</p>
+                        </div>
+
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between text-xs border-t border-white/5 pt-3">
+                                <span className="text-white/40">FREQUÊNCIA</span>
+                                <span className="text-white font-medium">{trend.frequency.split(' ')[0]}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs border-t border-white/5 pt-3">
+                                <span className="text-white/40">IMPACTO</span>
+                                <div className="flex items-center gap-1">
+                                    <Zap className="h-3 w-3 text-[#3B82F6]" fill="currentColor" />
+                                    <span className="text-white font-bold">{trend.impactEstimate}/10</span>
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                );
+            })}
+        </div>
+
+        {/* Disclaimer */}
+        <div className="text-center mt-4 px-6">
+            <p className="text-[10px] text-white/20 leading-relaxed">
+                Protocolos científicos baseados em análise craniofacial.
+                <br/>Consulte um especialista para orientação médica.
+            </p>
+        </div>
+
+        {/* Expanded Modal */}
+        <AnimatePresence>
+            {expandedTrend && (
+                <>
+                    <motion.div 
+                        initial={{ opacity: 0 }} 
+                        animate={{ opacity: 1 }} 
+                        exit={{ opacity: 0 }}
+                        onClick={() => setExpandedTrend(null)}
+                        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50"
+                    />
+                    <motion.div 
+                        layoutId={expandedTrend}
+                        className="fixed inset-x-4 top-[10%] bottom-8 bg-[#12121A] border border-white/10 rounded-[32px] z-50 overflow-hidden flex flex-col shadow-2xl"
+                    >
+                        {(() => {
+                            const trend = plan.trends.find(t => t.id === expandedTrend);
+                            if (!trend) return null;
+                            const Icon = getProtocolIcon(trend.category, trend.id);
+
+                            return (
+                                <div className="flex flex-col h-full overflow-y-auto no-scrollbar">
+                                    {/* Header */}
+                                    <div className="p-6 pb-4 border-b border-white/5 sticky top-0 bg-[#12121A]/95 backdrop-blur z-10">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div className="h-12 w-12 rounded-full bg-white/10 flex items-center justify-center">
+                                                <Icon className="h-6 w-6 text-[#3B82F6]" />
+                                            </div>
+                                            <button 
+                                                onClick={() => setExpandedTrend(null)}
+                                                className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10"
+                                            >
+                                                <XCircle className="h-5 w-5 text-white/60" />
+                                            </button>
+                                        </div>
+                                        <h2 className="text-2xl font-bold text-white mb-1">{trend.title}</h2>
+                                        <p className="text-white/60 text-sm">{trend.subtitle}</p>
+                                    </div>
+
+                                    {/* Content */}
+                                    <div className="p-6 space-y-8">
+                                        
+                                        {/* Science */}
+                                        <div className="bg-white/[0.03] rounded-2xl p-4 border border-white/5">
+                                            <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-2">
+                                                <BookOpen className="h-3 w-3 text-[#3B82F6]" /> A Ciência
+                                            </h4>
+                                            <p className="text-white/80 text-sm leading-relaxed">
+                                                {trend.science}
+                                            </p>
+                                        </div>
+
+                                        {/* Steps */}
+                                        <div>
+                                            <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                                                <CheckCircle2 className="h-4 w-4 text-[#3B82F6]" /> Passo a Passo
+                                            </h4>
+                                            <div className="space-y-4">
+                                                {trend.steps.map((step, idx) => (
+                                                    <div key={idx} className="flex gap-4">
+                                                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#3B82F6]/10 flex items-center justify-center text-xs font-bold text-[#3B82F6]">
+                                                            {idx + 1}
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-white font-medium text-sm mb-1">{step.text}</p>
+                                                            {step.detail && (
+                                                                <p className="text-white/50 text-xs leading-relaxed">{step.detail}</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Common Errors */}
+                                        {trend.common_errors && (
+                                            <div className="bg-red-500/10 rounded-2xl p-4 border border-red-500/20">
+                                                <h4 className="text-xs font-bold text-red-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                                    <AlertTriangle className="h-3 w-3" /> Erros Comuns
+                                                </h4>
+                                                <ul className="space-y-2">
+                                                    {trend.common_errors.map((err, idx) => (
+                                                        <li key={idx} className="text-red-200/80 text-xs flex gap-2">
+                                                            <span>•</span> {err}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+
+                                        {/* Success Signs */}
+                                        {trend.success_signs && (
+                                            <div className="bg-green-500/10 rounded-2xl p-4 border border-green-500/20">
+                                                <h4 className="text-xs font-bold text-green-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                                    <ThumbsUp className="h-3 w-3" /> Sinais de Progresso
+                                                </h4>
+                                                <ul className="space-y-2">
+                                                    {trend.success_signs.map((sign, idx) => (
+                                                        <li key={idx} className="text-green-200/80 text-xs flex gap-2">
+                                                            <span>•</span> {sign}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+
+                                        {/* Metadata Grid */}
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="bg-white/5 rounded-xl p-3 text-center">
+                                                <p className="text-[10px] text-white/40 uppercase font-bold mb-1">Duração</p>
+                                                <p className="text-white font-bold text-sm">{trend.session_duration || trend.duration}</p>
+                                            </div>
+                                            <div className="bg-white/5 rounded-xl p-3 text-center">
+                                                <p className="text-[10px] text-white/40 uppercase font-bold mb-1">Frequência</p>
+                                                <p className="text-white font-bold text-sm">{trend.frequency}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Disclaimer */}
+                                        <p className="text-[10px] text-white/30 text-center leading-relaxed pb-4">
+                                            {trend.disclaimer}
+                                        </p>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                    </motion.div>
+                </>
+            )}
+        </AnimatePresence>
+
+        <PaywallDialog />
       </div>
-      <PaywallDialog />
     </div>
   );
 }
