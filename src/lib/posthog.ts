@@ -8,11 +8,11 @@
 import posthog from 'posthog-js';
 
 function initializePosthog() {
-  const apiKey = import.meta.env.VITE_POSTHOG_API_KEY as string | undefined;
-  const apiHost = (import.meta.env.VITE_POSTHOG_HOST as string | undefined) || 'https://us.i.posthog.com';
+  const apiKey = import.meta.env.VITE_PUBLIC_POSTHOG_KEY as string | undefined;
+  const apiHost = (import.meta.env.VITE_PUBLIC_POSTHOG_HOST as string | undefined) || 'https://us.i.posthog.com';
 
   if (!apiKey) {
-    console.warn('WARNING: PostHog not configured (VITE_POSTHOG_API_KEY not set)');
+    console.warn('WARNING: PostHog not configured (VITE_PUBLIC_POSTHOG_KEY not set)');
     return null;
   }
 

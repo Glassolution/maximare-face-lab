@@ -9,14 +9,17 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
+import { usePendingBattles } from "@/hooks/usePendingBattles"; // New Hook
 
 export default function BottomNav() {
   const location = useLocation();
+  const pendingBattlesCount = usePendingBattles(); // Get realtime count
 
   const isActive = (path: string) => location.pathname === path;
 
-  const NavItem = ({ to, icon: Icon, active }: { to: string; icon: any; active: boolean }) => (
-    <Link to={to} className="flex items-center justify-center">
+  // Updated NavItem to accept badge count
+  const NavItem = ({ to, icon: Icon, active, badge }: { to: string; icon: any; active: boolean; badge?: number }) => (
+    <Link to={to} className="flex items-center justify-center relative">
       <div className={`flex items-center justify-center p-2.5 rounded-full transition-all duration-300 ${active ? "bg-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.5)]" : "bg-transparent"}`}>
         <Icon
           className={`h-5 w-5 md:h-6 md:w-6 transition-colors ${
@@ -24,6 +27,12 @@ export default function BottomNav() {
           } stroke-[1.5px]`}
         />
       </div>
+      {/* Badge Indicator */}
+      {badge && badge > 0 ? (
+        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold h-4 w-4 flex items-center justify-center rounded-full animate-pulse shadow-sm border border-[#0a0a0a]">
+            {badge > 9 ? '9+' : badge}
+        </span>
+      ) : null}
     </Link>
   );
 
@@ -36,8 +45,8 @@ export default function BottomNav() {
               {/* Home / Dashboard */}
               <NavItem to="/analysis" icon={Home} active={isActive("/analysis")} />
 
-              {/* Duelos */}
-              <NavItem to="/battles" icon={Swords} active={isActive("/battles")} />
+              {/* Duelos (With Badge) */}
+              <NavItem to="/battles" icon={Swords} active={isActive("/battles")} badge={pendingBattlesCount} />
 
               {/* Central Action Button */}
               <Drawer>

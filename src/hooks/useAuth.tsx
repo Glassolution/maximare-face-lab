@@ -39,7 +39,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const USERNAME_DOMAIN = "@maximare.local";
 
 import { logger } from "@/lib/logger";
-import { trackEvent, identifyUser, captureException } from "@/lib/posthog";
+import { trackEvent, identifyUser } from "@/lib/posthog";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
