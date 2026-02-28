@@ -127,14 +127,14 @@ export default function Results() {
     ];
 
     return (
-      <div className="min-h-screen bg-background text-white flex items-center justify-center px-5 py-6">
+      <div className="min-h-screen bg-background text-white flex items-center justify-center px-5 pt-6 pb-[calc(8rem+env(safe-area-inset-bottom))]">
         <div className="w-full max-w-[390px] flex flex-col items-center">
           <div className="w-full flex flex-col items-center">
-            <div className="w-[120px] h-[120px] rounded-full overflow-hidden border-2 border-white/10 ring-4 ring-primary/5 mb-4">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-              ) : statePhoto || result.photoUrl ? (
+            <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-white/10 ring-4 ring-primary/5 mb-4">
+              {statePhoto || result.photoUrl ? (
                 <img src={statePhoto || result.photoUrl} alt="Avatar" className="w-full h-full object-cover" />
+              ) : avatarUrl ? (
+                <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-black/40">
                   <Scan className="w-10 h-10 text-white/40" />
@@ -155,7 +155,7 @@ export default function Results() {
               ANÁLISE MAXIMARE
             </p>
 
-            <div className="w-full mt-5 bg-black/40 backdrop-blur-xl border border-white/10 rounded-[24px] p-6 shadow-2xl relative overflow-hidden">
+            <div className="w-full mt-5 bg-black/40 backdrop-blur-xl border border-white/10 rounded-[24px] p-5 shadow-2xl relative overflow-hidden">
               <div
                 className="absolute inset-0 opacity-[0.03] pointer-events-none"
                 style={{
@@ -164,9 +164,9 @@ export default function Results() {
                   backgroundSize: "20px 20px",
                 }}
               />
-              <div className="grid grid-cols-2 gap-x-8 gap-y-6 relative z-10">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-4 relative z-10">
                 {shareItems.map((item) => (
-                  <div key={item.label} className="space-y-3 min-w-0">
+                  <div key={item.label} className="space-y-1.5 min-w-0">
                     <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider truncate">
                       {item.label}
                     </p>
@@ -217,7 +217,7 @@ export default function Results() {
     <div className="min-h-screen bg-background text-white px-4 pt-6 pb-[calc(8rem+env(safe-area-inset-bottom))]">
       <div className="w-full max-w-[390px] mx-auto flex flex-col items-center">
         <div className="relative mb-6">
-          <div className="w-32 h-32 rounded-full overflow-hidden border-2 border-white/10 ring-4 ring-primary/5">
+          <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-white/10 ring-4 ring-primary/5">
             <div className="w-full h-full relative">
               {statePhoto ? (
                 <img
@@ -257,7 +257,7 @@ export default function Results() {
           </div>
         </div>
 
-        <div className="w-full bg-black/40 backdrop-blur-xl border border-white/10 rounded-[24px] p-6 shadow-2xl relative overflow-hidden">
+        <div className="w-full bg-black/40 backdrop-blur-xl border border-white/10 rounded-[24px] p-5 shadow-2xl relative overflow-hidden">
           <div
             className="absolute inset-0 opacity-[0.03] pointer-events-none"
             style={{
@@ -267,9 +267,9 @@ export default function Results() {
             }}
           />
 
-          <div className="grid grid-cols-2 gap-x-8 gap-y-6 relative z-10">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-4 relative z-10">
             {/* PSL - Visible */}
-            <div className="space-y-3">
+            <div className="space-y-1.5">
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
                 Pontuação PSL
               </p>
@@ -285,7 +285,7 @@ export default function Results() {
             </div>
 
             {/* Mindset - Visible */}
-            <div className="space-y-3">
+            <div className="space-y-1.5">
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
                 Mentalidade
               </p>
@@ -300,7 +300,7 @@ export default function Results() {
 
             {/* Strategy - Locked */}
             <div 
-              className="space-y-3 relative cursor-pointer"
+              className="space-y-1.5 relative cursor-pointer"
               onClick={() => !isPremium && checkGate({ trigger: 'feature_locked' })}
             >
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
@@ -324,7 +324,7 @@ export default function Results() {
 
             {/* Jaw - Locked */}
             <div 
-              className="space-y-3 relative cursor-pointer"
+              className="space-y-1.5 relative cursor-pointer"
               onClick={() => !isPremium && checkGate({ trigger: 'feature_locked' })}
             >
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
@@ -348,7 +348,7 @@ export default function Results() {
 
             {/* Breathing - Locked */}
             <div 
-              className="space-y-3 relative cursor-pointer"
+              className="space-y-1.5 relative cursor-pointer"
               onClick={() => !isPremium && checkGate({ trigger: 'feature_locked' })}
             >
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
@@ -372,7 +372,7 @@ export default function Results() {
 
             {/* Harmony - Locked */}
             <div 
-              className="space-y-3 relative cursor-pointer"
+              className="space-y-1.5 relative cursor-pointer"
               onClick={() => !isPremium && checkGate({ trigger: 'feature_locked' })}
             >
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
@@ -396,7 +396,7 @@ export default function Results() {
 
             {/* Symmetry - Locked */}
             <div 
-              className="space-y-3 relative cursor-pointer"
+              className="space-y-1.5 relative cursor-pointer"
               onClick={() => !isPremium && checkGate({ trigger: 'feature_locked' })}
             >
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
@@ -419,7 +419,7 @@ export default function Results() {
             </div>
 
             {/* Appeal - Visible */}
-            <div className="space-y-3">
+            <div className="space-y-1.5">
               <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
                 Nível de apelo
               </p>
