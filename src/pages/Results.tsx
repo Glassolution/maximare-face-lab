@@ -18,8 +18,9 @@ export default function Results() {
   
   // Soft gate on view
   useEffect(() => {
+    if (isPremium) return;
     checkGate({ trigger: 'report_view' });
-  }, [checkGate]);
+  }, [checkGate, isPremium]);
 
   const history = getAnalysisHistory();
   const result = history.find((a) => a.id === id) as ExtendedAnalysisResult | undefined;

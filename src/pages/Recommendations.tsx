@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getAnalysisHistory } from "@/lib/mockData";
 import { generatePersonalizedPlan, PersonalizedPlan, SmartTrend, ScientificReference } from "@/lib/smartTrendsEngine";
 import { usePaywallGate } from "@/hooks/usePaywallGate";
+import { usePremiumStatus } from "@/hooks/usePremiumStatus";
 import {
   ChevronDown,
   Zap,
@@ -197,8 +198,10 @@ export default function Recommendations() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [tutorialTrend, setTutorialTrend] = useState<SmartTrend | null>(null);
   const { checkGate } = usePaywallGate();
+  const { isPremium } = usePremiumStatus();
 
   useEffect(() => {
+    if (isPremium) return;
     checkGate({ trigger: "feature_locked", featureName: "recommendations_plan" });
     const history = getAnalysisHistory();
     if (history.length > 0) {
@@ -209,7 +212,7 @@ export default function Recommendations() {
         setExpanded(generatedPlan.trends[0].id);
       }
     }
-  }, []);
+  }, [isPremium]);
 
   if (!plan) {
     return (

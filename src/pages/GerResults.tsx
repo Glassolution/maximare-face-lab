@@ -5,6 +5,8 @@ import { ArrowLeft, Share2, Lock, ChevronLeft, ChevronRight } from "lucide-react
 import { Button } from "@/components/ui/button";
 import { getGerHistory, GerResult, GerAttribute, TIER_LABELS, getScoreColor } from "@/lib/gerTypes";
 import { getTier } from "@/lib/rankingSystem";
+import { usePaywallGate } from "@/hooks/usePaywallGate";
+import { usePremiumStatus } from "@/hooks/usePremiumStatus";
 import PaywallModal from "@/components/PaywallModal";
 
 const FREE_ATTRIBUTES_COUNT = 4;
@@ -47,7 +49,7 @@ export default function GerResults() {
   const navigate = useNavigate();
   const [showPaywall, setShowPaywall] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
-  const [isPro] = useState(false);
+  const { isPremium } = usePremiumStatus();
 
   const history = getGerHistory();
   const result = history.find((r) => r.id === id);
@@ -148,7 +150,7 @@ export default function GerResults() {
         <div className="grid grid-cols-2 gap-3">
           {paginatedAttrs.map((attr, i) => {
             const globalIdx = currentPage * ATTRS_PER_PAGE + i;
-            const locked = !isPro && globalIdx >= FREE_ATTRIBUTES_COUNT;
+            const locked = !isPremium && globalIdx >= FREE_ATTRIBUTES_COUNT;
             return <AttributeCard key={attr.id} attr={attr} index={i} locked={locked} />;
           })}
         </div>
@@ -184,7 +186,7 @@ export default function GerResults() {
       </motion.div>
 
       {/* Report section (PRO) */}
-      {isPro && result.report && (
+      {isPremium && result.report && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -219,7 +221,7 @@ export default function GerResults() {
         transition={{ delay: 0.6 }}
         className="px-4 mt-8 space-y-3"
       >
-        {!isPro && (
+        {!isPremium && (
           <>
             <Button
               className="w-full rounded-2xl py-6 text-base font-bold bg-destructive hover:bg-destructive/90 text-destructive-foreground"

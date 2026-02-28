@@ -13,6 +13,7 @@ import { generatePersonalizedPlan, type SmartTrend, type FacialBottleneck } from
 import { getAnalysisHistory } from "@/lib/mockData";
 import { ExtendedAnalysisResult } from "@/lib/rankingSystem";
 import { usePaywallGate } from "@/hooks/usePaywallGate";
+import { usePremiumStatus } from "@/hooks/usePremiumStatus";
 import { cn } from "@/lib/utils";
 
 // Icon mapping based on protocol type
@@ -41,6 +42,7 @@ export default function Trends() {
   const [expandedTrend, setExpandedTrend] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("All Protocols");
   const { checkGate, PaywallDialog } = usePaywallGate();
+  const { isPremium } = usePremiumStatus();
 
   const plan = useMemo(() => {
     const history = getAnalysisHistory();

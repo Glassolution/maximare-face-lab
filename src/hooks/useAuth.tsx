@@ -11,6 +11,10 @@ interface Profile {
   avatar_url: string | null;
   short_id?: string | null;
   public_id?: number | null;
+  subscription_status?: string;
+  subscription_expires_at?: string | null;
+  is_premium?: boolean;
+  plan_type?: string;
 }
 
 interface UserData {

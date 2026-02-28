@@ -4,14 +4,30 @@ import { PaywallContext, shouldShowPaywall, recordPaywallShow, recordPaywallDism
 import { usePaywallStore } from '@/lib/paywallStore';
 import { supabase } from '@/integrations/supabase/client';
 import { PaywallModal } from '@/components/PaywallModal';
+import { useAuth } from '@/hooks/useAuth';
 
 export function usePaywallGate() {
   const navigate = useNavigate();
   const { openMain, closeMain, isMainOpen, mainContext } = usePaywallStore();
+  const { profile } = useAuth();
+  
+  // Verificação de premium ANTES de qualquer ação
+  const isPremium = profile?.is_premium === true || profile?.subscription_status === 'active';
+  
+  if (isPremium) {
+    console.log('[PaywallGate] Usuário é premium, bloqueando todas as ações de paywall');
+    return {
+      checkGate: async () => true,
+      PaywallDialog: () => null,
+      isPaywallOpen: false,
+      closePaywall: async () => {},
+      handleUpgrade: async () => {}
+    };
+  }
 
   const closePaywall = useCallback(async () => {
     closeMain();
-    // Record dismiss when user closes the modal
+    // Record dismiss when user closes modal
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user && mainContext) {
       await recordPaywallDismiss(session.user.id, mainContext);
@@ -64,7 +80,7 @@ export function usePaywallGate() {
     }
   }, [navigate, openMain]);
 
-  // Wrapper component to render the modal controlled by this hook
+  // Wrapper component to render modal controlled by this hook
   const PaywallDialog = useCallback(() => (
     <PaywallModal 
       open={isMainOpen} 

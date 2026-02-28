@@ -56,6 +56,19 @@ export default function LookAlike() {
   const { isPremium } = usePremiumStatus();
 
   const startWebcam = useCallback(async () => {
+    if (isPremium) {
+      // Usuário premium pode usar sem restrições
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 640, height: 480 } });
+        setStream(s);
+        setMode("webcam");
+        setTimeout(() => {
+          if (videoRef.current) { videoRef.current.srcObject = s; videoRef.current.play(); }
+        }, 100);
+      } catch { alert("Não foi possível acessar a câmera."); }
+      return;
+    }
+    
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 640, height: 480 } });
       setStream(s);
@@ -64,7 +77,7 @@ export default function LookAlike() {
         if (videoRef.current) { videoRef.current.srcObject = s; videoRef.current.play(); }
       }, 100);
     } catch { alert("Não foi possível acessar a câmera."); }
-  }, []);
+  }, [isPremium]);
 
   const stopWebcam = () => {
     stream?.getTracks().forEach((t) => t.stop());

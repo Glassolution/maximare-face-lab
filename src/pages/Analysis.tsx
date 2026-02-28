@@ -584,8 +584,15 @@ export default function Analysis() {
         }
 
         // Check paywall gate
-        const allowed = await checkGate({ trigger: 'analysis_completed' });
         const targetPath = `/results/${result.id}`;
+        
+        if (isPremium) {
+          // Usuário premium pode ver resultados sem restrição
+          navigate(targetPath);
+          return;
+        }
+        
+        const allowed = await checkGate({ trigger: 'analysis_completed' });
 
         if (allowed) {
           navigate(targetPath, {
