@@ -628,19 +628,20 @@ Seja preciso. Reconheça a beleza masculina robusta e dê a nota CHAD que ela me
           });
         }
 
-        provider = "lovable-gateway";
-        model = "google/gemini-1.5-pro";
+        provider = "anthropic-claude";
+        model = "claude-3-haiku-20240307";
         const startedAt = performance.now();
 
-        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
           headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
+            'x-api-key': Deno.env.get('ANTHROPIC_API_KEY') ?? '',
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
           },
           body: JSON.stringify({
-            model,
-            temperature: 0, // FORCE DETERMINISM
+            model: 'claude-3-haiku-20240307',
+            max_tokens: 4096,
             messages: [
               {
                 role: "user",
@@ -658,7 +659,7 @@ Seja preciso. Reconheça a beleza masculina robusta e dê a nota CHAD que ela me
         }
 
         const aiResult = await response.json();
-        const rawContent = aiResult.choices?.[0]?.message?.content || "";
+        const rawContent = aiResult.content?.[0]?.text || "";
 
         let jsonStr = rawContent;
         const jsonMatch = rawContent.match(/```(?:json)?\s*([\s\S]*?)```/);

@@ -455,8 +455,8 @@ export default function Analysis() {
 
               if (!resp.ok) {
                 // Tratar diferentes tipos de erro HTTP
-                if (resp.status === 500) {
-                  throw new Error("Erro 500: Erro interno do servidor. Tente novamente.");
+                if (resp.status === 500 || resp.status === 401) {
+                  throw new Error(`Erro ${resp.status}: problema no servidor`);
                 } else if (resp.status === 429) {
                   throw new Error("Muitas tentativas. Aguarde um momento.");
                 } else if (resp.status === 401) {
