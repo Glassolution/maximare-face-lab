@@ -24,7 +24,7 @@ export default function Battles() {
 
   const pendingBattles = battles.filter(b => b.status === 'waiting' && !b.is_creator && !b.matched_at);
   const activeBattles = battles.filter(b =>
-    (b.status === 'waiting' && !!b.matched_at) ||
+    (b.status === 'waiting' && (!!b.matched_at || b.is_creator)) ||
     b.status === 'ready' ||
     b.status === 'running'
   );

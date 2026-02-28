@@ -21,6 +21,8 @@ export function useBattles() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      
+      console.log("Battles fetched:", data); // Debug log requested by user
 
       if (data && data.length > 0) {
         // Collect all user IDs needed (both creators and opponents)
@@ -139,6 +141,39 @@ export function useBattles() {
 
   useEffect(() => {
     fetchBattles();
+
+    if (!user) return;
+
+    // Realtime subscription for battles involving the user
+    const channel = supabase
+      .channel('battles-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'battles'
+        },
+        (payload) => {
+          const newBattle = payload.new as any;
+          const oldBattle = payload.old as any;
+          
+          // Check if the change is relevant to the current user
+          const isRelevant = 
+            (newBattle && (newBattle.created_by === user.id || newBattle.opponent_id === user.id)) ||
+            (oldBattle && (oldBattle.created_by === user.id || oldBattle.opponent_id === user.id));
+
+          if (isRelevant) {
+            console.log("Realtime update detected:", payload);
+            fetchBattles();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   return {
