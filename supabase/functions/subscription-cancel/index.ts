@@ -104,25 +104,32 @@ serve(async (req) => {
     }
 
     const db = admin ?? client;
+    // Fetch profile by id or user_id to support legacy schemas
     let { data: profile } = await db
       .from("profiles")
       .select(
-        "id, subscription_status, subscription_expires_at, premium_since, plan_type, payment_provider, payment_id, provider_payment_id, provider_subscription_id, first_payment_at, subscription_started_at"
+        "id, user_id, subscription_status, subscription_expires_at, premium_since, plan_type, payment_provider, payment_id, provider_payment_id, provider_subscription_id, first_payment_at, subscription_started_at"
       )
-      .eq("id", userId)
+      .or(`id.eq.${userId},user_id.eq.${userId}`)
       .maybeSingle();
 
     if (!profile) {
       if (admin) {
-        await admin
+        // Try upsert by id; if schema uses user_id, fall back to user_id upsert
+        const tryById = await admin
           .from("profiles")
           .upsert({ id: userId }, { onConflict: "id", ignoreDuplicates: true });
-        const re = await db
+        if (tryById.error) {
+          await admin
+            .from("profiles")
+            .upsert({ user_id: userId }, { onConflict: "user_id", ignoreDuplicates: true });
+        }
+        const re = await (admin ?? client)
           .from("profiles")
           .select(
-            "id, subscription_status, subscription_expires_at, premium_since, plan_type, payment_provider, payment_id, provider_payment_id, provider_subscription_id, first_payment_at, subscription_started_at"
+            "id, user_id, subscription_status, subscription_expires_at, premium_since, plan_type, payment_provider, payment_id, provider_payment_id, provider_subscription_id, first_payment_at, subscription_started_at"
           )
-          .eq("id", userId)
+          .or(`id.eq.${userId},user_id.eq.${userId}`)
           .maybeSingle();
         profile = re.data || null;
       }
@@ -252,7 +259,7 @@ serve(async (req) => {
     if (providerPaymentId && !profile.provider_payment_id) updates["provider_payment_id"] = providerPaymentId;
     if (!profile.first_payment_at && startDate) updates["first_payment_at"] = startDate.toISOString();
 
-    await db.from("profiles").update(updates).eq("id", userId);
+    await db.from("profiles").update(updates).or(`id.eq.${userId},user_id.eq.${userId}`);
 
     return new Response(
       JSON.stringify({
