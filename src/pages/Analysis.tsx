@@ -27,6 +27,7 @@ import faceScanHero from "@/assets/clark.png";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, captureException } from "@/lib/posthog";
+import { avatarService } from "@/services/avatarService";
 
 function CircularScore({ score, delta, ringColor }: { score: number; delta: number; ringColor: string }) {
   const springValue = useSpring(0, { stiffness: 40, damping: 20 });
@@ -876,8 +877,8 @@ export default function Analysis() {
 
   // ───────── DASHBOARD ─────────
 
-  const displayName =
-    (user && (user.user_metadata?.full_name || user.user_metadata?.name || user.email)) || "Usuário MAXIMARE";
+  const displayName = (user && (user.user_metadata?.full_name || user.user_metadata?.name || user.email)) || "Usuário MAXIMARE";
+  const avatarUrl = avatarService.getAvatarPublicUrl(profile?.avatar_url);
 
   return (
     <PaywallManager trigger="app_open">
@@ -887,13 +888,18 @@ export default function Analysis() {
             {/* Header / Top Bar */}
             <header className="flex items-center justify-between px-6 py-4 sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
           <div className="flex items-center gap-3">
-            {profile?.avatar_url ? (
+            {avatarUrl ? (
               <img 
-                src={profile.avatar_url} 
+                src={avatarUrl} 
                 alt="Avatar do usuário" 
                 className="size-10 rounded-full object-cover border-2 border-white/10 shadow-lg shadow-primary/20"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                }}
               />
-            ) : (
+            ) : null}
+            {!avatarUrl && (
               <div className="size-10 rounded-full bg-gradient-to-br from-primary to-blue-700 flex items-center justify-center border border-white/10 shadow-lg shadow-primary/20">
                <User className="text-white h-5 w-5" />
               </div>
