@@ -15,12 +15,17 @@ interface PaywallManagerProps {
 }
 
 export function PaywallManager({ children }: PaywallManagerProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { isPremium } = useAnalysisLimit();
   const [showPaywall, setShowPaywall] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'weekly' | 'monthly' | 'annual'>('annual');
   const navigate = useNavigate();
   const { isConversionCooldownActive, setLastConversionShown } = usePaywallStore();
+
+  const isPremiumUser =
+    profile?.premium === true ||
+    profile?.is_premium === true ||
+    profile?.subscription_status === 'active';
 
   // Session State (Memory only)
   const [sessionCount, setSessionCount] = useState(0);
@@ -31,7 +36,7 @@ export function PaywallManager({ children }: PaywallManagerProps) {
   const MAX_PER_SESSION = 1;
 
   const triggerPaywall = () => {
-    if (isPremium) return;
+    if (isPremiumUser || isPremium) return;
     if (sessionCount >= MAX_PER_SESSION) return;
     
     const now = Date.now();
@@ -50,10 +55,16 @@ export function PaywallManager({ children }: PaywallManagerProps) {
   };
 
   useEffect(() => {
-    if (!user || isPremium) return;
+    if (showPaywall && isPremiumUser) {
+      setShowPaywall(false);
+    }
+  }, [showPaywall, isPremiumUser]);
+
+  useEffect(() => {
+    if (!user || isPremiumUser || isPremium) return;
     const timer = setTimeout(() => triggerPaywall(), 2000);
     return () => clearTimeout(timer);
-  }, [user, isPremium]);
+  }, [user, isPremiumUser, isPremium]);
 
   const handleSubscribe = () => {
       setShowPaywall(false);
@@ -63,7 +74,7 @@ export function PaywallManager({ children }: PaywallManagerProps) {
   return (
     <>
       {children}
-      <Dialog open={showPaywall} onOpenChange={setShowPaywall}>
+      <Dialog open={showPaywall && !isPremiumUser} onOpenChange={setShowPaywall}>
         <DialogContent className="w-[95%] max-w-[380px] p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border border-white/10 bg-[#0a0a0a] text-white backdrop-blur-xl shadow-2xl overflow-y-auto max-h-[90vh] gap-3">
           <DialogTitle className="sr-only">Desbloqueie seu Potencial</DialogTitle>
           <DialogDescription className="sr-only">Escolha um plano para acessar todos os recursos.</DialogDescription>
