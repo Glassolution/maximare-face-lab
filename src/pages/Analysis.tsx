@@ -453,7 +453,14 @@ export default function Analysis() {
               }
 
               if (!resp.ok) {
-                if (data?.limits_disabled) {
+                // Tratar diferentes tipos de erro HTTP
+                if (resp.status === 500) {
+                  throw new Error("Erro 500: Erro interno do servidor. Tente novamente.");
+                } else if (resp.status === 429) {
+                  throw new Error("Muitas tentativas. Aguarde um momento.");
+                } else if (resp.status === 401) {
+                  throw new Error("Não autorizado. Faça login novamente.");
+                } else if (data?.limits_disabled) {
                   // ignore limit errors when disabled
                 } else if (data?.error_code === "QUOTA_EXCEEDED") {
                   setLimitInfo({
@@ -466,7 +473,7 @@ export default function Analysis() {
                   startCooldown(retry);
                   throw new Error(`Aguarde ${retry}s para nova análise.`);
                 } else {
-                  throw new Error(data?.message || "Erro na análise. Tente novamente.");
+                  throw new Error(data?.message || `Erro ${resp.status}: Erro na análise. Tente novamente.`);
                 }
               }
               if (data?.isValidFace === false) {
@@ -604,6 +611,38 @@ export default function Analysis() {
 
     } catch (error: unknown) {
         console.error("Erro na análise:", error);
+        
+        // Separar tratamento de erros
+        if (error instanceof Error) {
+            // Erro 500 ou erro de servidor - NÃO abrir paywall
+            if (error.message.includes('500') || error.message.includes('server') || error.message.includes('internal')) {
+                setErrorMsg("Erro no servidor. Tente novamente em alguns minutos.");
+                setCaptureStep("intro");
+                return;
+            }
+            
+            // Erros de limite/acesso - verificar premium antes de abrir paywall
+            if (error.message.includes('limite') || error.message.includes('quota') || error.message.includes('tentativas')) {
+                if (isPremium) {
+                    // Usuário premium não deve ver erros de limite
+                    setErrorMsg("Erro inesperado. Contate o suporte.");
+                    setCaptureStep("intro");
+                    return;
+                }
+                // Para usuários gratuitos, deixar o erro de limite aparecer
+                setErrorMsg(error.message);
+                setCaptureStep("intro");
+                return;
+            }
+            
+            // Outros erros
+            setErrorMsg(error.message || "Erro na análise. Tente novamente.");
+        } else {
+            setErrorMsg("Erro desconhecido. Tente novamente.");
+        }
+        
+        setCaptureStep("intro");
+        
         // PostHog: track analysis failure and capture exception
         trackEvent(distinctId, 'face_analysis_failed', {
           error_message: error instanceof Error ? error.message : String(error),
