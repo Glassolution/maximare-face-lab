@@ -5,6 +5,26 @@ export interface AvatarUploadResult {
   path: string;
 }
 
+async function getValidSession() {
+  const { data: { session: initialSession } } = await supabase.auth.getSession();
+
+  const isExpired = (sess: typeof initialSession | null) => {
+    if (!sess?.expires_at) return false;
+    return sess.expires_at * 1000 <= Date.now() + 5_000;
+  };
+
+  if (initialSession && !isExpired(initialSession)) {
+    return initialSession;
+  }
+
+  const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+  if (refreshError) {
+    return null;
+  }
+
+  return refreshedSession ?? null;
+}
+
 export const avatarService = {
   /**
    * Uploads a new avatar for the current user.
@@ -13,16 +33,15 @@ export const avatarService = {
    */
   async uploadAvatar(file: File): Promise<AvatarUploadResult> {
     console.log('[AvatarService] Starting avatar upload process...');
-    
-    // 1. Authenticate
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      console.error('[AvatarService] User not authenticated');
-      throw new Error("Usuário não autenticado");
+
+    const session = await getValidSession();
+
+    if (!session?.user) {
+      console.error('[AvatarService] User not authenticated (no valid session)');
+      throw new Error("Sessão expirada. Faça login novamente.");
     }
 
-    const userId = user.id;
+    const userId = session.user.id;
     const filePath = `${userId}/avatar.webp`;
     
     console.log(`[AvatarService] Target user: ${userId}`);
@@ -74,6 +93,56 @@ export const avatarService = {
     }
 
     console.log('[AvatarService] Profile updated successfully with:', filePath);
+
+    return { publicUrl, path: filePath };
+  },
+
+  async uploadAvatarBlob(blob: Blob, userId?: string): Promise<AvatarUploadResult> {
+    console.log('[AvatarService] Starting avatar blob upload process...');
+
+    const session = await getValidSession();
+    const effectiveUserId = userId ?? session?.user?.id;
+
+    if (!session?.user || !effectiveUserId) {
+      console.error('[AvatarService] User not authenticated (no valid session)');
+      throw new Error("Sessão expirada. Faça login novamente.");
+    }
+
+    const filePath = `${effectiveUserId}/avatar.webp`;
+
+    const contentType = blob.type || 'image/jpeg';
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, blob, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType,
+      });
+
+    if (uploadError) {
+      console.error('[AvatarService] Upload error:', uploadError);
+      throw uploadError;
+    }
+
+    console.log('[AvatarService] Upload success:', uploadData);
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(filePath);
+
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        avatar_url: filePath,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', effectiveUserId);
+
+    if (updateError) {
+      console.error('[AvatarService] Profile update error:', updateError);
+      throw updateError;
+    }
 
     return { publicUrl, path: filePath };
   },

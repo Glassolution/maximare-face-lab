@@ -530,6 +530,16 @@ export default function Analysis() {
         
         await saveAnalysis(result);
 
+        if (user && frontPhoto && !profile?.avatar_url) {
+          try {
+            const res = await fetch(frontPhoto);
+            const blob = await res.blob();
+            await avatarService.uploadAvatarBlob(blob, user.id);
+          } catch (e) {
+            console.warn("Falha ao definir avatar automaticamente:", e);
+          }
+        }
+
         // PostHog: track analysis completed
         trackEvent(distinctId, 'face_analysis_completed', {
           ger: result.ger,
