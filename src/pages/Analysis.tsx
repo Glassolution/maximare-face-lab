@@ -131,7 +131,7 @@ export default function Analysis() {
   const cooldownTimerRef = useRef<number | null>(null);
   const [limitsDisabled, setLimitsDisabled] = useState(DISABLE_LIMITS);
 
-  const { user, session } = useAuth();
+  const { user, session, profile } = useAuth();
 
   useEffect(() => {
     const sync = async () => {
@@ -887,9 +887,17 @@ export default function Analysis() {
             {/* Header / Top Bar */}
             <header className="flex items-center justify-between px-6 py-4 sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="size-10 rounded-full bg-gradient-to-br from-primary to-blue-700 flex items-center justify-center border border-white/10 shadow-lg shadow-primary/20">
+            {profile?.avatar_url ? (
+              <img 
+                src={profile.avatar_url} 
+                alt="Avatar do usuário" 
+                className="size-10 rounded-full object-cover border-2 border-white/10 shadow-lg shadow-primary/20"
+              />
+            ) : (
+              <div className="size-10 rounded-full bg-gradient-to-br from-primary to-blue-700 flex items-center justify-center border border-white/10 shadow-lg shadow-primary/20">
                <User className="text-white h-5 w-5" />
-            </div>
+              </div>
+            )}
             <div>
               <p className="text-[10px] text-muted-foreground font-bold tracking-widest uppercase">Membro Elite</p>
               <h2 className="text-sm font-bold text-foreground">{displayName}</h2>
