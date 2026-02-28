@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { logPaywallEvent } from "@/lib/paywall";
 import { useNavigate } from "react-router-dom";
 import { usePremiumStatus } from "@/hooks/usePremiumStatus";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Props {
   open: boolean;
@@ -70,6 +71,13 @@ const CONTEXT_CONFIG: Record<string, { title: string; description: string; benef
 };
 
 export const PaywallModal = ({ open, onClose, onUpgrade, context }: Props) => {
+  const { profile } = useAuth();
+  
+  // Verificação definitiva de premium - não renderiza NADA se for premium
+  if (profile?.is_premium === true || profile?.subscription_status === 'active') {
+    return null;
+  }
+  
   // Use Global Store to manage visibility of second modal
   const { isPopupOpen, closePopup, popupContext } = usePaywallStore();
   const navigate = useNavigate();

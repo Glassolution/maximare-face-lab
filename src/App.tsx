@@ -42,8 +42,13 @@ function Layout() {
   // ... existing hideNav logic ...
   const hideNav = ["/", "/onboarding", "/login", "/premium", "/landing", "/update-password", "/subscription"].includes(location.pathname);
 
-  const { user, loading } = useAuth();
+  const { user, loading, profile } = useAuth();
   const { openPopup } = usePaywallStore();
+  
+  // Não renderiza NADA relacionado a paywall se for premium
+  if (loading || profile?.is_premium === true || profile?.subscription_status === 'active') {
+    return null;
+  }
   
   const { checkGate, isPaywallOpen, closePaywall } = usePaywallGate();
   const { isPremium } = usePremiumStatus();
