@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PaywallContext, shouldShowPaywall, recordPaywallShow, recordPaywallDismiss, logPaywallEvent } from '@/lib/paywall';
 import { usePaywallStore } from '@/lib/paywallStore';
@@ -10,6 +10,9 @@ export function usePaywallGate() {
   const navigate = useNavigate();
   const { openMain, closeMain, isMainOpen, mainContext } = usePaywallStore();
   const { profile } = useAuth();
+  
+  // TODOS os hooks primeiro, sem exceção
+  const [isPaywallOpen, setIsPaywallOpen] = useState(false);
   
   const closePaywall = useCallback(async () => {
     closeMain();
@@ -29,21 +32,16 @@ export function usePaywallGate() {
     navigate('/premium', { state: { context: mainContext } });
   }, [navigate, mainContext, closeMain]);
 
-  // Verificação de premium DEPOIS de todos os hooks
-  const isPremium = profile?.is_premium === true || profile?.subscription_status === 'active';
-  
-  if (isPremium) {
-    console.log('[PaywallGate] Usuário é premium, bloqueando todas as ações de paywall');
-    return {
-      checkGate: async () => true,
-      PaywallDialog: () => null,
-      isPaywallOpen: false,
-      closePaywall: async () => {},
-      handleUpgrade: async () => {}
-    };
-  }
-
+  // Verificação de premium DENTRO da função, não no corpo do hook
   const checkGate = useCallback(async (triggerContext: PaywallContext): Promise<boolean> => {
+    // Verificação de premium DENTRO da função
+    const isPremium = profile?.is_premium === true || profile?.subscription_status === 'active';
+    
+    if (isPremium) {
+      console.log('[PaywallGate] Usuário é premium, permitindo todas as ações');
+      return true; // Permitir ação para premium
+    }
+    
     try {
       const shouldShow = await shouldShowPaywall(triggerContext);
       
@@ -69,6 +67,7 @@ export function usePaywallGate() {
         } else {
            // Soft gate: Show modal via Global Store
            openMain(triggerContext);
+           setIsPaywallOpen(true); // Controlar estado local
            return false; // Block action (or indicate paywall shown)
         }
       }
@@ -78,22 +77,31 @@ export function usePaywallGate() {
       console.error("Error checking paywall gate:", error);
       return true; // Fail safe: allow access if error
     }
-  }, [navigate, openMain]);
+  }, [navigate, openMain, setIsPaywallOpen]);
 
   // Wrapper component to render modal controlled by this hook
-  const PaywallDialog = useCallback(() => (
-    <PaywallModal 
-      open={isMainOpen} 
-      onClose={closePaywall} 
-      onUpgrade={handleUpgrade}
-      context={mainContext}
-    />
-  ), [isMainOpen, closePaywall, handleUpgrade, mainContext]);
+  const PaywallDialog = useCallback(() => {
+    // Verificação de premium DENTRO do componente
+    const isPremium = profile?.is_premium === true || profile?.subscription_status === 'active';
+    
+    if (isPremium) {
+      return null; // Não renderizar paywall para premium
+    }
+    
+    return (
+      <PaywallModal 
+        open={isMainOpen} 
+        onClose={closePaywall} 
+        onUpgrade={handleUpgrade}
+        context={mainContext}
+      />
+    );
+  }, [isMainOpen, closePaywall, handleUpgrade, mainContext, profile]);
 
   return {
     checkGate,
     PaywallDialog,
-    isPaywallOpen: isMainOpen,
+    isPaywallOpen: isPaywallOpen,
     closePaywall,
     handleUpgrade
   };
