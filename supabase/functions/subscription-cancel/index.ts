@@ -35,6 +35,14 @@ serve(async (req) => {
     }
 
     const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
+    try {
+      const info = {
+        hasAuth: !!authHeader,
+        authLen: authHeader ? authHeader.length : 0,
+        hasAnon: !!(req.headers.get("apikey") || req.headers.get("x-api-key") || ENV_ANON_KEY),
+      };
+      console.log(JSON.stringify({ tag: "subcancel_req_headers", ...info }));
+    } catch {}
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "unauthorized", reason: "missing_auth_header" }), {
         status: 401,
@@ -58,6 +66,9 @@ serve(async (req) => {
 
     const { data: userRes } = await client.auth.getUser();
     const user = userRes?.user;
+    try {
+      console.log(JSON.stringify({ tag: "subcancel_user", userId: user?.id || null }));
+    } catch {}
     if (!user) {
       return new Response(JSON.stringify({ error: "unauthorized", reason: "invalid_user" }), {
         status: 401,
