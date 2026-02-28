@@ -255,6 +255,24 @@ async function getGuardInfo(
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  // DEBUG: Logs detalhados no início
+  console.log('Function started');
+  console.log('Env vars:', {
+    hasOpenAI: !!Deno.env.get('OPENAI_API_KEY'),
+    hasAnthropicKey: !!Deno.env.get('ANTHROPIC_API_KEY'),
+    hasLovableKey: !!Deno.env.get('LOVABLE_API_KEY'),
+    hasSupabaseUrl: !!Deno.env.get('SUPABASE_URL'),
+    hasSupabaseServiceKey: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+    disableLimits: Deno.env.get('DISABLE_LIMITS'),
+    rollingLimit: Deno.env.get('LOVABLE_ROLLING_LIMIT')
+  });
+  console.log('Request method:', req.method);
+  console.log('Request headers:', {
+    authorization: req.headers.get('Authorization') ? 'present' : 'missing',
+    contentType: req.headers.get('Content-Type'),
+    userAgent: req.headers.get('User-Agent')
+  });
+
   try {
     let response: Response | undefined;
     const body = await req.json();

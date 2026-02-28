@@ -225,7 +225,14 @@ export default function GerResults() {
           <>
             <Button
               className="w-full rounded-2xl py-6 text-base font-bold bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-              onClick={() => setShowPaywall(true)}
+              onClick={() => {
+                if (isPremium) {
+                  // Usuário premium não deve ver paywall
+                  navigate('/premium');
+                  return;
+                }
+                setShowPaywall(true);
+              }}
             >
               <Lock className="h-5 w-5 mr-2" />
               Desbloquear Análise Completa

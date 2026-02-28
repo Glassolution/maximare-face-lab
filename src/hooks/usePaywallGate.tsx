@@ -37,6 +37,15 @@ export function usePaywallGate() {
     // Verificação de premium DENTRO da função
     const isPremium = profile?.is_premium === true || profile?.subscription_status === 'active';
     
+    console.log('[PaywallGate] checkGate chamado:', {
+      trigger: triggerContext.trigger,
+      isPremium,
+      profile: {
+        is_premium: profile?.is_premium,
+        subscription_status: profile?.subscription_status
+      }
+    });
+    
     if (isPremium) {
       console.log('[PaywallGate] Usuário é premium, permitindo todas as ações');
       return true; // Permitir ação para premium
@@ -84,10 +93,21 @@ export function usePaywallGate() {
     // Verificação de premium DENTRO do componente
     const isPremium = profile?.is_premium === true || profile?.subscription_status === 'active';
     
+    console.log('[PaywallGate] PaywallDialog renderizado:', {
+      isPremium,
+      isMainOpen,
+      profile: {
+        is_premium: profile?.is_premium,
+        subscription_status: profile?.subscription_status
+      }
+    });
+    
     if (isPremium) {
+      console.log('[PaywallGate] PaywallDialog: Usuário é premium, retornando null');
       return null; // Não renderizar paywall para premium
     }
     
+    console.log('[PaywallGate] PaywallDialog: Renderizando PaywallModal');
     return (
       <PaywallModal 
         open={isMainOpen} 
