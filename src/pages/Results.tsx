@@ -118,26 +118,26 @@ export default function Results() {
 
   if (isShareMode) {
     const shareItems = [
-      { label: 'PSL Score', value: pslScore.toFixed(1), color: pslColor },
-      { label: 'Mentalidade', value: mindset, color: classificationColor },
-      { label: 'Estratégia', value: strategy, color: classificationColor },
-      { label: 'Tipo de Mandíbula', value: jawType, color: classificationColor },
-      { label: 'Respiração', value: breathing, color: breathingColor },
-      { label: 'Harmonia', value: harmony, color: harmonyColor },
+      { label: 'Pontuação PSL', value: pslScore.toFixed(1), color: pslColor, width: `${pslPercent}%` },
+      { label: 'Mentalidade', value: mindset, color: classificationColor, width: `${mindsetPercent}%` },
+      { label: 'Estratégia', value: strategy, color: classificationColor, width: "65%" },
+      { label: 'Tipo de mandíbula', value: jawType, color: classificationColor, width: "92%" },
+      { label: 'Respiração', value: breathing, color: breathingColor, width: `${breathingPercent}%` },
+      { label: 'Nível de apelo', value: appealLevel, color: classificationColor, width: "95%" },
     ];
 
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center px-5 py-6">
-        <div className="w-full max-w-[380px] flex flex-col items-center">
+      <div className="min-h-screen bg-background text-white flex items-center justify-center px-5 py-6">
+        <div className="w-full max-w-[390px] flex flex-col items-center">
           <div className="w-full flex flex-col items-center">
-            <div className="w-[120px] h-[120px] rounded-full overflow-hidden border border-white/15 mb-4">
+            <div className="w-[120px] h-[120px] rounded-full overflow-hidden border-2 border-white/10 ring-4 ring-primary/5 mb-4">
               {avatarUrl ? (
                 <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
               ) : statePhoto || result.photoUrl ? (
                 <img src={statePhoto || result.photoUrl} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-white/5">
-                  <Scan className="w-10 h-10 text-white/30" />
+                <div className="w-full h-full flex items-center justify-center bg-black/40">
+                  <Scan className="w-10 h-10 text-white/40" />
                 </div>
               )}
             </div>
@@ -155,21 +155,43 @@ export default function Results() {
               ANÁLISE MAXIMARE
             </p>
 
-            <div className="w-full mt-5 bg-white/5 border border-white/10 rounded-2xl p-4">
-              <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+            <div className="w-full mt-5 bg-black/40 backdrop-blur-xl border border-white/10 rounded-[24px] p-6 shadow-2xl relative overflow-hidden">
+              <div
+                className="absolute inset-0 opacity-[0.03] pointer-events-none"
+                style={{
+                  backgroundImage:
+                    "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
+                  backgroundSize: "20px 20px",
+                }}
+              />
+              <div className="grid grid-cols-2 gap-x-8 gap-y-6 relative z-10">
                 {shareItems.map((item) => (
-                  <div key={item.label} className="space-y-2 min-w-0">
-                    <p className="text-[10px] font-mono text-white/45 uppercase tracking-wider truncate">
+                  <div key={item.label} className="space-y-3 min-w-0">
+                    <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider truncate">
                       {item.label}
                     </p>
                     <p className="text-sm font-semibold text-white truncate">
                       {item.value}
                     </p>
-                    <div className="w-full h-[2px] bg-white/10 rounded-full overflow-hidden">
-                      <div className="h-full" style={{ width: '60%', backgroundColor: item.color }} />
+                    <div className="w-full bg-white/10 rounded-full overflow-hidden h-[2px]">
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: item.width, backgroundColor: item.color }}
+                      />
                     </div>
                   </div>
                 ))}
+              </div>
+
+              <div className="mt-6 pt-6 border-t border-white/5 flex justify-between items-center relative z-10">
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary/40" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary/20" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary/10" />
+                </div>
+                <span className="text-[9px] font-mono text-white/20 uppercase tracking-widest">
+                  Dados biométricos verificados
+                </span>
               </div>
             </div>
 
