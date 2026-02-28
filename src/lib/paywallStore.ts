@@ -18,6 +18,11 @@ interface PaywallState {
 
   // Global Logic
   closeAll: () => void;
+  
+  // Cooldown tracking
+  lastConversionShown: number;
+  setLastConversionShown: (timestamp: number) => void;
+  isConversionCooldownActive: () => boolean;
 }
 
 export const usePaywallStore = create<PaywallState>((set, get) => ({
@@ -25,6 +30,7 @@ export const usePaywallStore = create<PaywallState>((set, get) => ({
   mainContext: undefined,
   isPopupOpen: false,
   popupContext: undefined,
+  lastConversionShown: 0,
 
   openMain: (context) => {
     // High priority: Closes popup if open
@@ -32,7 +38,8 @@ export const usePaywallStore = create<PaywallState>((set, get) => ({
       isMainOpen: true,
       mainContext: context,
       isPopupOpen: false,
-      popupContext: undefined
+      popupContext: undefined,
+      lastConversionShown: Date.now()
     });
   },
 
@@ -49,7 +56,8 @@ export const usePaywallStore = create<PaywallState>((set, get) => ({
     if (!isMainOpen) {
       set({
         isPopupOpen: true,
-        popupContext: context
+        popupContext: context,
+        lastConversionShown: Date.now()
       });
     }
   },
@@ -68,5 +76,16 @@ export const usePaywallStore = create<PaywallState>((set, get) => ({
       isPopupOpen: false,
       popupContext: undefined
     });
+  },
+
+  setLastConversionShown: (timestamp) => {
+    set({ lastConversionShown: timestamp });
+  },
+
+  isConversionCooldownActive: () => {
+    const { lastConversionShown } = get();
+    const now = Date.now();
+    const COOLDOWN_MS = 600000; // 10 minutes
+    return (now - lastConversionShown) < COOLDOWN_MS;
   }
 }));

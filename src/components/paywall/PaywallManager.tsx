@@ -7,6 +7,7 @@ import { Check, ShieldCheck, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { usePaywallStore } from "@/lib/paywallStore";
 
 interface PaywallManagerProps {
   children: React.ReactNode;
@@ -19,6 +20,7 @@ export function PaywallManager({ children }: PaywallManagerProps) {
   const [showPaywall, setShowPaywall] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'weekly' | 'monthly' | 'annual'>('annual');
   const navigate = useNavigate();
+  const { isConversionCooldownActive, setLastConversionShown } = usePaywallStore();
 
   // Session State (Memory only)
   const [sessionCount, setSessionCount] = useState(0);
@@ -35,9 +37,16 @@ export function PaywallManager({ children }: PaywallManagerProps) {
     const now = Date.now();
     if (now - lastShownAt < COOLDOWN_MS) return;
 
+    // Check global conversion cooldown
+    if (isConversionCooldownActive()) {
+      console.log('[PaywallManager] Skipped: Global conversion cooldown active');
+      return;
+    }
+
     setShowPaywall(true);
     setLastShownAt(now);
     setSessionCount(prev => prev + 1);
+    setLastConversionShown(now);
   };
 
   useEffect(() => {

@@ -32,6 +32,14 @@ export function usePaywallGate() {
       const shouldShow = await shouldShowPaywall(triggerContext);
       
       if (shouldShow) {
+        // Check global conversion cooldown before showing
+        const { isConversionCooldownActive, setLastConversionShown } = usePaywallStore.getState();
+        
+        if (isConversionCooldownActive() && triggerContext.trigger !== 'feature_locked' && triggerContext.trigger !== 'manual' && triggerContext.trigger !== 'periodic_force') {
+          console.log('[PaywallGate] Skipped: Global conversion cooldown active');
+          return true; // Allow action to proceed
+        }
+
         // Log show event
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
