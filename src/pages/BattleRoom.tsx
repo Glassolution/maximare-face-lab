@@ -45,6 +45,12 @@ export default function BattleRoom() {
       return supabase.storage.from('battles').getPublicUrl(path).data.publicUrl;
   };
 
+  const getAvatarUrl = (pathOrUrl: string | null | undefined) => {
+      if (!pathOrUrl) return null;
+      if (pathOrUrl.startsWith('http') || pathOrUrl.startsWith('data:')) return pathOrUrl;
+      return supabase.storage.from('avatars').getPublicUrl(pathOrUrl).data.publicUrl;
+  };
+
   if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-8 w-8" /></div>;
   if (error || !battle) return <div className="p-8 text-center text-red-500">Erro: {error || 'Batalha não encontrada'}</div>;
 
@@ -77,8 +83,8 @@ export default function BattleRoom() {
       (!processingAnimationComplete && ['reveal_loser', 'completed'].includes(battle.status) && !!mySubmission && !!opponentSubmission);
 
   if (shouldShowProcessing) {
-      const myAvatar = getPhotoUrl(mySubmission?.front_photo_path) || userProfile?.avatar_url;
-      const opponentAvatar = getPhotoUrl(opponentSubmission?.front_photo_path) || opponentProfile?.avatar_url;
+      const myAvatar = getPhotoUrl(mySubmission?.front_photo_path) || getAvatarUrl(userProfile?.avatar_url);
+      const opponentAvatar = getPhotoUrl(opponentSubmission?.front_photo_path) || getAvatarUrl(opponentProfile?.avatar_url);
       
       // We tell the overlay to finish ONLY if the real status is completed/reveal_loser
       const isReady = ['reveal_loser', 'completed'].includes(battle.status);

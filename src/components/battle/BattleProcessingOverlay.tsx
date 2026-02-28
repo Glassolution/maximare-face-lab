@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { Swords } from "lucide-react";
 
@@ -23,6 +23,8 @@ const STAGES = [
 export function BattleProcessingOverlay({ userAvatar, opponentAvatar, isReady, onComplete, startTime }: BattleProcessingOverlayProps) {
   const [stageIndex, setStageIndex] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [userAvatarFailed, setUserAvatarFailed] = useState(false);
+  const [opponentAvatarFailed, setOpponentAvatarFailed] = useState(false);
 
   useEffect(() => {
     let currentStage = 0;
@@ -92,8 +94,7 @@ export function BattleProcessingOverlay({ userAvatar, opponentAvatar, isReady, o
         {/* User Avatar (Left) */}
         <motion.div 
             animate={{ 
-                x: isFinalStage ? 20 : 0,
-                x: [0, -2, 2, -2, 2, 0],
+                x: isFinalStage ? 20 : [0, -2, 2, -2, 2, 0],
             }}
             transition={{ 
                 x: isFinalStage ? { duration: 1 } : { repeat: Infinity, duration: 0.2, repeatDelay: 3 } // Shake periodically
@@ -103,8 +104,16 @@ export function BattleProcessingOverlay({ userAvatar, opponentAvatar, isReady, o
             <div className="relative">
                 <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full" />
                 <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-blue-500/30 shadow-[0_0_20px_rgba(59,130,246,0.4)]">
-                    <AvatarImage src={userAvatar || undefined} className="object-cover" />
-                    <AvatarFallback className="bg-zinc-900 text-zinc-500">YOU</AvatarFallback>
+                    {userAvatar && !userAvatarFailed ? (
+                      <img
+                        src={userAvatar}
+                        alt="Avatar do usuário"
+                        className="w-full h-full object-cover rounded-full"
+                        onError={() => setUserAvatarFailed(true)}
+                      />
+                    ) : (
+                      <AvatarFallback className="bg-zinc-900 text-zinc-500">YOU</AvatarFallback>
+                    )}
                 </Avatar>
             </div>
             <span className="text-blue-500 font-bold tracking-widest text-sm uppercase">Você</span>
@@ -129,8 +138,7 @@ export function BattleProcessingOverlay({ userAvatar, opponentAvatar, isReady, o
         {/* Opponent Avatar (Right) */}
         <motion.div 
             animate={{ 
-                x: isFinalStage ? -20 : 0,
-                x: [0, 2, -2, 2, -2, 0],
+                x: isFinalStage ? -20 : [0, 2, -2, 2, -2, 0],
             }}
             transition={{ 
                 x: isFinalStage ? { duration: 1 } : { repeat: Infinity, duration: 0.2, repeatDelay: 3, delay: 0.1 } // Shake periodically
@@ -140,8 +148,16 @@ export function BattleProcessingOverlay({ userAvatar, opponentAvatar, isReady, o
             <div className="relative">
                 <div className="absolute inset-0 bg-red-500/20 blur-xl rounded-full" />
                 <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-red-500/30 shadow-[0_0_20px_rgba(239,68,68,0.4)]">
-                    <AvatarImage src={opponentAvatar || undefined} className="object-cover" />
-                    <AvatarFallback className="bg-zinc-900 text-zinc-500">VS</AvatarFallback>
+                    {opponentAvatar && !opponentAvatarFailed ? (
+                      <img
+                        src={opponentAvatar}
+                        alt="Avatar do oponente"
+                        className="w-full h-full object-cover rounded-full"
+                        onError={() => setOpponentAvatarFailed(true)}
+                      />
+                    ) : (
+                      <AvatarFallback className="bg-zinc-900 text-zinc-500">VS</AvatarFallback>
+                    )}
                 </Avatar>
             </div>
             <span className="text-red-500 font-bold tracking-widest text-sm uppercase">Oponente</span>
@@ -162,7 +178,7 @@ export function BattleProcessingOverlay({ userAvatar, opponentAvatar, isReady, o
         </motion.p>
         
         <div className="w-full max-w-md relative">
-            <Progress value={progress} className="h-2 bg-zinc-900" indicatorClassName="bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.8)]" />
+            <Progress value={progress} className="h-2 bg-zinc-900" />
             <p className="text-right text-xs text-zinc-500 mt-2 font-mono">{Math.floor(progress)}%</p>
         </div>
       </div>
