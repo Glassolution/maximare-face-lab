@@ -9,7 +9,7 @@ const corsHeaders = {
 };
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+const ENV_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const MP_ACCESS_TOKEN = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN") ?? "";
 
@@ -27,17 +27,26 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    if (!SUPABASE_URL || !ANON_KEY || !SERVICE_ROLE_KEY) {
-      return new Response(JSON.stringify({ error: "Server configuration error" }), {
+    if (!SUPABASE_URL) {
+      return new Response(JSON.stringify({ error: "server_config_error", detail: "MISSING_URL" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const authHeader = req.headers.get("Authorization");
+    const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      return new Response(JSON.stringify({ error: "unauthorized", reason: "missing_auth_header" }), {
         status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const headerAnon = req.headers.get("apikey") || req.headers.get("x-api-key") || "";
+    const ANON_KEY = ENV_ANON_KEY || headerAnon;
+    if (!ANON_KEY) {
+      return new Response(JSON.stringify({ error: "server_config_error", detail: "MISSING_ANON_KEY" }), {
+        status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -45,12 +54,12 @@ serve(async (req) => {
     const client = createClient(SUPABASE_URL, ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
-    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const admin = SERVICE_ROLE_KEY ? createClient(SUPABASE_URL, SERVICE_ROLE_KEY) : null;
 
     const { data: userRes } = await client.auth.getUser();
     const user = userRes?.user;
     if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      return new Response(JSON.stringify({ error: "unauthorized", reason: "invalid_user" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -64,7 +73,8 @@ serve(async (req) => {
       });
     }
 
-    const { data: profile } = await admin
+    const db = admin ?? client;
+    const { data: profile } = await db
       .from("profiles")
       .select(
         "id, subscription_status, subscription_expires_at, premium_since, plan_type, payment_provider, payment_id, provider_payment_id, provider_subscription_id, first_payment_at, subscription_started_at"
@@ -103,7 +113,7 @@ serve(async (req) => {
     const providerSubscriptionId = profile.provider_subscription_id || null;
 
     if (providerPaymentId) {
-      const { data: existing } = await admin
+      const { data: existing } = await db
         .from("subscription_cancellation_feedback")
         .select("id, refund_status, created_at")
         .eq("user_id", user.id)
@@ -165,7 +175,7 @@ serve(async (req) => {
 
     const finalAction = isWithin7Days && providerPaymentId ? (refundStatus === "approved" ? "cancel_refund" : "cancel_refund_failed") : "cancel";
 
-    await admin.from("subscription_cancellation_feedback").insert({
+    await db.from("subscription_cancellation_feedback").insert({
       user_id: user.id,
       provider: "mercadopago",
       provider_subscription_id: providerSubscriptionId,
@@ -195,7 +205,7 @@ serve(async (req) => {
     if (providerPaymentId && !profile.provider_payment_id) updates["provider_payment_id"] = providerPaymentId;
     if (!profile.first_payment_at && startDate) updates["first_payment_at"] = startDate.toISOString();
 
-    await admin.from("profiles").update(updates).eq("id", user.id);
+    await db.from("profiles").update(updates).eq("id", user.id);
 
     return new Response(
       JSON.stringify({
