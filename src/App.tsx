@@ -27,6 +27,7 @@ import { ThemeProvider } from "@/theme/ThemeProvider";
 import { useEffect, useState } from "react";
 import { usePaywallGate } from "@/hooks/usePaywallGate";
 import { syncHistoryWithSupabase } from "@/lib/mockData";
+import { usePremiumStatus } from "@/hooks/usePremiumStatus";
 
 import UpdatePassword from "@/pages/UpdatePassword";
 
@@ -44,6 +45,7 @@ function Layout() {
   const { openPopup } = usePaywallStore();
   
   const { checkGate, PaywallDialog } = usePaywallGate();
+  const { isPremium } = usePremiumStatus();
 
   useEffect(() => {
     if (user) {
@@ -54,7 +56,7 @@ function Layout() {
 
   useEffect(() => {
     const checkPeriodicPaywall = async () => {
-      if (!user || loading) return;
+      if (!user || loading || isPremium) return;
       if (location.pathname === "/premium" || location.pathname === "/login" || location.pathname === "/" || location.pathname === "/update-password") return;
       
       // Only check on main tabs to avoid spamming while navigating sub-pages
@@ -67,17 +69,17 @@ function Layout() {
     // Small delay to ensure page is loaded and user interaction is likely
     const timer = setTimeout(checkPeriodicPaywall, 2000);
     return () => clearTimeout(timer);
-  }, [location.pathname, user, loading, checkGate]);
+  }, [location.pathname, user, loading, isPremium, checkGate]);
 
   // Force Paywall after Login
   useEffect(() => {
-    if (user && !loading && location.state && (location.state as any).showPaywallOnEntry) {
+    if (user && !loading && !isPremium && location.state && (location.state as any).showPaywallOnEntry) {
        console.log("[App] Triggering login paywall force");
        checkGate({ trigger: 'periodic_force' });
        // Clear the state to prevent re-triggering
        navigate(location.pathname, { replace: true, state: {} });
     }
-  }, [user, loading, location, checkGate, navigate]);
+  }, [user, loading, isPremium, location, checkGate, navigate]);
 
   if (loading) {
     return (

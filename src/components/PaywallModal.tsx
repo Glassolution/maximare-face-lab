@@ -8,6 +8,7 @@ import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { logPaywallEvent } from "@/lib/paywall";
 import { useNavigate } from "react-router-dom";
+import { usePremiumStatus } from "@/hooks/usePremiumStatus";
 
 interface Props {
   open: boolean;
@@ -72,6 +73,13 @@ export const PaywallModal = ({ open, onClose, onUpgrade, context }: Props) => {
   // Use Global Store to manage visibility of second modal
   const { isPopupOpen, closePopup, popupContext } = usePaywallStore();
   const navigate = useNavigate();
+  const { isPremium } = usePremiumStatus();
+  
+  useEffect(() => {
+    if (open && isPremium) {
+      onClose();
+    }
+  }, [open, isPremium, onClose]);
 
   // If Main modal is open, Popup modal should be closed by store logic
   // Here we just render Popup if state says so
@@ -88,7 +96,7 @@ export const PaywallModal = ({ open, onClose, onUpgrade, context }: Props) => {
   return (
     <>
       {/* MODAL 1: Main (High Priority) - Controlled by props (usePaywallGate) */}
-      <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <Dialog open={open && !isPremium} onOpenChange={(v) => !v && onClose()}>
         <DialogContent className="max-w-none w-full h-full p-0 border-0 bg-black overflow-y-auto [&>button]:hidden z-[100]">
            <PremiumContent onClose={onClose} context={context} isModal />
         </DialogContent>

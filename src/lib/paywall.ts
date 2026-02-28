@@ -44,7 +44,7 @@ export async function shouldShowPaywall(context: PaywallContext): Promise<boolea
   // Fetch profile with only new paywall fields
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('subscription_status, subscription_expires_at, last_paywall_shown_at, paywall_show_count_7d, last_paywall_dismissed_at, paywall_dismiss_count_7d')
+    .select('subscription_status, subscription_expires_at, is_premium, last_paywall_shown_at, paywall_show_count_7d, last_paywall_dismissed_at, paywall_dismiss_count_7d')
     .eq('id', session.user.id)
     .single();
 
@@ -57,9 +57,10 @@ export async function shouldShowPaywall(context: PaywallContext): Promise<boolea
   const now = new Date();
   const status = profile.subscription_status;
   const isPremium = 
-    (status === 'active' || status === 'trialing' || status === 'premium_active') && 
-    profile.subscription_expires_at && 
-    new Date(profile.subscription_expires_at) > now;
+    ((status === 'active' || status === 'trialing' || status === 'premium_active') && 
+     profile.subscription_expires_at && 
+     new Date(profile.subscription_expires_at) > now) ||
+    profile.is_premium === true;
 
   if (isPremium) {
     console.log('User is premium, not showing paywall');
