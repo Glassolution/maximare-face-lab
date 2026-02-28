@@ -102,6 +102,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
   const [loadingUser, setLoadingUser] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'pix'>('card');
   const cardPaymentBrickController = useRef<any>(null);
+  const notifiedRef = useRef(false);
   
   // User data
   const [email, setEmail] = useState('');
@@ -191,7 +192,10 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
 
               if (rpcData && rpcData.success) {
                   logger.log("[Checkout]", "RPC Approved. Forcing session refresh...", rpcData);
-                  toast.success("Pagamento confirmado! Acesso liberado.");
+                  if (!notifiedRef.current) {
+                    notifiedRef.current = true;
+                    toast.success("Pagamento confirmado! Acesso liberado.");
+                  }
                   setVerifying(false);
                   
                   // 1. Force Refresh Session & Profile
@@ -231,7 +235,10 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
       
       if (data?.subscription_status === 'active' || data?.is_premium) {
           logger.log("[Checkout]", "Profile Polling found active status!");
-          toast.success("Pagamento confirmado! Acesso liberado.");
+          if (!notifiedRef.current) {
+            notifiedRef.current = true;
+            toast.success("Pagamento confirmado! Acesso liberado.");
+          }
           setVerifying(false);
           await refreshSession(); // Ensure global state is synced
           onSuccess(email);
@@ -266,7 +273,6 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
           // Hard stop after 5 minutes of total failure
           if (attempts > 100) { 
               setVerifying(false);
-              toast.error("O tempo limite excedeu. Verifique se o pagamento foi debitado.");
               return;
           }
 
@@ -289,7 +295,6 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
       setShowTimeoutFallback(false); // Reset fallback UI if user retries manually
       setPollingStartTime(Date.now()); // Reset timeout counter
       
-      toast.info("Verificando status...");
       const payId = currentPaymentId || pixData?.payment_id;
       
       if (payId) {
@@ -299,17 +304,15 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
             
             if (rpcData && rpcData.success) {
                 logger.log("[Checkout]", "Manual Check Approved.");
-                toast.success("Confirmado!");
+                if (!notifiedRef.current) {
+                  notifiedRef.current = true;
+                  toast.success("Pagamento confirmado! Acesso liberado.");
+                }
                 setVerifying(false);
                 await refreshSession();
                 onSuccess(email);
                 return;
             } else {
-                 if (rpcData?.status === 'pending') {
-                     toast.warning("O pagamento ainda está pendente no banco.");
-                 } else {
-                     toast.warning("Pagamento não confirmado ainda. Tente novamente.");
-                 }
                  return;
             }
           } catch (err) {
@@ -323,12 +326,14 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
           const { data } = await supabase.from('profiles').select('subscription_status, is_premium').eq('id', user.id).maybeSingle();
           if (data?.subscription_status === 'active' || data?.is_premium) {
               logger.log("[Checkout]", "Manual Profile Check Approved.");
-              toast.success("Confirmado!");
+              if (!notifiedRef.current) {
+                notifiedRef.current = true;
+                toast.success("Pagamento confirmado! Acesso liberado.");
+              }
               setVerifying(false);
               await refreshSession();
               onSuccess(email);
           } else {
-              toast.warning("Pagamento ainda não confirmado pelo banco. Tente novamente em instantes.");
           }
       }
   };
