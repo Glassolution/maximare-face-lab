@@ -138,7 +138,11 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
     },
     visual: {
         style: {
-            theme: 'dark', 
+            theme: 'dark',
+            customVariables: {
+                buttonBackgroundColor: '#3b82f6', // Azul padrão do site (blue-500)
+                buttonTextColor: '#ffffff',
+            }
         },
         hidePaymentButton: false,
     },
