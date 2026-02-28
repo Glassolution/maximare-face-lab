@@ -12,7 +12,8 @@ export const PaywallDialog = ({ isOpen, onClose, context }: PaywallDialogProps) 
   const { profile } = useAuth();
   
   // Verificação de premium - não renderizar paywall para usuários premium
-  if (profile?.is_premium === true || profile?.subscription_status === 'active') {
+  const isPremiumProfile = profile?.premium === true || profile?.is_premium === true || profile?.subscription_status === 'active';
+  if (isPremiumProfile) {
     return null;
   }
   

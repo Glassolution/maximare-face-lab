@@ -13,6 +13,7 @@ interface Profile {
   public_id?: number | null;
   subscription_status?: string;
   subscription_expires_at?: string | null;
+  premium?: boolean;
   is_premium?: boolean;
   plan_type?: string;
 }
@@ -35,6 +36,7 @@ interface AuthContextType {
   signIn: (username: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshUserData: () => Promise<void>;
+  refreshSession: () => Promise<void>;
   updateUserData: (data: Partial<Pick<UserData, "last_analysis_score" | "analysis_history" | "preferences">>) => Promise<void>;
 }
 

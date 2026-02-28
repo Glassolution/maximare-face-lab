@@ -74,7 +74,8 @@ export const PaywallModal = ({ open, onClose, onUpgrade, context }: Props) => {
   const { profile } = useAuth();
   
   // Verificação definitiva de premium - não renderiza NADA se for premium
-  if (profile?.is_premium === true || profile?.subscription_status === 'active') {
+  const isPremiumProfile = profile?.premium === true || profile?.is_premium === true || profile?.subscription_status === 'active';
+  if (isPremiumProfile) {
     return null;
   }
   
