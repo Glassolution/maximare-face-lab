@@ -63,7 +63,6 @@ export default function Friends() {
             {displayName}
           </p>
           <div className="flex items-center gap-2">
-             {user.username && <p className="text-xs text-muted-foreground">@{user.username}</p>}
              {shortIdFormatted && <span className="text-[10px] bg-muted px-1 rounded text-muted-foreground">{shortIdFormatted}</span>}
           </div>
         </div>
