@@ -15,8 +15,23 @@ export function useBattleRoom(battleId: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [serverTimeOffsetMs, setServerTimeOffsetMs] = useState(0);
+
   // Watchdog Timer Ref
   const watchdogRef = useRef<NodeJS.Timeout>();
+  const latestBattleRef = useRef<Battle | null>(null);
+
+  const fetchServerTimeOffset = useCallback(async () => {
+    try {
+      const { data, error: timeError } = await supabase.rpc('get_server_time');
+      if (timeError) return;
+      const serverMs = new Date(data as unknown as string).getTime();
+      if (!Number.isFinite(serverMs)) return;
+      setServerTimeOffsetMs(serverMs - Date.now());
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // Fetch Battle State
   const fetchBattleState = useCallback(async () => {
@@ -30,6 +45,7 @@ export function useBattleRoom(battleId: string) {
 
       if (battleError) throw battleError;
       setBattle(battleData as Battle);
+      latestBattleRef.current = battleData as Battle;
 
       // 2. Get Opponent Profile
       const opponentId = battleData.created_by === user?.id ? battleData.opponent_id : battleData.created_by;
@@ -43,7 +59,7 @@ export function useBattleRoom(battleId: string) {
       if (subs) setSubmissions(subs as BattleSubmission[]);
 
       // 4. Get Result if needed (status is completed or reveal_loser)
-      if (['completed', 'reveal_loser'].includes(battleData.status)) {
+      if (battleData.status === 'finished') {
         const { data: res } = await supabase.from('battle_results').select('*').eq('battle_id', battleId).single();
         if (res) setResult(res as BattleResult);
       }
@@ -60,6 +76,8 @@ export function useBattleRoom(battleId: string) {
   useEffect(() => {
     if (!battleId || !user) return;
 
+    fetchServerTimeOffset();
+
     // Initial fetch
     fetchBattleState();
 
@@ -71,16 +89,19 @@ export function useBattleRoom(battleId: string) {
         (payload) => {
           console.log('[Realtime] Battle update:', payload.new);
           setBattle(payload.new as Battle);
+          latestBattleRef.current = payload.new as Battle;
           
-          // If status became reveal_loser or completed, fetch result immediately
-          if (['reveal_loser', 'completed'].includes((payload.new as Battle).status)) {
-             // Small delay to ensure result is inserted before we fetch
-             setTimeout(() => {
-                 supabase.from('battle_results').select('*').eq('battle_id', battleId).single()
-                 .then(({ data }) => {
-                     if (data) setResult(data as BattleResult);
-                 });
-             }, 500);
+          if ((payload.new as Battle).status === 'finished') {
+            setTimeout(() => {
+              supabase
+                .from('battle_results')
+                .select('*')
+                .eq('battle_id', battleId)
+                .single()
+                .then(({ data }) => {
+                  if (data) setResult(data as BattleResult);
+                });
+            }, 300);
           }
         }
       )
@@ -108,59 +129,72 @@ export function useBattleRoom(battleId: string) {
           }
       });
 
-    // Watchdog: If status is processing for too long (>15s), force refetch
+    // Fallback polling: keep UI progressing even if realtime drops
     watchdogRef.current = setInterval(() => {
-        if (battle?.status === 'processing') {
-            fetchBattleState();
-        }
-    }, 10000);
+      const b = latestBattleRef.current;
+      const needsResult = b?.status === 'finished' && !result;
+      const notFinished = b && b.status !== 'finished' && b.status !== 'canceled' && b.status !== 'expired';
+      if (needsResult || notFinished) {
+        fetchBattleState();
+      }
+    }, 4000);
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchServerTimeOffset();
+        fetchBattleState();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
       supabase.removeChannel(channel);
       if (watchdogRef.current) clearInterval(watchdogRef.current);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [battleId, user, fetchBattleState]); // Removed 'battle' from dependency to avoid re-subscribing on state change
+  }, [battleId, user, fetchBattleState, fetchServerTimeOffset, result]);
 
   // Actions
   const submitPhotos = async (frontFile: File, sideFile?: File) => {
     if (!user || !battle) return;
 
     try {
-      // Upload Front
       const frontPath = `${battleId}/${user.id}/front.jpg`;
-      const { error: uploadError1 } = await supabase.storage.from('battle-photos').upload(frontPath, frontFile, { upsert: true });
+      const { error: uploadError1 } = await supabase.storage
+        .from('battle-photos')
+        .upload(frontPath, frontFile, { upsert: true, contentType: frontFile.type });
       if (uploadError1) throw uploadError1;
 
-      // Upload Side (Optional)
-      let sidePath = null;
-      if (sideFile) {
-        sidePath = `${battleId}/${user.id}/side.jpg`;
-        const { error: uploadError2 } = await supabase.storage.from('battle-photos').upload(sidePath, sideFile, { upsert: true });
-        if (uploadError2) throw uploadError2;
-      }
+      const { data: { publicUrl } } = supabase.storage.from('battle-photos').getPublicUrl(frontPath);
 
-      // Submit RPC
-      const { error } = await supabase.rpc('submit_battle_photos_v2', {
+      const { data, error } = await supabase.rpc('submit_battle_photo_urls_v3', {
         p_battle_id: battleId,
-        p_front_path: frontPath,
-        p_side_path: sidePath
+        p_front_url: publicUrl,
       });
 
       if (error) throw error;
+      if (data && (data as any).success === false) throw new Error((data as any).error);
+
       toast.success('Fotos enviadas!');
-      
-      // Simulate Processing Trigger (Mock)
-      // Check if opponent has submitted (locally) or just try to trigger
-      // We trigger the mock logic after 2s to simulate "waiting for other / processing"
+
+      // If the battle becomes ready/running, we let start_at synchronize animations.
+      // Trigger mock processing after a safe delay (only once battle is running).
       setTimeout(async () => {
-             // Only trigger mock if status is processing (meaning both submitted)
-             // Or we can try to force it for the demo flow if this user is the second one
-             const { data: current } = await supabase.from('battles').select('status').eq('id', battleId).single();
-             if (current?.status === 'processing') {
-                 // Trigger Mock AI
-                 await supabase.rpc('mock_process_battle_result', { p_battle_id: battleId });
-             }
-      }, 2500); 
+        const { data: current } = await supabase
+          .from('battles')
+          .select('status, start_at')
+          .eq('id', battleId)
+          .single();
+
+        if (current?.status === 'ready' || current?.status === 'running') {
+          const startAtMs = current?.start_at ? new Date(current.start_at).getTime() : Date.now();
+          const fireIn = Math.max(0, startAtMs + 9000 - (Date.now() + serverTimeOffsetMs));
+          setTimeout(() => {
+            supabase.rpc('mock_process_battle_result', { p_battle_id: battleId });
+          }, fireIn);
+        }
+      }, 300);
 
     } catch (err: any) {
       toast.error(err.message || 'Erro ao enviar fotos');
@@ -174,6 +208,7 @@ export function useBattleRoom(battleId: string) {
     result,
     loading,
     error,
-    submitPhotos
+    submitPhotos,
+    serverTimeOffsetMs,
   };
 }

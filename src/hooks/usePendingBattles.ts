@@ -15,7 +15,8 @@ export function usePendingBattles() {
         .from('battles')
         .select('*', { count: 'exact', head: true })
         .eq('opponent_id', user.id)
-        .eq('status', 'waiting_for_opponent');
+        .eq('status', 'waiting')
+        .is('matched_at', null);
 
       if (!error && count !== null) {
         setPendingCount(count);

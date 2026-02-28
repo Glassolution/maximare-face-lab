@@ -9,14 +9,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { BattleProcessingOverlay } from '@/components/battle/BattleProcessingOverlay';
-import { LoserRevealOverlay } from '@/components/battle/LoserRevealOverlay';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function BattleRoom() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { profile: userProfile } = useAuth();
-  const { battle, opponentProfile, submissions, result, loading, error, submitPhotos } = useBattleRoom(id!);
+  const { battle, opponentProfile, submissions, result, loading, error, submitPhotos, serverTimeOffsetMs } = useBattleRoom(id!);
   const [frontFile, setFrontFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showResultScreen, setShowResultScreen] = useState(false);
@@ -40,22 +39,78 @@ export default function BattleRoom() {
       setShowResultScreen(true);
   };
 
-  const getPhotoUrl = (path: string | null) => {
-      if (!path) return null;
-      return supabase.storage.from('battles').getPublicUrl(path).data.publicUrl;
-  };
-
   const getAvatarUrl = (pathOrUrl: string | null | undefined) => {
       if (!pathOrUrl) return null;
       if (pathOrUrl.startsWith('http') || pathOrUrl.startsWith('data:')) return pathOrUrl;
       return supabase.storage.from('avatars').getPublicUrl(pathOrUrl).data.publicUrl;
   };
 
+  const [stableCreatorPhotoUrl, setStableCreatorPhotoUrl] = useState<string | null>(null);
+  const [stableOpponentPhotoUrl, setStableOpponentPhotoUrl] = useState<string | null>(null);
+  const [photosPreloaded, setPhotosPreloaded] = useState(false);
+
+  useEffect(() => {
+    if (!battle) return;
+    if (battle.creator_photo_url && !stableCreatorPhotoUrl) setStableCreatorPhotoUrl(battle.creator_photo_url);
+    if (battle.opponent_photo_url && !stableOpponentPhotoUrl) setStableOpponentPhotoUrl(battle.opponent_photo_url);
+  }, [battle, stableCreatorPhotoUrl, stableOpponentPhotoUrl]);
+
+  const isCreator = battle?.created_by === userProfile?.id;
+  const myStablePhotoUrl = isCreator ? stableCreatorPhotoUrl : stableOpponentPhotoUrl;
+  const opponentStablePhotoUrl = isCreator ? stableOpponentPhotoUrl : stableCreatorPhotoUrl;
+
+  useEffect(() => {
+    if (!myStablePhotoUrl || !opponentStablePhotoUrl) return;
+
+    let cancelled = false;
+    setPhotosPreloaded(false);
+
+    const timeout = window.setTimeout(() => {
+      if (!cancelled) setPhotosPreloaded(true);
+    }, 2500);
+
+    const preload = (src: string) =>
+      new Promise<void>((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve();
+        img.onerror = () => resolve();
+        img.src = src;
+      });
+
+    Promise.all([preload(myStablePhotoUrl), preload(opponentStablePhotoUrl)]).then(() => {
+      window.clearTimeout(timeout);
+      if (!cancelled) setPhotosPreloaded(true);
+    });
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
+  }, [myStablePhotoUrl, opponentStablePhotoUrl]);
+
+  useEffect(() => {
+    if (!battle?.start_at) return;
+    if (battle.status !== 'ready') return;
+
+    const startAtMs = new Date(battle.start_at).getTime();
+    if (!Number.isFinite(startAtMs)) return;
+
+    const tick = window.setInterval(() => {
+      const nowServerApprox = Date.now() + serverTimeOffsetMs;
+      if (nowServerApprox >= startAtMs) {
+        supabase.rpc('mark_battle_running_v3', { p_battle_id: battle.id });
+        window.clearInterval(tick);
+      }
+    }, 250);
+
+    return () => window.clearInterval(tick);
+  }, [battle?.id, battle?.status, battle?.start_at, serverTimeOffsetMs]);
+
   if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-8 w-8" /></div>;
   if (error || !battle) return <div className="p-8 text-center text-red-500">Erro: {error || 'Batalha não encontrada'}</div>;
 
   // Status: Waiting for Opponent
-  if (battle.status === 'waiting_for_opponent') {
+  if (battle.status === 'waiting' && !battle.matched_at) {
     return (
       <div className="container max-w-md mx-auto py-10 px-4 text-center space-y-6">
         <h1 className="text-2xl font-bold">Aguardando Oponente...</h1>
@@ -73,60 +128,41 @@ export default function BattleRoom() {
   const mySubmission = submissions.find(s => s.user_id === userProfile?.id);
   const opponentSubmission = submissions.find(s => s.user_id !== userProfile?.id);
 
+  if ((battle.status === 'ready' || battle.status === 'running' || battle.status === 'finished') && !photosPreloaded) {
+    return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-8 w-8" /></div>;
+  }
+
   // 1. PROCESSING OVERLAY (Highest Priority during processing phase)
   // Show if:
   // - Status is 'processing'
   // - OR Status is advanced ('reveal_loser' or 'completed') BUT animation hasn't finished yet
   // - AND both users have submitted (to be safe)
-  const shouldShowProcessing = 
-      (battle.status === 'processing') || 
-      (!processingAnimationComplete && ['reveal_loser', 'completed'].includes(battle.status) && !!mySubmission && !!opponentSubmission);
+  const shouldShowProcessing =
+      (battle.status === 'ready' || battle.status === 'running') && !!myStablePhotoUrl && !!opponentStablePhotoUrl;
 
   if (shouldShowProcessing) {
-      const myAvatar = getPhotoUrl(mySubmission?.front_photo_path) || getAvatarUrl(userProfile?.avatar_url);
-      const opponentAvatar = getPhotoUrl(opponentSubmission?.front_photo_path) || getAvatarUrl(opponentProfile?.avatar_url);
-      
-      // We tell the overlay to finish ONLY if the real status is completed/reveal_loser
-      const isReady = ['reveal_loser', 'completed'].includes(battle.status);
-      
-      // Use matched_at as a fallback for start time
-      const startTime = battle.matched_at ? new Date(battle.matched_at).getTime() : undefined;
+      const myAvatar = myStablePhotoUrl || getAvatarUrl(userProfile?.avatar_url);
+      const opponentAvatar = opponentStablePhotoUrl || getAvatarUrl(opponentProfile?.avatar_url);
+
+      const startTime = battle.start_at ? new Date(battle.start_at).getTime() : (battle.matched_at ? new Date(battle.matched_at).getTime() : undefined);
+      const adjustedStartTime = startTime ? startTime - serverTimeOffsetMs : undefined;
+
+      const nowServerApprox = Date.now() + serverTimeOffsetMs;
+      const readyToResolve = battle.status === 'running' && !!battle.start_at && nowServerApprox >= new Date(battle.start_at).getTime() + 9000;
 
       return (
         <BattleProcessingOverlay 
             userAvatar={myAvatar} 
             opponentAvatar={opponentAvatar} 
-            isReady={isReady}
+            isReady={readyToResolve || battle.status === 'finished'}
             onComplete={handleProcessingComplete}
-            startTime={startTime}
-        />
-      );
-  }
-
-  // 2. REVEAL OVERLAY (Intermediate Phase)
-  // Show if:
-  // - Status is 'reveal_loser' (or completed if we skipped reveal_loser in DB but want to show it)
-  // - AND Processing animation finished
-  // - AND Reveal animation NOT finished
-  const shouldShowReveal = 
-      processingAnimationComplete && 
-      !revealAnimationComplete && 
-      ['reveal_loser', 'completed'].includes(battle.status);
-
-  if (shouldShowReveal) {
-      const myPhoto = getPhotoUrl(mySubmission?.front_photo_path) || userProfile?.avatar_url;
-
-      return (
-        <LoserRevealOverlay 
-            result={result} 
-            userPhoto={myPhoto}
-            onComplete={handleRevealComplete} 
+            startTime={adjustedStartTime}
         />
       );
   }
 
   // 3. FINAL RESULT SCREEN
-  if (showResultScreen && result) {
+  if ((battle.status === 'finished' || showResultScreen) && result) {
        // Logic to determine labels and colors based on winner/loser
       // Assuming user logged in is viewing
       return (
@@ -147,7 +183,7 @@ export default function BattleRoom() {
                       <div className="pt-8 pb-4 px-2 text-center bg-card">
                           <div className="h-20 w-20 mx-auto rounded-full border-4 border-amber-500 overflow-hidden mb-2 bg-muted relative">
                                 <Avatar className="h-full w-full">
-                                    <AvatarImage src={result.winner_id === userProfile?.id ? getPhotoUrl(submissions.find(s => s.user_id === userProfile?.id)?.front_photo_path) || userProfile?.avatar_url : getPhotoUrl(submissions.find(s => s.user_id !== userProfile?.id)?.front_photo_path) || opponentProfile?.avatar_url} />
+                                    <AvatarImage src={result.winner_id === userProfile?.id ? (myStablePhotoUrl || userProfile?.avatar_url || undefined) : (opponentStablePhotoUrl || opponentProfile?.avatar_url || undefined)} />
                                     <AvatarFallback>WIN</AvatarFallback>
                                 </Avatar>
                           </div>
@@ -164,7 +200,7 @@ export default function BattleRoom() {
                       <div className="pt-8 pb-4 px-2 text-center bg-card">
                            <div className="h-20 w-20 mx-auto rounded-full border-2 border-muted overflow-hidden mb-2 bg-muted relative">
                                 <Avatar className="h-full w-full">
-                                    <AvatarImage src={result.loser_id === userProfile?.id ? getPhotoUrl(submissions.find(s => s.user_id === userProfile?.id)?.front_photo_path) || userProfile?.avatar_url : getPhotoUrl(submissions.find(s => s.user_id !== userProfile?.id)?.front_photo_path) || opponentProfile?.avatar_url} />
+                                    <AvatarImage src={result.loser_id === userProfile?.id ? (myStablePhotoUrl || userProfile?.avatar_url || undefined) : (opponentStablePhotoUrl || opponentProfile?.avatar_url || undefined)} />
                                     <AvatarFallback>RIP</AvatarFallback>
                                 </Avatar>
                           </div>
@@ -204,8 +240,8 @@ export default function BattleRoom() {
 
   // 4. SUBMISSION FORM (Default if not waiting opponent, processing, or revealing)
   // Only show if status is matched/photo_submission
-  if (battle.status === 'matched' || battle.status === 'photo_submission') {
-      const hasSubmitted = !!mySubmission;
+  if (battle.status === 'waiting' || battle.status === 'ready') {
+      const hasSubmitted = !!myStablePhotoUrl;
 
       return (
           <div className="container max-w-lg mx-auto py-6 px-4 space-y-6">
@@ -249,7 +285,7 @@ export default function BattleRoom() {
                               </p>
                               <div className="relative aspect-[3/4] max-w-[150px] mx-auto rounded-lg overflow-hidden border shadow-sm opacity-80">
                                   <img 
-                                    src={getPhotoUrl(mySubmission.front_photo_path) || ''} 
+                                    src={myStablePhotoUrl || ''} 
                                     alt="Minha foto" 
                                     className="w-full h-full object-cover" 
                                   />

@@ -22,12 +22,16 @@ export default function Battles() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("active");
 
-  const activeBattles = battles.filter(b => ['matched', 'photo_submission', 'processing'].includes(b.status));
-  const pendingBattles = battles.filter(b => b.status === 'waiting_for_opponent');
-  const historyBattles = battles.filter(b => ['completed', 'canceled', 'expired'].includes(b.status));
+  const pendingBattles = battles.filter(b => b.status === 'waiting' && !b.is_creator && !b.matched_at);
+  const activeBattles = battles.filter(b =>
+    (b.status === 'waiting' && !!b.matched_at) ||
+    b.status === 'ready' ||
+    b.status === 'running'
+  );
+  const historyBattles = battles.filter(b => ['finished', 'canceled', 'expired'].includes(b.status));
 
   const handleBattleClick = (battle: EnrichedBattle) => {
-    if (battle.status === 'waiting_for_opponent' && !battle.is_creator) {
+    if (battle.status === 'waiting' && !battle.is_creator && !battle.matched_at) {
        // If pending and I am opponent, don't navigate, let them use buttons
        return;
     } else {
@@ -81,16 +85,15 @@ function BattleCard({ battle, onClick, onAccept, onReject }: {
     onAccept?: (id: string) => Promise<boolean>,
     onReject?: (id: string) => Promise<boolean>
 }) {
-    const isPending = battle.status === 'waiting_for_opponent';
+    const isPending = battle.status === 'waiting' && !battle.is_creator && !battle.matched_at;
     const opponentName = battle.opponent_profile?.display_name || 'Aguardando...';
 
     const getStatusLabel = (status: string) => {
         switch (status) {
-            case 'waiting_for_opponent': return 'Aguardando Oponente';
-            case 'matched': return 'Duelo Iniciado';
-            case 'photo_submission': return 'Envie sua Foto';
-            case 'processing': return 'Processando';
-            case 'completed': return 'Finalizado';
+            case 'waiting': return battle.matched_at ? 'Aguardando Fotos' : 'Convite Pendente';
+            case 'ready': return 'Pronto';
+            case 'running': return 'Em andamento';
+            case 'finished': return 'Finalizado';
             case 'canceled': return 'Cancelado';
             case 'expired': return 'Expirado';
             default: return status.replace(/_/g, ' ');
@@ -110,8 +113,8 @@ function BattleCard({ battle, onClick, onAccept, onReject }: {
                             <AvatarFallback>?</AvatarFallback>
                         </Avatar>
                         <div className={`absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-background ${
-                            battle.status === 'processing' ? 'bg-blue-500 animate-pulse' : 
-                            battle.status === 'completed' ? 'bg-green-500' : 'bg-yellow-500'
+                            battle.status === 'running' ? 'bg-blue-500 animate-pulse' : 
+                            battle.status === 'finished' ? 'bg-green-500' : 'bg-yellow-500'
                         }`} />
                     </div>
                     <div>
