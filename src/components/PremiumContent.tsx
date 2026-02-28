@@ -159,7 +159,7 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
     <div className={`bg-black text-white flex flex-col relative overflow-hidden ${isModal ? 'h-full w-full' : 'h-[100dvh]'}`}>
       
       {/* Background Image - Balanced height */}
-      <div className="absolute inset-0 z-0 h-[50vh]">
+      <div className="absolute inset-0 z-0 h-[180px] sm:h-[50vh]">
         <img 
           src={faceScanHero} 
           alt="Face Scan" 
@@ -169,8 +169,11 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
       </div>
 
       {/* Header */}
-      <div className="relative z-10 flex justify-between items-center px-6 pt-6">
-        <button onClick={handleClose} className="p-2.5 rounded-full bg-black/40 backdrop-blur-md hover:bg-black/60 transition-colors">
+      <div className="relative z-10 flex justify-between items-center px-5 sm:px-6 pt-5 sm:pt-6">
+        <button
+          onClick={handleClose}
+          className="fixed top-4 right-4 z-[9999] w-11 h-11 flex items-center justify-center rounded-full bg-black/40 backdrop-blur-md hover:bg-black/60 transition-colors"
+        >
           <X className="w-6 h-6 text-white" />
         </button>
         <button className="px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md text-xs font-bold uppercase tracking-wider hover:bg-white/20 transition-colors">
@@ -179,20 +182,20 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
       </div>
 
       {/* Content - Balanced spacing */}
-      <div className="relative z-10 flex-1 flex flex-col px-6 pb-6 overflow-y-auto no-scrollbar">
+      <div className="relative z-10 flex-1 flex flex-col px-5 sm:px-6 pb-4 sm:pb-6 overflow-y-auto no-scrollbar">
         
         {/* Spacer to push content below image */}
-        <div className="shrink-0 h-[25vh]" />
+        <div className="shrink-0 h-[140px] sm:h-[25vh]" />
 
         {/* Hero Text - Balanced */}
-        <div className="text-center mb-6 shrink-0">
-          <h1 className="text-2xl font-bold leading-tight whitespace-pre-line drop-shadow-2xl text-white">
+        <div className="text-center mb-4 sm:mb-6 shrink-0">
+          <h1 className="text-[22px] sm:text-2xl font-bold leading-tight whitespace-pre-line drop-shadow-2xl text-white">
             {getDynamicTitle()}
           </h1>
         </div>
 
         {/* Comparison Table - Balanced */}
-        <div className="bg-zinc-900/90 backdrop-blur-md rounded-3xl p-5 mb-6 border border-zinc-800/50 shadow-xl shrink-0">
+        <div className="bg-zinc-900/90 backdrop-blur-md rounded-3xl p-4 sm:p-5 mb-4 sm:mb-6 border border-zinc-800/50 shadow-xl shrink-0">
           <div className="grid grid-cols-[1.5fr,0.8fr,0.8fr] gap-3 mb-4 text-[10px] font-bold uppercase tracking-widest text-center items-center opacity-80">
             <div className="text-left pl-1 text-zinc-400">SERVIÇO</div>
             <div className="text-zinc-500">GRÁTIS</div>
@@ -202,7 +205,7 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
           <div className="space-y-3.5">
             {features.map((feature, i) => (
               <div key={i} className="grid grid-cols-[1.5fr,0.8fr,0.8fr] gap-3 items-center text-center group">
-                <div className="flex items-center gap-3 text-xs font-semibold text-left text-zinc-200">
+                <div className="flex items-center gap-2.5 text-[13px] font-semibold text-left text-zinc-200">
                   <span className="opacity-80 group-hover:opacity-100 transition-opacity p-1 bg-white/5 rounded-md">{feature.icon}</span>
                   <span className="leading-tight truncate">{feature.name}</span>
                 </div>
@@ -228,7 +231,7 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
         </div>
 
         {/* Plans Selection - Balanced Grid */}
-        <div className="grid grid-cols-3 gap-3 mb-6 shrink-0">
+        <div className="grid grid-cols-3 gap-2.5 sm:gap-3 mb-4 sm:mb-6 shrink-0">
           {(['weekly', 'monthly', 'yearly'] as PlanType[]).map((key) => {
             const plan = PLAN_CONFIG.PLANS[key];
             const isSelected = selectedPlan === key;
@@ -238,7 +241,7 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
                 key={key}
                 onClick={() => setSelectedPlan(key)}
                 className={`
-                  relative rounded-2xl p-3 flex flex-col items-center justify-center cursor-pointer border transition-all duration-300 group
+                  relative rounded-2xl p-2.5 sm:p-3 flex flex-col items-center justify-center cursor-pointer border transition-all duration-300 group
                   ${isSelected 
                     ? 'bg-zinc-900 border-blue-500 ring-1 ring-blue-500/40 shadow-[0_0_20px_rgba(59,130,246,0.15)] scale-[1.02]' 
                     : 'bg-zinc-900/60 border-zinc-800 hover:bg-zinc-800/80 hover:border-zinc-700'}
@@ -260,7 +263,7 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
                   {key === 'weekly' ? 'Semana' : key === 'monthly' ? 'Mês' : 'Anual'}
                 </span>
                 <div className="flex items-baseline gap-0.5">
-                  <span className="text-base font-bold text-white">R${Math.floor(plan.price)}</span>
+                  <span className="text-sm sm:text-base font-bold text-white">R${Math.floor(plan.price)}</span>
                   <span className="text-[10px] font-bold text-white/60">,{plan.price.toFixed(2).split('.')[1]}</span>
                 </div>
               </div>
@@ -272,7 +275,7 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
         <Button 
           onClick={handleSubscribe}
           disabled={!!loading}
-          className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-2xl py-7 text-base font-bold shadow-xl shadow-blue-600/20 mb-4 uppercase tracking-wider transition-all active:scale-[0.98] shrink-0"
+          className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-2xl py-7 text-base font-bold shadow-xl shadow-blue-600/20 mb-2 uppercase tracking-wider transition-all active:scale-[0.98] shrink-0"
         >
           {loading ? 'Processando...' : 'Desbloquear Agora'}
         </Button>
