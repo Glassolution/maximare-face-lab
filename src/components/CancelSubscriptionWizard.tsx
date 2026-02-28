@@ -63,7 +63,11 @@ export function CancelSubscriptionWizard({ open, onOpenChange }: Props) {
         issue_details: issueDetails || null
       };
       const { data, error } = await supabase.functions.invoke("subscription-cancel", {
-        headers: { apikey: (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "" },
+        headers: { 
+          Authorization: `Bearer ${(import.meta as any).env?.VITE_SUPABASE_ANON_KEY || ""}`,
+          apikey: (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "",
+          "sb-access-token": (await supabase.auth.getSession()).data.session?.access_token || ""
+        },
         body: payload
       });
       if (error) {

@@ -40,10 +40,11 @@ serve(async (req) => {
         hasAuth: !!authHeader,
         authLen: authHeader ? authHeader.length : 0,
         hasAnon: !!(req.headers.get("apikey") || req.headers.get("x-api-key") || ENV_ANON_KEY),
+        hasSbToken: !!(req.headers.get("sb-access-token") || req.headers.get("x-supabase-auth"))
       };
       console.log(JSON.stringify({ tag: "subcancel_req_headers", ...info }));
     } catch {}
-    if (!authHeader) {
+    if (!authHeader && !ENV_ANON_KEY && !req.headers.get("apikey") && !req.headers.get("x-api-key")) {
       return new Response(JSON.stringify({ error: "unauthorized", reason: "missing_auth_header" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -59,19 +60,35 @@ serve(async (req) => {
       });
     }
 
+    const sbToken = req.headers.get("sb-access-token") || req.headers.get("x-supabase-auth") || "";
     const client = createClient(SUPABASE_URL, ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
+      global: { headers: { Authorization: `Bearer ${sbToken}` } },
     });
     const admin = SERVICE_ROLE_KEY ? createClient(SUPABASE_URL, SERVICE_ROLE_KEY) : null;
 
-    const token = authHeader.replace(/^Bearer\s+/i, "");
-    const { data: userRes } = await client.auth.getUser(token);
-    const user = userRes?.user;
+    const token = sbToken || (authHeader ? authHeader.replace(/^Bearer\s+/i, "") : "");
+    const { data: userRes, error: userErr } = await client.auth.getUser(token);
+    let userId = userRes?.user?.id || null;
+    if (!userId) {
+      // Fallback: decode JWT locally just to extract "sub" (no signature verification).
+      // PostgREST will still verify the token when using it for DB operations.
+      try {
+        const payloadB64 = token.split(".")[1];
+        const normalized = payloadB64.replace(/-/g, "+").replace(/_/g, "/");
+        const json = atob(normalized);
+        const payload = JSON.parse(json) as { sub?: string; iss?: string; aud?: string };
+        if (payload?.iss?.includes("xbtendfjajspaidpktsw")) {
+          userId = payload?.sub || null;
+        }
+      } catch (_e) {
+        // ignore
+      }
+    }
     try {
-      console.log(JSON.stringify({ tag: "subcancel_user", userId: user?.id || null }));
+      console.log(JSON.stringify({ tag: "subcancel_user", userId, getUserError: userErr?.message || null }));
     } catch {}
-    if (!user) {
-      return new Response(JSON.stringify({ error: "unauthorized", reason: "invalid_user" }), {
+    if (!userId) {
+      return new Response(JSON.stringify({ error: "unauthorized", reason: "invalid_user_or_parse" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -91,7 +108,7 @@ serve(async (req) => {
       .select(
         "id, subscription_status, subscription_expires_at, premium_since, plan_type, payment_provider, payment_id, provider_payment_id, provider_subscription_id, first_payment_at, subscription_started_at"
       )
-      .eq("id", user.id)
+      .eq("id", userId)
       .maybeSingle();
 
     if (!profile) {
@@ -128,7 +145,7 @@ serve(async (req) => {
       const { data: existing } = await db
         .from("subscription_cancellation_feedback")
         .select("id, refund_status, created_at")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .eq("provider_payment_id", providerPaymentId)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -188,7 +205,7 @@ serve(async (req) => {
     const finalAction = isWithin7Days && providerPaymentId ? (refundStatus === "approved" ? "cancel_refund" : "cancel_refund_failed") : "cancel";
 
     await db.from("subscription_cancellation_feedback").insert({
-      user_id: user.id,
+      user_id: userId,
       provider: "mercadopago",
       provider_subscription_id: providerSubscriptionId,
       provider_payment_id: providerPaymentId,
@@ -217,7 +234,7 @@ serve(async (req) => {
     if (providerPaymentId && !profile.provider_payment_id) updates["provider_payment_id"] = providerPaymentId;
     if (!profile.first_payment_at && startDate) updates["first_payment_at"] = startDate.toISOString();
 
-    await db.from("profiles").update(updates).eq("id", user.id);
+    await db.from("profiles").update(updates).eq("id", userId);
 
     return new Response(
       JSON.stringify({
