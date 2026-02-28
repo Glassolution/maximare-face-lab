@@ -192,7 +192,7 @@ export default function Results() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-white flex flex-col items-center justify-center px-4 py-6">
+    <div className="min-h-screen bg-background text-white px-4 pt-6 pb-28">
       <div className="w-full max-w-[390px] mx-auto flex flex-col items-center">
         <div className="relative mb-6">
           <div className="w-32 h-32 rounded-full overflow-hidden border-2 border-white/10 ring-4 ring-primary/5">
@@ -233,12 +233,6 @@ export default function Results() {
               Análise Maximare
             </p>
           </div>
-        </div>
-
-        <div className="w-full mt-5">
-          <Button className="w-full rounded-2xl" onClick={handleEnterShareMode}>
-            Compartilhar resultado
-          </Button>
         </div>
 
         <div className="w-full bg-black/40 backdrop-blur-xl border border-white/10 rounded-[24px] p-6 shadow-2xl relative overflow-hidden">
@@ -468,6 +462,13 @@ export default function Results() {
         {/* Button removed per user request */}
 
       <PaywallDialog isOpen={isPaywallOpen} onClose={closePaywall} />
+      <div className="fixed bottom-0 left-0 right-0 px-4 pb-6 pt-3 bg-background/80 backdrop-blur-md border-t border-white/10">
+        <div className="w-full max-w-[390px] mx-auto">
+          <Button className="w-full rounded-2xl" onClick={handleEnterShareMode}>
+            Compartilhar resultado
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
