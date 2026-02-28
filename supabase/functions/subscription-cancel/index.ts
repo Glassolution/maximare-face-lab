@@ -104,7 +104,7 @@ serve(async (req) => {
     }
 
     const db = admin ?? client;
-    const { data: profile } = await db
+    let { data: profile } = await db
       .from("profiles")
       .select(
         "id, subscription_status, subscription_expires_at, premium_since, plan_type, payment_provider, payment_id, provider_payment_id, provider_subscription_id, first_payment_at, subscription_started_at"
@@ -113,10 +113,23 @@ serve(async (req) => {
       .maybeSingle();
 
     if (!profile) {
-      return new Response(JSON.stringify({ error: "Profile not found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      if (admin) {
+        await admin.from("profiles").insert({ id: userId }).onConflict("id").ignore();
+        const re = await db
+          .from("profiles")
+          .select(
+            "id, subscription_status, subscription_expires_at, premium_since, plan_type, payment_provider, payment_id, provider_payment_id, provider_subscription_id, first_payment_at, subscription_started_at"
+          )
+          .eq("id", userId)
+          .maybeSingle();
+        profile = re.data || null;
+      }
+      if (!profile) {
+        return new Response(JSON.stringify({ error: "Profile not found" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     let startDate: Date | null = null;
