@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useFriends, useFriendRequests } from "@/hooks/useFriendSystem";
 import { useUserSearch } from "@/hooks/useUserSearch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,6 +12,36 @@ import { FriendProfile } from "@/types/friendship";
 import { Button } from "@/components/ui/button";
 import { PublicProfileModal } from "@/components/profile/PublicProfileModal";
 import { supabase } from "@/integrations/supabase/client";
+
+const ResolvedAvatarImage = ({ avatarUrl }: { avatarUrl: string | null | undefined }) => {
+  const [src, setSrc] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    let active = true;
+    setSrc(undefined);
+
+    if (!avatarUrl) return () => {
+      active = false;
+    };
+
+    if (avatarUrl.startsWith('http') || avatarUrl.startsWith('data:')) {
+      setSrc(avatarUrl);
+      return () => {
+        active = false;
+      };
+    }
+
+    const { data } = supabase.storage.from('avatars').getPublicUrl(avatarUrl);
+    const resolved = data.publicUrl ? `${data.publicUrl}?t=${Date.now()}` : undefined;
+    if (active) setSrc(resolved);
+
+    return () => {
+      active = false;
+    };
+  }, [avatarUrl]);
+
+  return <AvatarImage src={src} className="object-cover" />;
+};
 
 export default function Friends() {
   const { friends, loading: friendsLoading, refetch: refetchFriends } = useFriends();
@@ -45,7 +75,6 @@ export default function Friends() {
     // Already mapped in useUserSearch, but safe fallback here too
     const displayName = user.display_name || user.full_name || user.username || `Usuário #${user.short_id}`;
     const initials = (displayName || "?").substring(0, 2).toUpperCase().replace(/[^A-Z]/g, '') || "U";
-    const avatarSrc = resolveAvatarUrl(user.avatar_url);
     const shortIdFormatted = formatShortId(user.short_id);
 
     return (
@@ -55,7 +84,7 @@ export default function Friends() {
         onClick={() => setSelectedProfile(user)}
       >
         <Avatar className="h-10 w-10 border border-border">
-          <AvatarImage src={avatarSrc} className="object-cover" />
+          <ResolvedAvatarImage avatarUrl={user.avatar_url} />
           <AvatarFallback>{initials}</AvatarFallback>
         </Avatar>
         <div>
@@ -83,7 +112,7 @@ export default function Friends() {
       <Tabs defaultValue="list" className="w-full">
         <TabsList className="grid w-full grid-cols-3 mb-6">
           <TabsTrigger value="list">Amigos ({friends.length})</TabsTrigger>
-          <TabsTrigger value="requests">Solicitações ({incoming.length})</TabsTrigger>
+          <TabsTrigger value="requests">Solicitações ({incoming.length + outgoing.length})</TabsTrigger>
           <TabsTrigger value="search">Buscar</TabsTrigger>
         </TabsList>
 
