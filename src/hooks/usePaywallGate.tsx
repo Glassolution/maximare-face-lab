@@ -11,20 +11,6 @@ export function usePaywallGate() {
   const { openMain, closeMain, isMainOpen, mainContext } = usePaywallStore();
   const { profile } = useAuth();
   
-  // Verificação de premium ANTES de qualquer ação
-  const isPremium = profile?.is_premium === true || profile?.subscription_status === 'active';
-  
-  if (isPremium) {
-    console.log('[PaywallGate] Usuário é premium, bloqueando todas as ações de paywall');
-    return {
-      checkGate: async () => true,
-      PaywallDialog: () => null,
-      isPaywallOpen: false,
-      closePaywall: async () => {},
-      handleUpgrade: async () => {}
-    };
-  }
-
   const closePaywall = useCallback(async () => {
     closeMain();
     // Record dismiss when user closes modal
@@ -42,6 +28,20 @@ export function usePaywallGate() {
     closeMain();
     navigate('/premium', { state: { context: mainContext } });
   }, [navigate, mainContext, closeMain]);
+
+  // Verificação de premium DEPOIS de todos os hooks
+  const isPremium = profile?.is_premium === true || profile?.subscription_status === 'active';
+  
+  if (isPremium) {
+    console.log('[PaywallGate] Usuário é premium, bloqueando todas as ações de paywall');
+    return {
+      checkGate: async () => true,
+      PaywallDialog: () => null,
+      isPaywallOpen: false,
+      closePaywall: async () => {},
+      handleUpgrade: async () => {}
+    };
+  }
 
   const checkGate = useCallback(async (triggerContext: PaywallContext): Promise<boolean> => {
     try {
