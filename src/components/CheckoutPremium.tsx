@@ -345,6 +345,11 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
     try {
         const { data: { session } } = await supabase.auth.getSession();
         const { data, error } = await supabase.functions.invoke('create-payment', {
+            headers: { 
+                Authorization: `Bearer ${(import.meta as any).env?.VITE_SUPABASE_ANON_KEY || ""}`,
+                apikey: (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "",
+                "sb-access-token": session?.access_token || ""
+            },
             body: {
                 payment_method_id: formData.payment_method_id, // e.g. 'master'
                 token: formData.token,
@@ -405,6 +410,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
   const handlePix = async () => {
     setLoading(true);
     try {
+        const { data: { session } } = await supabase.auth.getSession();
         // Validate inputs with detailed messages
         const missingFields = [];
         if (!firstName) missingFields.push("Nome");
@@ -419,6 +425,11 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
         }
 
         const { data, error } = await supabase.functions.invoke('create-payment', {
+            headers: { 
+                Authorization: `Bearer ${(import.meta as any).env?.VITE_SUPABASE_ANON_KEY || ""}`,
+                apikey: (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "",
+                "sb-access-token": session?.access_token || ""
+            },
             body: {
                 payment_method_id: 'pix',
                 payer: {

@@ -114,7 +114,9 @@ serve(async (req) => {
 
     if (!profile) {
       if (admin) {
-        await admin.from("profiles").insert({ id: userId }).onConflict("id").ignore();
+        await admin
+          .from("profiles")
+          .upsert({ id: userId }, { onConflict: "id", ignoreDuplicates: true });
         const re = await db
           .from("profiles")
           .select(

@@ -54,11 +54,20 @@ serve(async (req) => {
     // 2. Resolve User
     let userId;
     
-    // Check if user is logged in via Authorization header
-    const authHeader = req.headers.get('Authorization');
-    if (authHeader) {
-      const headerAnon = req.headers.get('apikey') || req.headers.get('x-api-key') || '';
-      const effectiveAnon = ENV_ANON_KEY || headerAnon;
+    // Resolve user via sb-access-token first (to avoid gateway issues),
+    // fallback to Authorization for backward compatibility
+    const sbToken = req.headers.get('sb-access-token') || req.headers.get('x-supabase-auth') || '';
+    const authHeader = req.headers.get('Authorization') || '';
+    const headerAnon = req.headers.get('apikey') || req.headers.get('x-api-key') || '';
+    const effectiveAnon = ENV_ANON_KEY || headerAnon;
+
+    if (sbToken) {
+      const supabaseClient = createClient(SUPABASE_URL!, effectiveAnon, {
+        global: { headers: { Authorization: `Bearer ${sbToken}` } },
+      });
+      const { data: { user } } = await supabaseClient.auth.getUser(sbToken);
+      if (user) userId = user.id;
+    } else if (authHeader) {
       const supabaseClient = createClient(SUPABASE_URL!, effectiveAnon, {
         global: { headers: { Authorization: authHeader } },
       });
