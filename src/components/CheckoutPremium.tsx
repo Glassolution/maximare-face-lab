@@ -13,6 +13,10 @@ import { PLAN_CONFIG } from "@/config/plans";
 import { trackEvent, captureException } from "@/lib/posthog";
 import { motion } from "framer-motion";
 
+initMercadoPago(import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY || 'TEST-539d056c-2673-4566-a401-4475f82245c7', {
+  locale: 'pt-BR'
+});
+
 interface CheckoutPremiumProps {
   plan: 'weekly' | 'monthly' | 'yearly';
   price: number;
@@ -94,6 +98,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
   const { refreshSession } = useAuth(); 
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
+  const [sdkReady] = useState(true);
   const [loadingUser, setLoadingUser] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'pix'>('card');
   const cardPaymentBrickController = useRef<any>(null);
@@ -147,12 +152,6 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
         hidePaymentButton: false,
     },
   }), []);
-
-  useEffect(() => {
-    initMercadoPago(import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY || 'TEST-539d056c-2673-4566-a401-4475f82245c7', {
-        locale: 'pt-BR'
-    });
-  }, []);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -721,16 +720,18 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                     <p className="text-sm font-bold text-gray-900 dark:text-white mb-2">Cartão de crédito ou débito</p>
                     {/* Card Form handled by Brick */}
                     <div className="bg-transparent dark:bg-transparent rounded-2xl p-1 border-none min-h-[300px]">
-                        <CardPayment
-                            initialization={initialization}
-                            customization={customization}
-                            onSubmit={handleCardSubmit}
-                            onReady={() => setReady(true)}
-                            onError={(error) => {
-                                console.error('Brick Error:', error);
-                                toast.error("Erro ao carregar formulário de pagamento.");
-                            }}
-                        />
+                        {sdkReady ? (
+                            <CardPayment
+                                initialization={initialization}
+                                customization={customization}
+                                onSubmit={handleCardSubmit}
+                                onReady={() => setReady(true)}
+                                onError={(error) => {
+                                    console.error('Brick Error:', error);
+                                    toast.error("Erro ao carregar formulário de pagamento.");
+                                }}
+                            />
+                        ) : null}
                     </div>
                 </div>
             )}
