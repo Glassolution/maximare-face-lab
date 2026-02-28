@@ -40,7 +40,8 @@ function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   // ... existing hideNav logic ...
-  const hideNav = ["/", "/onboarding", "/login", "/premium", "/landing", "/update-password", "/subscription"].includes(location.pathname);
+  const isShareMode = new URLSearchParams(location.search).get('share') === '1';
+  const hideNav = ["/", "/onboarding", "/login", "/premium", "/landing", "/update-password", "/subscription"].includes(location.pathname) || isShareMode;
 
   const { user, loading } = useAuth();
   const { openPopup } = usePaywallStore();

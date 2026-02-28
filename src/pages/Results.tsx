@@ -9,6 +9,8 @@ import { usePremiumStatus } from "@/hooks/usePremiumStatus";
 import { PaywallDialog } from "@/components/paywall/PaywallDialog";
 import { ExtendedAnalysisResult, getTier, getMindset, getStrategy } from "@/lib/rankingSystem";
 import { getScoreColor } from "@/lib/gerTypes";
+import { useAuth } from "@/hooks/useAuth";
+import { avatarService } from "@/services/avatarService";
 
 export default function Results() {
   const { id } = useParams();
@@ -16,6 +18,7 @@ export default function Results() {
   const location = useLocation();
   const { checkGate, isPaywallOpen, closePaywall } = usePaywallGate();
   const { isPremium } = usePremiumStatus();
+  const { user, profile } = useAuth();
   
   // Soft gate on view
   useEffect(() => {
@@ -41,6 +44,7 @@ export default function Results() {
   const tier = isExtended ? result.tier : "SUB3";
   const badge = isExtended ? result.badge || "" : "";
   const statePhoto = (location.state as { photoUrl?: string } | null)?.photoUrl;
+  const isShareMode = new URLSearchParams(location.search).get('share') === '1';
 
   // Force recalculation based on GER to ensure consistency across the app
   const tierInfo = getTier(ger);
@@ -78,6 +82,114 @@ export default function Results() {
   const rankLabel = baseAppeal.toUpperCase();
   
   const mindsetPercent = mindset === "Ascensionado" ? 100 : mindset === "Focado" ? 66 : 33;
+
+  const displayName =
+    profile?.display_name ||
+    profile?.username ||
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.email ||
+    "Usuário";
+
+  const avatarUrl = avatarService.getAvatarPublicUrl(profile?.avatar_url);
+
+  const handleEnterShareMode = () => {
+    navigate(`/results/${id}?share=1`);
+  };
+
+  const handleExitShareMode = () => {
+    navigate(`/results/${id}`);
+  };
+
+  const handleShare = async () => {
+    try {
+      if (!('share' in navigator)) {
+        return;
+      }
+      await navigator.share({
+        title: 'Minha Análise Maximare',
+        text: `Minha análise Maximare: ${rankLabel} • PSL ${pslScore.toFixed(1)}`,
+        url: window.location.href,
+      });
+    } catch {
+      return;
+    }
+  };
+
+  if (isShareMode) {
+    const shareItems = [
+      { label: 'PSL Score', value: pslScore.toFixed(1), color: pslColor },
+      { label: 'Mentalidade', value: mindset, color: classificationColor },
+      { label: 'Estratégia', value: strategy, color: classificationColor },
+      { label: 'Tipo de Mandíbula', value: jawType, color: classificationColor },
+      { label: 'Respiração', value: breathing, color: breathingColor },
+      { label: 'Harmonia', value: harmony, color: harmonyColor },
+    ];
+
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center px-5 py-6">
+        <div className="w-full max-w-[380px] flex flex-col items-center">
+          <div className="w-full flex flex-col items-center">
+            <div className="w-[120px] h-[120px] rounded-full overflow-hidden border border-white/15 mb-4">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+              ) : statePhoto || result.photoUrl ? (
+                <img src={statePhoto || result.photoUrl} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-white/5">
+                  <Scan className="w-10 h-10 text-white/30" />
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-center gap-2">
+              <span className="px-2 py-0.5 text-[10px] font-mono tracking-widest text-primary border border-primary/40 rounded bg-primary/5 uppercase">
+                {rankLabel}
+              </span>
+              <h1 className="text-lg font-bold tracking-tight text-white truncate max-w-[240px]">
+                {displayName}
+              </h1>
+            </div>
+
+            <p className="mt-1 text-white/40 text-[10px] font-mono uppercase tracking-[0.22em] text-center">
+              ANÁLISE MAXIMARE
+            </p>
+
+            <div className="w-full mt-5 bg-white/5 border border-white/10 rounded-2xl p-4">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                {shareItems.map((item) => (
+                  <div key={item.label} className="space-y-2 min-w-0">
+                    <p className="text-[10px] font-mono text-white/45 uppercase tracking-wider truncate">
+                      {item.label}
+                    </p>
+                    <p className="text-sm font-semibold text-white truncate">
+                      {item.value}
+                    </p>
+                    <div className="w-full h-[2px] bg-white/10 rounded-full overflow-hidden">
+                      <div className="h-full" style={{ width: '60%', backgroundColor: item.color }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <p className="mt-4 text-white/35 text-[10px] font-mono tracking-wider">maximare.app</p>
+          </div>
+
+          <div className="w-full mt-4 flex flex-col gap-2">
+            <Button className="w-full rounded-2xl" onClick={handleShare}>
+              Compartilhar
+            </Button>
+            <Button variant="outline" className="w-full rounded-2xl" onClick={handleExitShareMode}>
+              Voltar
+            </Button>
+          </div>
+
+          <PaywallDialog isOpen={isPaywallOpen} onClose={closePaywall} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-white flex flex-col items-center justify-center px-4 py-6">
@@ -121,6 +233,12 @@ export default function Results() {
               Análise Maximare
             </p>
           </div>
+        </div>
+
+        <div className="w-full mt-5">
+          <Button className="w-full rounded-2xl" onClick={handleEnterShareMode}>
+            Compartilhar resultado
+          </Button>
         </div>
 
         <div className="w-full bg-black/40 backdrop-blur-xl border border-white/10 rounded-[24px] p-6 shadow-2xl relative overflow-hidden">
