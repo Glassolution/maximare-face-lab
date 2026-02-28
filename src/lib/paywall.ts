@@ -53,6 +53,14 @@ export async function shouldShowPaywall(context: PaywallContext): Promise<boolea
     return false;
   }
 
+  // DEBUG: Mostrar valores atuais
+  console.log('[Paywall DEBUG] Verificação premium:', {
+    subscription_status: profile.subscription_status,
+    is_premium: profile.is_premium,
+    subscription_expires_at: profile.subscription_expires_at,
+    trigger: context.trigger
+  });
+
   // 1. Check if user is actively premium (STRICT NEW SYSTEM)
   const now = new Date();
   const status = profile.subscription_status;
@@ -61,6 +69,8 @@ export async function shouldShowPaywall(context: PaywallContext): Promise<boolea
      profile.subscription_expires_at && 
      new Date(profile.subscription_expires_at) > now) ||
     profile.is_premium === true;
+
+  console.log('[Paywall DEBUG] isPremium calculado:', isPremium);
 
   if (isPremium) {
     console.log('User is premium, not showing paywall');
