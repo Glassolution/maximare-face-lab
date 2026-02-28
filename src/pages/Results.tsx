@@ -192,7 +192,7 @@ export default function Results() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-white px-4 pt-6 pb-[calc(16rem+env(safe-area-inset-bottom))]">
+    <div className="min-h-screen bg-background text-white px-4 pt-6 pb-[calc(8rem+env(safe-area-inset-bottom))]">
       <div className="w-full max-w-[390px] mx-auto flex flex-col items-center">
         <div className="relative mb-6">
           <div className="w-32 h-32 rounded-full overflow-hidden border-2 border-white/10 ring-4 ring-primary/5">
@@ -461,14 +461,13 @@ export default function Results() {
 
         {/* Button removed per user request */}
 
-      <PaywallDialog isOpen={isPaywallOpen} onClose={closePaywall} />
-      <div className="fixed left-0 right-0 px-4 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))] bg-background/80 backdrop-blur-md border-t border-white/10 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-40">
-        <div className="w-full max-w-[390px] mx-auto">
+        <div className="w-full mt-6">
           <Button className="w-full rounded-2xl" onClick={handleEnterShareMode}>
             Compartilhar resultado
           </Button>
         </div>
-      </div>
+
+      <PaywallDialog isOpen={isPaywallOpen} onClose={closePaywall} />
     </div>
   );
 }
