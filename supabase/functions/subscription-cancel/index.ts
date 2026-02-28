@@ -64,7 +64,8 @@ serve(async (req) => {
     });
     const admin = SERVICE_ROLE_KEY ? createClient(SUPABASE_URL, SERVICE_ROLE_KEY) : null;
 
-    const { data: userRes } = await client.auth.getUser();
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    const { data: userRes } = await client.auth.getUser(token);
     const user = userRes?.user;
     try {
       console.log(JSON.stringify({ tag: "subcancel_user", userId: user?.id || null }));
