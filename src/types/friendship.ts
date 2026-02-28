@@ -4,6 +4,7 @@ export interface FriendProfile {
   id: string;
   username: string | null;
   display_name: string | null;
+  full_name?: string | null;
   avatar_url: string | null;
   short_id: string | null;
   friendship_status?: FriendshipStatus; // Enriched by hooks
@@ -30,6 +31,7 @@ export interface SearchResult {
   id: string;
   username: string;
   display_name: string | null;
+  full_name?: string | null;
   avatar_url: string | null;
   short_id: string | null;
   status: FriendshipStatus; // 'none', 'pending', 'accepted', 'blocked'

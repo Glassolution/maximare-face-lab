@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 // Should match logic in useUserSearch.ts
 const normalizeProfile = (rawProfile: any): FriendProfile => {
   const displayName = rawProfile.display_name || rawProfile.full_name || rawProfile.username || `Usuário #${rawProfile.public_id || rawProfile.short_id}`;
-  const username = rawProfile.username || `user_${rawProfile.public_id || rawProfile.short_id}`;
+  const username = rawProfile.username ?? null;
   
   let avatarUrl = rawProfile.avatar_url;
   // If it's a relative path (not starting with http/https) and not empty, treat as storage path

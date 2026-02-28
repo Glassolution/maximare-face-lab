@@ -11,6 +11,7 @@ import { FriendActionButtons } from "@/components/friends/FriendActionButtons";
 import { FriendProfile } from "@/types/friendship";
 import { Button } from "@/components/ui/button";
 import { PublicProfileModal } from "@/components/profile/PublicProfileModal";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Friends() {
   const { friends, loading: friendsLoading, refetch: refetchFriends } = useFriends();
@@ -18,6 +19,20 @@ export default function Friends() {
   const { query, setQuery, results, loading: searchLoading, search } = useUserSearch();
   
   const [selectedProfile, setSelectedProfile] = useState<FriendProfile | null>(null);
+
+  const formatShortId = (shortId: string | null | undefined) => {
+    if (!shortId) return null;
+    const digits = shortId.toString().replace(/\D/g, '');
+    if (!digits) return `#${shortId}`;
+    return `#${digits.padStart(4, '0')}`;
+  };
+
+  const resolveAvatarUrl = (avatarUrl: string | null | undefined) => {
+    if (!avatarUrl) return undefined;
+    if (avatarUrl.startsWith('http') || avatarUrl.startsWith('data:')) return avatarUrl;
+    const { data } = supabase.storage.from('avatars').getPublicUrl(avatarUrl);
+    return data.publicUrl;
+  };
 
   const handleActionComplete = () => {
     refetchFriends();
@@ -28,8 +43,10 @@ export default function Friends() {
 
   const renderUserItem = (user: FriendProfile, context: 'friend' | 'request' | 'search') => {
     // Already mapped in useUserSearch, but safe fallback here too
-    const displayName = user.display_name || user.username || `Usuário #${user.short_id}`;
+    const displayName = user.display_name || user.full_name || user.username || `Usuário #${user.short_id}`;
     const initials = (displayName || "?").substring(0, 2).toUpperCase().replace(/[^A-Z]/g, '') || "U";
+    const avatarSrc = resolveAvatarUrl(user.avatar_url);
+    const shortIdFormatted = formatShortId(user.short_id);
 
     return (
     <div key={user.id} className="flex items-center justify-between p-3 border rounded-lg bg-card/50 hover:bg-card/80 transition-colors">
@@ -38,7 +55,7 @@ export default function Friends() {
         onClick={() => setSelectedProfile(user)}
       >
         <Avatar className="h-10 w-10 border border-border">
-          <AvatarImage src={user.avatar_url || undefined} className="object-cover" />
+          <AvatarImage src={avatarSrc} className="object-cover" />
           <AvatarFallback>{initials}</AvatarFallback>
         </Avatar>
         <div>
@@ -47,7 +64,7 @@ export default function Friends() {
           </p>
           <div className="flex items-center gap-2">
              {user.username && <p className="text-xs text-muted-foreground">@{user.username}</p>}
-             {user.short_id && <span className="text-[10px] bg-muted px-1 rounded text-muted-foreground">#{user.short_id}</span>}
+             {shortIdFormatted && <span className="text-[10px] bg-muted px-1 rounded text-muted-foreground">{shortIdFormatted}</span>}
           </div>
         </div>
       </div>

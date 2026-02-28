@@ -56,7 +56,7 @@ export function useUserSearch() {
         const mapped: FriendProfile[] = data.map((item: any) => {
            // Fallback logic
            const displayName = item.display_name || item.full_name || item.username || `Usuário #${item.public_id || item.short_id}`;
-           const username = item.username || `user_${item.public_id || item.short_id}`;
+           const username = item.username ?? null;
            
            // Avatar URL Logic
            let avatarUrl = item.avatar_url;
@@ -83,6 +83,7 @@ export function useUserSearch() {
               id: item.id,
               username: username, // Use processed username
               display_name: displayName, // Use processed display_name
+              full_name: item.full_name ?? null,
               avatar_url: avatarUrl, // Use processed avatarUrl
               short_id: item.public_id?.toString() || item.short_id,
               friendship_status: item.friendship_status,
