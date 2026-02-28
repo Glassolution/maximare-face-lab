@@ -3,14 +3,14 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, sb-access-token, x-supabase-auth",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Max-Age": "86400"
 };
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const ENV_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? "";
 const MP_ACCESS_TOKEN = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN") ?? "";
 
 type Payload = {
@@ -64,7 +64,8 @@ serve(async (req) => {
     const client = createClient(SUPABASE_URL, ANON_KEY, {
       global: { headers: { Authorization: `Bearer ${sbToken}` } },
     });
-    const admin = SERVICE_ROLE_KEY ? createClient(SUPABASE_URL, SERVICE_ROLE_KEY) : null;
+    const isServiceJwt = SERVICE_ROLE_KEY && SERVICE_ROLE_KEY.includes(".");
+    const admin = isServiceJwt ? createClient(SUPABASE_URL, SERVICE_ROLE_KEY) : null;
 
     const token = sbToken || (authHeader ? authHeader.replace(/^Bearer\s+/i, "") : "");
     const { data: userRes, error: userErr } = await client.auth.getUser(token);
@@ -124,15 +125,17 @@ serve(async (req) => {
     else if (profile.premium_since) startDate = new Date(profile.premium_since as string);
 
     if (!startDate || isNaN(startDate.getTime())) {
-      const { data: firstPay } = await admin
-        .from("payments")
-        .select("created_at")
-        .eq("user_id", user.id)
-        .eq("status", "approved")
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      if (firstPay?.created_at) startDate = new Date(firstPay.created_at as string);
+      if (admin) {
+        const { data: firstPay } = await admin
+          .from("payments")
+          .select("created_at")
+          .eq("user_id", userId)
+          .eq("status", "approved")
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (firstPay?.created_at) startDate = new Date(firstPay.created_at as string);
+      }
     }
 
     const now = new Date();
