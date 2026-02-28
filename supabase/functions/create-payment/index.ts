@@ -3,12 +3,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, sb-access-token, x-supabase-auth',
 };
 
 const MP_ACCESS_TOKEN = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN');
-const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const ENV_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('ANON_KEY') ?? '';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -56,8 +57,10 @@ serve(async (req) => {
     // Check if user is logged in via Authorization header
     const authHeader = req.headers.get('Authorization');
     if (authHeader) {
-      const supabaseClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
-        global: { headers: { Authorization: authHeader } }
+      const headerAnon = req.headers.get('apikey') || req.headers.get('x-api-key') || '';
+      const effectiveAnon = ENV_ANON_KEY || headerAnon;
+      const supabaseClient = createClient(SUPABASE_URL!, effectiveAnon, {
+        global: { headers: { Authorization: authHeader } },
       });
       const { data: { user } } = await supabaseClient.auth.getUser();
       if (user) userId = user.id;
