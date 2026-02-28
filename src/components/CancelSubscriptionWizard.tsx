@@ -51,6 +51,14 @@ export function CancelSubscriptionWizard({ open, onOpenChange }: Props) {
         setLoading(false);
         return;
       }
+      const nowSec = Math.floor(Date.now() / 1000);
+      let accessToken = session.access_token;
+      if (session.expires_at && session.expires_at - nowSec < 60) {
+        const { data: refreshed } = await supabase.auth.refreshSession();
+        if (refreshed?.session?.access_token) {
+          accessToken = refreshed.session.access_token;
+        }
+      }
       const payload: any = {
         reason_primary: reason,
         reason_details: details || null,
@@ -59,7 +67,10 @@ export function CancelSubscriptionWizard({ open, onOpenChange }: Props) {
         issue_details: issueDetails || null
       };
       const { data, error } = await supabase.functions.invoke("subscription-cancel", {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { 
+          Authorization: `Bearer ${accessToken}`,
+          apikey: (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || ""
+        },
         body: payload
       });
       if (error) {
