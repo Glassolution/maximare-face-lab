@@ -26,6 +26,7 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 import { useEffect, useState } from "react";
 import { usePaywallGate } from "@/hooks/usePaywallGate";
+import { PaywallDialog } from "@/components/paywall/PaywallDialog";
 import { syncHistoryWithSupabase } from "@/lib/mockData";
 import { usePremiumStatus } from "@/hooks/usePremiumStatus";
 
@@ -44,7 +45,7 @@ function Layout() {
   const { user, loading } = useAuth();
   const { openPopup } = usePaywallStore();
   
-  const { checkGate, PaywallDialog } = usePaywallGate();
+  const { checkGate, isPaywallOpen, closePaywall } = usePaywallGate();
   const { isPremium } = usePremiumStatus();
 
   useEffect(() => {
@@ -133,7 +134,7 @@ function Layout() {
         <Route path="*" element={<NotFound />} />
       </Routes>
       {!hideNav && <BottomNav />}
-      <PaywallDialog />
+      <PaywallDialog isOpen={isPaywallOpen} onClose={closePaywall} />
     </>
   );
 }

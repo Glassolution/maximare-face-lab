@@ -6,6 +6,7 @@ import { Scan, Lock } from "lucide-react";
 import { useState, useEffect } from "react";
 import { usePaywallGate } from "@/hooks/usePaywallGate";
 import { usePremiumStatus } from "@/hooks/usePremiumStatus";
+import { PaywallDialog } from "@/components/paywall/PaywallDialog";
 import { ExtendedAnalysisResult, getTier, getMindset, getStrategy } from "@/lib/rankingSystem";
 import { getScoreColor } from "@/lib/gerTypes";
 
@@ -13,7 +14,7 @@ export default function Results() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { checkGate, PaywallDialog } = usePaywallGate();
+  const { checkGate, isPaywallOpen, closePaywall } = usePaywallGate();
   const { isPremium } = usePremiumStatus();
   
   // Soft gate on view
@@ -348,7 +349,7 @@ export default function Results() {
 
         {/* Button removed per user request */}
 
-      <PaywallDialog />
+      <PaywallDialog isOpen={isPaywallOpen} onClose={closePaywall} />
     </div>
   );
 }

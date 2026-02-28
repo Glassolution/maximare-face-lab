@@ -18,6 +18,7 @@ import {
   Clock,
 } from "lucide-react";
 import { usePaywallGate } from "@/hooks/usePaywallGate";
+import { PaywallDialog } from "@/components/paywall/PaywallDialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { saveAnalysis, getAnalysisHistory, deleteAnalysis, syncHistoryWithSupabase, type AnalysisResult } from "@/lib/mockData";
@@ -105,7 +106,7 @@ import { LimitTimer } from "@/components/paywall/LimitTimer";
 
 export default function Analysis() {
   const navigate = useNavigate();
-  const { checkGate, PaywallDialog, isPaywallOpen } = usePaywallGate();
+  const { checkGate, isPaywallOpen, closePaywall } = usePaywallGate();
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -1227,7 +1228,7 @@ export default function Analysis() {
             </div>
           </DialogContent>
         </Dialog>
-        <PaywallDialog />
+        <PaywallDialog isOpen={isPaywallOpen} onClose={closePaywall} />
       </div>
     </div>
     </PaywallManager>

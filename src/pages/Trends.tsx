@@ -14,6 +14,7 @@ import { getAnalysisHistory } from "@/lib/mockData";
 import { ExtendedAnalysisResult } from "@/lib/rankingSystem";
 import { usePaywallGate } from "@/hooks/usePaywallGate";
 import { usePremiumStatus } from "@/hooks/usePremiumStatus";
+import { PaywallDialog } from "@/components/paywall/PaywallDialog";
 import { cn } from "@/lib/utils";
 
 // Icon mapping based on protocol type
@@ -41,7 +42,7 @@ export default function Trends() {
   const navigate = useNavigate();
   const [expandedTrend, setExpandedTrend] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("All Protocols");
-  const { checkGate, PaywallDialog } = usePaywallGate();
+  const { checkGate, isPaywallOpen, closePaywall } = usePaywallGate();
   const { isPremium } = usePremiumStatus();
 
   const plan = useMemo(() => {
@@ -332,7 +333,7 @@ export default function Trends() {
             )}
         </AnimatePresence>
 
-        <PaywallDialog />
+        <PaywallDialog isOpen={isPaywallOpen} onClose={closePaywall} />
       </div>
     </div>
   );

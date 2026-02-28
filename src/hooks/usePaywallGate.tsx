@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { PaywallContext, shouldShowPaywall, recordPaywallShow, recordPaywallDismiss, logPaywallEvent } from '@/lib/paywall';
 import { usePaywallStore } from '@/lib/paywallStore';
 import { supabase } from '@/integrations/supabase/client';
-import { PaywallModal } from '@/components/PaywallModal';
 import { useAuth } from '@/hooks/useAuth';
 
 export function usePaywallGate() {
@@ -88,40 +87,9 @@ export function usePaywallGate() {
     }
   }, [navigate, openMain, setIsPaywallOpen]);
 
-  // Wrapper component to render modal controlled by this hook
-  const PaywallDialog = useCallback(() => {
-    // Verificação de premium DENTRO do componente
-    const isPremium = profile?.is_premium === true || profile?.subscription_status === 'active';
-    
-    console.log('[PaywallGate] PaywallDialog renderizado:', {
-      isPremium,
-      isMainOpen,
-      profile: {
-        is_premium: profile?.is_premium,
-        subscription_status: profile?.subscription_status
-      }
-    });
-    
-    if (isPremium) {
-      console.log('[PaywallGate] PaywallDialog: Usuário é premium, retornando null');
-      return null; // Não renderizar paywall para premium
-    }
-    
-    console.log('[PaywallGate] PaywallDialog: Renderizando PaywallModal');
-    return (
-      <PaywallModal 
-        open={isMainOpen} 
-        onClose={closePaywall} 
-        onUpgrade={handleUpgrade}
-        context={mainContext}
-      />
-    );
-  }, [isMainOpen, closePaywall, handleUpgrade, mainContext, profile]);
-
   return {
     checkGate,
-    PaywallDialog,
-    isPaywallOpen: isPaywallOpen,
+    isPaywallOpen: isMainOpen,
     closePaywall,
     handleUpgrade
   };
