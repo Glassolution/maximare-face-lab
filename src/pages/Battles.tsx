@@ -22,9 +22,15 @@ export default function Battles() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("active");
 
+  console.log('Battle status:', battles.map(b => b.status));
+
   const pendingBattles = battles.filter(b => b.status === 'waiting' && !b.is_creator && !b.matched_at);
-  const activeBattles = battles.filter(b =>
-    (b.status === 'waiting' && (!!b.matched_at || b.is_creator)) ||
+  const activeBattles = battles.filter(b => 
+    b.status === 'waiting_for_opponent' || 
+    b.status === 'waiting' || 
+    b.status === 'matched' || 
+    b.status === 'active' || 
+    b.status === 'photo_submission' ||
     b.status === 'ready' ||
     b.status === 'running'
   );
