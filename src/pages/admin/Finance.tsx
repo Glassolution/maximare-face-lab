@@ -4,18 +4,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import { format, subMonths } from "date-fns";
 import { toast } from "sonner";
 import { 
   TrendingUp, 
   CreditCard, 
   DollarSign, 
-  Calendar,
   Users,
   Target,
   ArrowUpRight
 } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -63,7 +62,8 @@ const AdminFinance = () => {
     refunds: 0,
     churnRate: 0,
     netRevenue: 0,
-    mrr: 0
+    mrr: 0,
+    totalSubscribers: 0
   });
   const [showNetRevenue, setShowNetRevenue] = useState(false);
   const [revenueChartData, setRevenueChartData] = useState<any[]>([]);
@@ -117,13 +117,8 @@ const AdminFinance = () => {
 
   // Mock data for the basic chart (fallback)
   const basicChartData = [
-    { name: '1 Fev', value: 200 },
-    { name: '5 Fev', value: 450 },
-    { name: '10 Fev', value: 300 },
-    { name: '15 Fev', value: 600 },
-    { name: '20 Fev', value: 550 },
-    { name: '25 Fev', value: 800 },
-    { name: '28 Fev', value: 950 },
+    { name: '1 Fev', value: 0 },
+    { name: '28 Fev', value: 0 },
   ];
 
   // Advanced chart data matching the reference image
@@ -157,39 +152,79 @@ const AdminFinance = () => {
   const fetchPurchases = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('get_admin_purchases');
-      if (error) throw error;
+      // 1. Fetch Purchases
+      const { data: purchaseData, error: purchaseError } = await supabase.rpc('get_admin_purchases');
+      if (purchaseError) throw purchaseError;
       
-      const purchaseList = data as AdminPurchase[] || [];
+      const purchaseList = purchaseData as AdminPurchase[] || [];
       setPurchases(purchaseList);
 
-      // Calculate stats
+      // 2. Fetch Active Subscribers for MRR
+      const { data: subscribersData, error: subError } = await supabase
+        .from('profiles')
+        .select('plan_type')
+        .eq('is_premium', true)
+        // Ideally we check subscription_status too, but is_premium is the flag used in app
+        // .eq('subscription_status', 'active') 
+      
+      if (subError) throw subError;
+
+      // 3. Fetch Churn Data
       const now = new Date();
+      const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      
+      // Cancelados no mês
+      const { count: canceledCount } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .in('subscription_status', ['canceled', 'expired'])
+        .gte('updated_at', startOfCurrentMonth);
+
+      // Total no início do mês (aproximado: criados antes do mês e premium)
+      const { count: totalStartMonth } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .lt('created_at', startOfCurrentMonth);
+
+      // --- Calculations ---
+
       const today = now.toISOString().split('T')[0];
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-
+      
+      // Receita Hoje (Approved only)
       const todayRevenue = purchaseList
-        .filter((p: any) => p.created_at.startsWith(today))
+        .filter((p: any) => p.created_at.startsWith(today) && (p.status === 'approved' || p.status === 'paid'))
         .reduce((acc: number, p: any) => acc + (p.amount_cents || 0), 0);
 
+      // Receita Mês (Approved only)
       const monthRevenue = purchaseList
-        .filter((p: any) => p.created_at >= monthStart)
+        .filter((p: any) => p.created_at >= startOfCurrentMonth && (p.status === 'approved' || p.status === 'paid'))
         .reduce((acc: number, p: any) => acc + (p.amount_cents || 0), 0);
 
+      // Receita Total (Approved only)
       const totalRevenue = purchaseList
+        .filter((p: any) => p.status === 'approved' || p.status === 'paid')
         .reduce((acc: number, p: any) => acc + (p.amount_cents || 0), 0);
 
-      // Calculate advanced metrics
+      // Estornos Mês
       const refundsMonth = purchaseList
-        .filter((p: any) => (p.status === 'refunded' || p.status === 'charged_back') && p.created_at >= monthStart)
+        .filter((p: any) => (p.status === 'refunded' || p.status === 'charged_back') && p.created_at >= startOfCurrentMonth)
         .reduce((acc: number, p: any) => acc + (p.amount_cents || 0), 0);
 
-      // Mock churn data (in real scenario, fetch from profiles)
-      const churnedUsers = 5; // Example
-      const totalSubscribers = 142; // Example
-      const churnRate = (churnedUsers / totalSubscribers) * 100;
+      // MRR Calculation based on active plans
+      // Weekly: 24.90 * 4.33 approx
+      // Monthly: 49.90
+      // Annual: 499.90 / 12
+      const priceMap: Record<string, number> = { 
+        weekly: 24.90 * 4.33, 
+        monthly: 49.90, 
+        annual: 499.90 / 12 
+      };
+      
+      const mrr = (subscribersData || []).reduce((sum, p) => sum + (priceMap[p.plan_type || ''] || 0), 0);
 
-      const mrr = 14500; // Example MRR
+      // Churn Rate
+      const totalStart = totalStartMonth || 1; // avoid division by zero
+      const churnRate = ((canceledCount || 0) / totalStart) * 100;
 
       setStats({
         today: todayRevenue / 100,
@@ -198,11 +233,12 @@ const AdminFinance = () => {
         refunds: refundsMonth / 100,
         churnRate: churnRate,
         netRevenue: (monthRevenue - refundsMonth) / 100,
-        mrr: mrr
+        mrr: mrr,
+        totalSubscribers: subscribersData?.length || 0
       });
 
     } catch (error) {
-      console.error("Error fetching purchases:", error);
+      console.error("Error fetching finance data:", error);
       toast.error("Erro ao carregar dados financeiros");
     } finally {
       setLoading(false);
@@ -245,8 +281,8 @@ const AdminFinance = () => {
                 </div>
               </div>
               <div className="flex items-baseline space-x-2">
-                <h2 className="text-2xl font-bold tracking-tight">R$ {stats.netRevenue.toFixed(2)}</h2>
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">+12%</span>
+                <h2 className="text-2xl font-bold tracking-tight">R$ {stats.netRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h2>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">+0%</span>
               </div>
               <p className="text-xs text-slate-400 mt-2">vs. mês anterior</p>
             </div>
@@ -257,10 +293,10 @@ const AdminFinance = () => {
                   <TrendingUp className="w-4 h-4" />
                 </div>
               </div>
-              <h2 className="text-2xl font-bold tracking-tight">R$ {stats.mrr.toFixed(2)}</h2>
+              <h2 className="text-2xl font-bold tracking-tight">R$ {stats.mrr.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h2>
               <p className="text-xs text-slate-400 mt-2 flex items-center">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2"></span>
-                Atualizado agora
+                Projeção planos ativos
               </p>
             </div>
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
@@ -270,8 +306,8 @@ const AdminFinance = () => {
                   <TrendingUp className="w-4 h-4" />
                 </div>
               </div>
-              <h2 className="text-2xl font-bold tracking-tight">R$ {(stats.mrr * 12).toFixed(2)}</h2>
-              <p className="text-xs text-slate-400 mt-2">Projeção anual baseada no MRR</p>
+              <h2 className="text-2xl font-bold tracking-tight">R$ {(stats.mrr * 12).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h2>
+              <p className="text-xs text-slate-400 mt-2">Projeção anual (MRR x 12)</p>
             </div>
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
               <div className="flex justify-between items-start mb-4">
@@ -282,7 +318,7 @@ const AdminFinance = () => {
               </div>
               <div className="flex items-baseline space-x-2">
                 <h2 className="text-2xl font-bold tracking-tight">{stats.churnRate.toFixed(1)}%</h2>
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-600">Reembolso</span>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-600">Cancelamentos</span>
               </div>
               <p className="text-xs text-slate-400 mt-2">Dentro da meta de 3%</p>
             </div>
@@ -506,7 +542,7 @@ const AdminFinance = () => {
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-xs font-medium text-gray-500 mb-1">Receita Hoje</p>
-                <h3 className="text-xl font-bold text-gray-900">R$ {stats.today.toFixed(2)}</h3>
+                <h3 className="text-xl font-bold text-gray-900">R$ {stats.today.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
               </div>
               <Badge className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border-none">
                 <TrendingUp className="w-3 h-3 mr-1" />
@@ -522,7 +558,7 @@ const AdminFinance = () => {
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-xs font-medium text-gray-500 mb-1">Receita Mês</p>
-                <h3 className="text-xl font-bold text-gray-900">R$ {stats.month.toFixed(2)}</h3>
+                <h3 className="text-xl font-bold text-gray-900">R$ {stats.month.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
               </div>
               <Badge className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border-none">
                 <TrendingUp className="w-3 h-3 mr-1" />
@@ -650,7 +686,7 @@ const AdminFinance = () => {
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500">Média Transação</p>
-                <h4 className="text-xl font-bold text-gray-900">R$ {purchases.length > 0 ? (stats.total / purchases.length).toFixed(2) : '0.00'}</h4>
+                <h4 className="text-xl font-bold text-gray-900">R$ {purchases.length > 0 ? (stats.total / purchases.length).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0.00'}</h4>
               </div>
             </CardContent>
           </Card>
@@ -662,7 +698,7 @@ const AdminFinance = () => {
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500">Usuários Ativos</p>
-                <h4 className="text-xl font-bold text-gray-900">142</h4>
+                <h4 className="text-xl font-bold text-gray-900">{stats.totalSubscribers}</h4>
               </div>
             </CardContent>
           </Card>
@@ -742,7 +778,7 @@ const AdminFinance = () => {
                       <TableCell>
                         <span className={`text-sm font-bold ${purchase.status === 'refunded' || purchase.status === 'charged_back' ? 'text-red-600' : 'text-gray-900'}`}>
                           {purchase.status === 'refunded' || purchase.status === 'charged_back' ? '-' : ''} 
-                          R$ {(purchase.amount_cents / 100).toFixed(2)}
+                          R$ {(purchase.amount_cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
                       </TableCell>
                       <TableCell>
