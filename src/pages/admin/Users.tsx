@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { avatarService } from "@/services/avatarService";
 
 interface AdminUser {
   id: string;
@@ -188,6 +189,7 @@ const AdminUsers = () => {
     const matchesPlan = filterPlan === "all" ||
       (filterPlan === "premium" && user.is_premium) ||
       (filterPlan === "free" && !user.is_premium) ||
+      (filterPlan === "with_photo" && user.avatar_url) || // Filtro Com Foto
       (filterPlan === plan);
     return matchesSearch && matchesPlan;
   });
@@ -218,6 +220,7 @@ const AdminUsers = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os Planos</SelectItem>
+              <SelectItem value="with_photo">Com Foto</SelectItem>
               <SelectItem value="free">Gratuito</SelectItem>
               <SelectItem value="weekly">Semanal</SelectItem>
               <SelectItem value="monthly">Mensal</SelectItem>
@@ -252,12 +255,14 @@ const AdminUsers = () => {
                   const isBanned = user.is_banned ?? user.banned;
                   const isUgc = user.ugc_enabled ?? user.is_ugc;
                   const plan = user.premium_plan || user.plan_type;
+                  const avatarPublicUrl = avatarService.getAvatarPublicUrl(user.avatar_url); // Uso do avatarService
+
                   return (
                 <TableRow key={user.id} className="hover:bg-gray-50/60 border-b border-gray-50">
                   <TableCell className="pl-6 py-4">
                     <div className="flex items-center gap-3">
                       <Avatar className="h-9 w-9 border border-gray-200">
-                        <AvatarImage src={user.avatar_url} />
+                        <AvatarImage src={avatarPublicUrl || undefined} />
                         <AvatarFallback className="bg-gray-800 text-white text-xs font-bold">
                           {user.username?.[0]?.toUpperCase() || 'U'}
                         </AvatarFallback>
@@ -325,43 +330,6 @@ const AdminUsers = () => {
             )}
           </TableBody>
         </Table>
-
-        {/* Footer / Pagination */}
-        <div className="flex items-center justify-between border-t border-gray-100 px-6 py-4">
-          <span className="text-xs text-gray-400 uppercase tracking-wide">
-            Mostrando {((page - 1) * USERS_PER_PAGE) + 1} a {Math.min(page * USERS_PER_PAGE, filteredUsers.length)} de {filteredUsers.length} usuários
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="h-8 w-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-              const p = i + 1;
-              return (
-                <button
-                  key={p}
-                  onClick={() => setPage(p)}
-                  className={`h-8 w-8 flex items-center justify-center rounded-lg text-sm font-medium ${
-                    page === p ? 'bg-blue-600 text-white' : 'border border-gray-200 text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  {p}
-                </button>
-              );
-            })}
-            <button
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="h-8 w-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
       </div>
 
       <Dialog
