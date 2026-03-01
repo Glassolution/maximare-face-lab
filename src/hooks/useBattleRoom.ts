@@ -130,10 +130,35 @@ export function useBattleRoom(battleId: string) {
       });
 
     // Fallback polling: keep UI progressing even if realtime drops
+    // Also acts as a safety net to trigger transitions if they get stuck
     watchdogRef.current = setInterval(() => {
       const b = latestBattleRef.current;
-      const needsResult = b?.status === 'finished' && !result;
-      const notFinished = b && b.status !== 'finished' && b.status !== 'canceled' && b.status !== 'expired';
+      if (!b) return;
+
+      const now = Date.now() + serverTimeOffsetMs;
+
+      // Safety: Ensure ready -> running
+      if (b.status === 'ready' && b.start_at) {
+        const startAt = new Date(b.start_at).getTime();
+        if (now > startAt + 3000) { // 3s buffer
+          console.log('[Safety] Triggering mark_battle_running_v3');
+          supabase.rpc('mark_battle_running_v3', { p_battle_id: battleId });
+        }
+      }
+
+      // Safety: Ensure running -> finished
+      if (b.status === 'running' && b.start_at) {
+        const startAt = new Date(b.start_at).getTime();
+        // Normal duration is ~9-10s. If we are at 15s, something is stuck.
+        if (now > startAt + 15000) { 
+          console.log('[Safety] Triggering mock_process_battle_result');
+          supabase.rpc('mock_process_battle_result', { p_battle_id: battleId });
+        }
+      }
+
+      const needsResult = b.status === 'finished' && !result;
+      const notFinished = b.status !== 'finished' && b.status !== 'canceled' && b.status !== 'expired';
+      
       if (needsResult || notFinished) {
         fetchBattleState();
       }
@@ -153,7 +178,7 @@ export function useBattleRoom(battleId: string) {
       if (watchdogRef.current) clearInterval(watchdogRef.current);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [battleId, user, fetchBattleState, fetchServerTimeOffset, result]);
+  }, [battleId, user, fetchBattleState, fetchServerTimeOffset, result, serverTimeOffsetMs]);
 
   // Actions
   const submitPhotos = async (frontFile: File, sideFile?: File) => {
