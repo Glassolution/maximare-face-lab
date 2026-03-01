@@ -130,7 +130,7 @@ function Layout() {
         <Route path="/premium" element={<Premium />} />
         <Route path="/subscription" element={<Subscription />} />
         <Route path="/update-password" element={<UpdatePassword />} />
-        <Route path="/admin-tools" element={<Admin />} />
+        <Route path="/admin/*" element={<Admin />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {!hideNav && <BottomNav />}

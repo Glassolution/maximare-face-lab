@@ -16,6 +16,8 @@ interface Profile {
   premium?: boolean;
   is_premium?: boolean;
   plan_type?: string;
+  is_admin?: boolean;
+  is_ugc?: boolean;
 }
 
 interface UserData {
