@@ -9,11 +9,17 @@ import {
   Swords, 
   Palette, 
   Settings, 
-  Menu,
-  X
+  LogOut,
+  Search,
+  Bell,
+  Moon,
+  Mail,
+  Edit
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 import AdminDashboard from "./admin/Dashboard";
 import AdminUsers from "./admin/Users";
@@ -24,10 +30,9 @@ const AdminBattles = () => <div className="p-8 text-2xl font-bold">Batalhas (Em 
 const AdminSettings = () => <div className="p-8 text-2xl font-bold">Configurações (Em desenvolvimento)</div>;
 
 const Admin = () => {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const isAdmin = profile?.is_admin || user?.email === 'xavierluisfelipe12@gmail.com';
 
@@ -56,69 +61,85 @@ const Admin = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#F1F5F9]">
+    <div className="flex min-h-screen bg-[#F3F4F6]">
       {/* Sidebar */}
-      <aside 
-        className={cn(
-          "fixed left-0 top-0 z-40 h-screen transition-all duration-300 bg-[#1E40AF] text-white flex flex-col shadow-xl",
-          sidebarOpen ? "w-[220px]" : "w-[64px]"
-        )}
-      >
-        <div className="flex h-16 items-center justify-between px-4 border-b border-blue-800">
-          {sidebarOpen && <span className="text-xl font-bold tracking-tight">Maximare</span>}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="text-white hover:bg-blue-800 ml-auto"
-          >
-            {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </Button>
+      <aside className="fixed left-0 top-0 z-40 h-screen w-[80px] bg-[#3B82F6] flex flex-col items-center py-6 shadow-xl transition-all duration-300">
+        <div className="mb-8 h-12 w-12 rounded-full bg-white flex items-center justify-center shadow-md">
+          <span className="text-xl font-bold text-[#3B82F6]">M</span>
         </div>
 
-        <nav className="flex-1 space-y-1 p-2 mt-4">
+        <nav className="flex-1 flex flex-col gap-4 w-full px-2">
           {navItems.map((item) => (
             <Link
               key={item.path}
               to={item.path}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                "flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-200 mx-auto",
                 isActive(item.path) 
-                  ? "bg-white/10 text-white shadow-sm" 
-                  : "text-blue-100 hover:bg-white/5 hover:text-white",
-                !sidebarOpen && "justify-center px-0"
+                  ? "bg-white text-[#3B82F6] shadow-md" 
+                  : "text-white/80 hover:bg-white/10 hover:text-white"
               )}
-              title={!sidebarOpen ? item.label : undefined}
+              title={item.label}
             >
-              <item.icon className={cn("h-5 w-5 flex-shrink-0", isActive(item.path) && "text-blue-200")} />
-              {sidebarOpen && <span>{item.label}</span>}
+              <item.icon className="h-6 w-6" />
             </Link>
           ))}
         </nav>
 
-        <div className="p-4 border-t border-blue-800">
-          <div className={cn("flex items-center gap-3", !sidebarOpen && "justify-center")}>
-            <div className="h-8 w-8 rounded-full bg-blue-700 flex items-center justify-center text-xs font-bold">
-              {profile?.username?.[0]?.toUpperCase() || 'A'}
-            </div>
-            {sidebarOpen && (
-              <div className="flex flex-col overflow-hidden">
-                <span className="text-sm font-medium truncate">{profile?.username}</span>
-                <span className="text-xs text-blue-300 truncate">Admin</span>
-              </div>
-            )}
-          </div>
+        <div className="mt-auto flex flex-col gap-4 pb-4">
+           <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => signOut()}
+            className="text-white/80 hover:bg-white/10 hover:text-white rounded-xl w-12 h-12 mx-auto"
+            title="Sair"
+          >
+            <LogOut className="h-6 w-6" />
+          </Button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main 
-        className={cn(
-          "flex-1 transition-all duration-300 min-h-screen",
-          sidebarOpen ? "ml-[220px]" : "ml-[64px]"
-        )}
-      >
-        <div className="container py-8 max-w-7xl mx-auto animate-in fade-in duration-500">
+      <main className="flex-1 ml-[80px] min-h-screen flex flex-col">
+        {/* Header */}
+        <header className="bg-white h-20 px-8 flex items-center justify-between shadow-sm sticky top-0 z-30">
+          <div className="relative w-96">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input 
+              placeholder="Search or type a command" 
+              className="pl-10 bg-gray-50 border-none rounded-lg h-10 w-full focus-visible:ring-1 focus-visible:ring-gray-200"
+            />
+          </div>
+
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" className="text-gray-500 hover:bg-gray-100 rounded-lg">
+              <Edit className="h-5 w-5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="text-gray-500 hover:bg-gray-100 rounded-lg">
+              <Mail className="h-5 w-5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="text-gray-500 hover:bg-gray-100 rounded-lg">
+              <Moon className="h-5 w-5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="text-gray-500 hover:bg-gray-100 rounded-lg relative">
+              <Bell className="h-5 w-5" />
+              <span className="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full border-2 border-white"></span>
+            </Button>
+            
+            <div className="h-8 w-px bg-gray-200 mx-2"></div>
+            
+            <div className="flex items-center gap-3">
+               <Avatar className="h-10 w-10 border-2 border-white shadow-sm cursor-pointer">
+                  <AvatarImage src={profile?.avatar_url || ""} />
+                  <AvatarFallback className="bg-blue-100 text-blue-600 font-bold">
+                    {profile?.username?.[0]?.toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+            </div>
+          </div>
+        </header>
+
+        <div className="p-8 max-w-[1600px] mx-auto w-full animate-in fade-in duration-500">
           <Routes>
             <Route path="/" element={<AdminDashboard />} />
             <Route path="users" element={<AdminUsers />} />

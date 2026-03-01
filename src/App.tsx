@@ -40,7 +40,7 @@ function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   // ... existing hideNav logic ...
-  const hideNav = ["/", "/onboarding", "/login", "/premium", "/landing", "/update-password", "/subscription"].includes(location.pathname);
+  const hideNav = ["/", "/onboarding", "/login", "/premium", "/landing", "/update-password", "/subscription"].includes(location.pathname) || location.pathname.startsWith("/admin");
 
   const { user, loading } = useAuth();
   const { openPopup } = usePaywallStore();
