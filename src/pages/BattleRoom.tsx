@@ -110,7 +110,7 @@ export default function BattleRoom() {
   if (error || !battle) return <div className="p-8 text-center text-red-500">Erro: {error || 'Batalha não encontrada'}</div>;
 
   // Status: Waiting for Opponent
-  if (battle.status === 'waiting' && !battle.matched_at) {
+  if ((battle.status === 'waiting' && !battle.matched_at) || battle.status === 'waiting_for_opponent') {
     return (
       <div className="container max-w-md mx-auto py-10 px-4 text-center space-y-6">
         <h1 className="text-2xl font-bold">Aguardando Oponente...</h1>
@@ -239,8 +239,8 @@ export default function BattleRoom() {
   }
 
   // 4. SUBMISSION FORM (Default if not waiting opponent, processing, or revealing)
-  // Only show if status is matched/photo_submission
-  if (battle.status === 'waiting' || battle.status === 'ready') {
+  // Only show if status is matched/photo_submission/active/ready/waiting(legacy)
+  if (['waiting', 'ready', 'matched', 'active', 'photo_submission'].includes(battle.status)) {
       const hasSubmitted = !!myStablePhotoUrl;
 
       return (

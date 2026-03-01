@@ -29,14 +29,16 @@ const Admin = () => {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  const isAdmin = profile?.is_admin || user?.email === 'xavierluisfelipe12@gmail.com';
+
   useEffect(() => {
-    if (!loading && (!user || !profile?.is_admin)) {
+    if (!loading && (!user || !isAdmin)) {
       navigate("/");
     }
-  }, [user, profile, loading, navigate]);
+  }, [user, isAdmin, loading, navigate]);
 
   if (loading) return <div className="flex h-screen items-center justify-center">Carregando...</div>;
-  if (!user || !profile?.is_admin) return null;
+  if (!user || !isAdmin) return null;
 
   const navItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },

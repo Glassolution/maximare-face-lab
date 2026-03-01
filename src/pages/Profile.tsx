@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Crown, ChevronRight, Settings, Shield, Zap, Star, TrendingUp, Search, LogOut, Moon, Sun, CreditCard, Copy, Upload, Camera } from "lucide-react";
+import { Crown, ChevronRight, Settings, Shield, Zap, Star, TrendingUp, Search, LogOut, Moon, Sun, CreditCard, Copy, Upload, Camera, LayoutDashboard } from "lucide-react";
 import { getAnalysisHistory } from "@/lib/mockData";
 import { toast } from "sonner";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -201,11 +201,19 @@ export default function Profile() {
   const displayName =
     (user && (user.user_metadata?.full_name || user.user_metadata?.name || user.email)) || "Usuário MAXIMARE";
 
+  const isAdmin = profile?.is_admin || user?.email === 'xavierluisfelipe12@gmail.com';
+
   const menuItems: MenuItem[] = [
     { label: "Plano Pro", icon: Crown, desc: isPremium ? "Gerenciar assinatura" : "Desbloqueie tudo", path: isPremium ? "#" : "/premium", onClick: isPremium ? () => setShowSubscription(true) : undefined },
     { label: "Progresso", icon: TrendingUp, desc: "Seu histórico", path: "/progress" },
     { label: "Configurações", icon: Settings, desc: "Preferências", path: "#", onClick: () => setShowPreferences(true) },
     { label: "Privacidade", icon: Shield, desc: "Seus dados", path: "/privacy" },
+    ...(isAdmin ? [{
+      label: "Admin Dashboard",
+      icon: LayoutDashboard,
+      desc: "Painel Administrativo",
+      path: "/admin"
+    }] : []),
   ];
 
   const formatDate = (date: Date | string | null) => {
