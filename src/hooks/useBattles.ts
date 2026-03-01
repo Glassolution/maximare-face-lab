@@ -85,13 +85,31 @@ export function useBattles() {
 
   const createBattle = async (opponentId: string) => {
     try {
-      const { data, error } = await supabase.rpc('create_battle_challenge_v2', {
-        target_opponent_id: opponentId,
-        battle_mode: 'front_lateral'
-      });
+      // 1. Check for existing pending battle
+      const { data: existing } = await supabase
+        .from('battles')
+        .select('id')
+        .eq('created_by', user.id)
+        .eq('opponent_id', opponentId)
+        .eq('status', 'waiting_for_opponent')
+        .maybeSingle();
+      
+      if (existing) {
+        toast.error('Já existe um desafio pendente para este usuário.');
+        return false;
+      }
+
+      // 2. Create directly (bypass RPC to ensure correct status)
+      const { data, error } = await supabase.from('battles').insert({
+        created_by: user.id,
+        opponent_id: opponentId,
+        status: 'waiting_for_opponent',
+        mode: 'front_lateral',
+        room_version: 1,
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24h
+      }).select().single();
 
       if (error) throw error;
-      if (!data.success) throw new Error(data.error);
       
       toast.success('Desafio criado!');
       fetchBattles();
@@ -104,12 +122,17 @@ export function useBattles() {
 
   const acceptBattle = async (battleId: string) => {
     try {
-      const { data, error } = await supabase.rpc('accept_battle_challenge_v2', {
-        p_battle_id: battleId
-      });
+      // Direct update to active
+      const { error } = await supabase
+        .from('battles')
+        .update({ 
+          status: 'active', 
+          matched_at: new Date().toISOString() 
+        })
+        .eq('id', battleId)
+        .eq('opponent_id', user.id); // Security check
 
       if (error) throw error;
-      if (!data.success) throw new Error(data.error);
 
       toast.success('Desafio aceito! Redirecionando...');
       fetchBattles();

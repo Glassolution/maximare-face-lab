@@ -24,20 +24,21 @@ export default function Battles() {
 
   console.log('Battle status:', battles.map(b => b.status));
 
-  const pendingBattles = battles.filter(b => b.status === 'waiting' && !b.is_creator && !b.matched_at);
-  const activeBattles = battles.filter(b => 
-    b.status === 'waiting_for_opponent' || 
-    b.status === 'waiting' || 
-    b.status === 'matched' || 
-    b.status === 'active' || 
-    b.status === 'photo_submission' ||
-    b.status === 'ready' ||
-    b.status === 'running'
+  const pendingBattles = battles.filter(b => 
+    (b.status === 'waiting' || b.status === 'waiting_for_opponent') && 
+    !b.is_creator && 
+    !b.matched_at
   );
+
+  const activeBattles = battles.filter(b => {
+    if (b.status === 'waiting_for_opponent') return b.is_creator;
+    if (b.status === 'waiting') return b.is_creator || !!b.matched_at;
+    return ['matched', 'active', 'photo_submission', 'ready', 'running'].includes(b.status);
+  });
   const historyBattles = battles.filter(b => ['finished', 'canceled', 'expired'].includes(b.status));
 
   const handleBattleClick = (battle: EnrichedBattle) => {
-    if (battle.status === 'waiting' && !battle.is_creator && !battle.matched_at) {
+    if ((battle.status === 'waiting' || battle.status === 'waiting_for_opponent') && !battle.is_creator && !battle.matched_at) {
        // If pending and I am opponent, don't navigate, let them use buttons
        return;
     } else {
@@ -91,12 +92,13 @@ function BattleCard({ battle, onClick, onAccept, onReject }: {
     onAccept?: (id: string) => Promise<boolean>,
     onReject?: (id: string) => Promise<boolean>
 }) {
-    const isPending = battle.status === 'waiting' && !battle.is_creator && !battle.matched_at;
+    const isPending = (battle.status === 'waiting' || battle.status === 'waiting_for_opponent') && !battle.is_creator && !battle.matched_at;
     const opponentName = battle.opponent_profile?.display_name || 'Aguardando...';
 
     const getStatusLabel = (status: string) => {
         switch (status) {
             case 'waiting': return battle.matched_at ? 'Aguardando Fotos' : 'Convite Pendente';
+            case 'waiting_for_opponent': return 'Aguardando Oponente';
             case 'ready': return 'Pronto';
             case 'running': return 'Em andamento';
             case 'finished': return 'Finalizado';

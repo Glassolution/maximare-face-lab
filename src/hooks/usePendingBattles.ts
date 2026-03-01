@@ -15,7 +15,7 @@ export function usePendingBattles() {
         .from('battles')
         .select('*', { count: 'exact', head: true })
         .eq('opponent_id', user.id)
-        .eq('status', 'waiting')
+        .in('status', ['waiting', 'waiting_for_opponent'])
         .is('matched_at', null);
 
       if (!error && count !== null) {
@@ -27,7 +27,7 @@ export function usePendingBattles() {
 
     // 2. Realtime subscription
     const channel = supabase
-      .channel('pending-battles-count')
+      .channel(`pending-battles-count-${user.id}`)
       .on(
         'postgres_changes',
         {
