@@ -39,23 +39,28 @@ export const DashboardOverviewCard = ({ stats, latestAvatars }: Props) => (
       </div>
 
       <p className="text-sm text-gray-500 mb-3">Últimos usuários cadastrados</p>
-      <div className="flex -space-x-3">
+      <div className="flex items-center gap-4">
         {latestAvatars.map((user) => (
-          <Avatar key={user.id} className="border-2 border-white w-10 h-10">
-            <AvatarImage src={user.avatar_url} />
-            <AvatarFallback>{user.username?.substring(0, 2).toUpperCase() || 'U'}</AvatarFallback>
-          </Avatar>
+          <div key={user.id} className="flex flex-col items-center">
+            <Avatar className="border-2 border-white w-10 h-10 shadow-sm mb-1">
+              <AvatarImage src={user.avatar_url} />
+              <AvatarFallback className="bg-slate-900 text-white text-xs font-bold">
+                {user.username?.substring(0, 2).toUpperCase() || 'U'}
+              </AvatarFallback>
+            </Avatar>
+            <span className="text-[10px] text-gray-600 font-medium truncate max-w-[60px] text-center">
+              {user.username || 'User'}
+            </span>
+          </div>
         ))}
         {stats.totalUsers > 4 && (
-          <div className="w-10 h-10 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-xs text-gray-500 font-bold">
-            +{stats.totalUsers - 4}
+          <div className="flex flex-col items-center">
+            <div className="w-10 h-10 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-xs text-gray-500 font-bold shadow-sm mb-1">
+              +{stats.totalUsers - 4}
+            </div>
+            <span className="text-[10px] text-gray-400 font-medium">mais</span>
           </div>
         )}
-      </div>
-      <div className="flex justify-between mt-2 px-2 text-xs font-medium text-gray-800 overflow-hidden">
-        {latestAvatars.map((user) => (
-          <span key={user.id} className="truncate max-w-[60px]">{user.username || 'User'}</span>
-        ))}
       </div>
     </CardContent>
   </Card>

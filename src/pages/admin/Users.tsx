@@ -53,10 +53,19 @@ const PlanBadge = ({ plan }: { plan: string }) => {
     annual: "bg-emerald-600 text-white",
     ugc_gift: "bg-purple-600 text-white",
   };
+  
+  const translations: Record<string, string> = {
+    weekly: "Semanal",
+    monthly: "Mensal",
+    annual: "Anual",
+    ugc_gift: "UGC Gift",
+    free: "Gratuito"
+  };
+
   const cls = colors[plan] || "bg-gray-800 text-white";
   return (
     <span className={`inline-block rounded px-3 py-0.5 text-[11px] font-bold uppercase tracking-wider ${cls}`}>
-      {plan || "FREE"}
+      {translations[plan] || plan || "GRATUITO"}
     </span>
   );
 };

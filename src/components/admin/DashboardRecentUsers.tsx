@@ -50,7 +50,12 @@ export const DashboardRecentUsers = ({ recentUsers }: Props) => (
                 </div>
               </TableCell>
               <TableCell>
-                <span className="text-sm font-medium text-gray-600 capitalize">{user.plan_type || "Gratuito"}</span>
+                <span className="text-sm font-medium text-gray-600 capitalize">
+                  {user.plan_type === 'weekly' ? 'Semanal' : 
+                   user.plan_type === 'monthly' ? 'Mensal' : 
+                   user.plan_type === 'annual' ? 'Anual' : 
+                   user.plan_type || "Gratuito"}
+                </span>
               </TableCell>
               <TableCell>
                 <span className="text-sm text-gray-500">{format(new Date(user.created_at), "dd MMM, yyyy")}</span>
