@@ -189,14 +189,20 @@ export default function Analysis() {
   const primaryTrend = plan.hasAnalysis && plan.trends.length > 0 ? plan.trends[0] : null;
   const primaryBottleneck = plan.hasAnalysis && plan.bottlenecks.length > 0 ? plan.bottlenecks[0] : null;
 
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   const handleDeleteHistory = async (id: string) => {
-    const ok = await deleteAnalysis(id);
-    if (!ok) {
-      toast.error("Falha ao excluir. Tente novamente.");
+    setDeletingId(id);
+    const result = await deleteAnalysis(id);
+    if (!result.ok) {
+      toast.error(`Falha ao excluir. Status ${result.status} · apagadas ${result.deleted}`);
+      setDeletingId(null);
       return;
     }
+    toast.success(`Excluída. Registros removidos: ${result.deleted}`);
     await syncHistoryWithSupabase();
     setHistory(getAnalysisHistory());
+    setDeletingId(null);
   };
 
   const formatHistoryDate = (iso: string) => {
@@ -1157,10 +1163,11 @@ export default function Analysis() {
                           e.stopPropagation();
                           handleDeleteHistory(analysis.id);
                         }}
-                        className="mt-1 inline-flex items-center gap-1 text-[10px] text-red-400 hover:text-red-300"
+                        disabled={deletingId === analysis.id}
+                        className={`mt-1 inline-flex items-center gap-1 text-[10px] ${deletingId === analysis.id ? 'text-red-400/50' : 'text-red-400 hover:text-red-300'}`}
                       >
-                        <Trash2 className="h-3 w-3" />
-                        Excluir
+                        {deletingId === analysis.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                        {deletingId === analysis.id ? 'Excluindo...' : 'Excluir'}
                       </button>
                     </div>
                   </div>

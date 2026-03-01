@@ -117,20 +117,68 @@ export function clearLocalHistory() {
     localStorage.removeItem("maximare_history");
 }
 
-export async function deleteAnalysis(id: string): Promise<boolean> {
+export async function deleteAnalysis(id: string): Promise<{ ok: boolean; deleted: number; status: number; error?: string }> {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) return false;
-    const { data, error } = await supabase.functions.invoke('delete-analysis', {
+    let { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      const refreshed = await supabase.auth.refreshSession();
+      session = refreshed.data.session ?? null;
+    }
+    if (!session?.access_token) return { ok: false, deleted: 0, status: 401, error: "no_session_token" };
+    // 1) Tentar via fetch direto para capturar body em 5xx
+    const baseUrl = ((import.meta as any).env?.VITE_SUPABASE_URL || "").replace(/\/+$/, "");
+    const anon = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "";
+    if (baseUrl) {
+      try {
+        const res = await fetch(`${baseUrl}/functions/v1/delete-analysis`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "sb-access-token": session.access_token,
+            "Authorization": `Bearer ${anon}`,
+            "apikey": anon
+          },
+          body: JSON.stringify({ analysis_id: id })
+        });
+        let body: any = null;
+        let text = "";
+        try { body = await res.clone().json(); } catch { text = await res.text().catch(() => ""); }
+        const ok = !!body?.ok && res.ok;
+        const deleted = Number(body?.deleted || 0);
+        if (ok && deleted > 0) {
+          // Atualiza cache local
+          const history = getAnalysisHistory();
+          const filtered = history.filter((item) => item.id !== id);
+          try {
+            if (filtered.length === 0) localStorage.removeItem("maximare_history");
+            else localStorage.setItem("maximare_history", JSON.stringify(filtered));
+          } catch {}
+          return { ok: true, deleted, status: res.status };
+        }
+        // Se não foi ok, continua para fallback RLS
+        if (!ok) {
+          return await deleteAnalysisRlsFallback(id, session.access_token, res.status, body?.error || text || "edge_failed");
+        }
+      } catch (e: any) {
+        // Continua para invoke/rls
+      }
+    }
+    // 2) Tentar via functions.invoke (fallback)
+    const { data, error, status } = await supabase.functions.invoke('delete-analysis', {
       headers: {
         'sb-access-token': session.access_token,
-        'apikey': (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '',
+        'Authorization': `Bearer ${anon}`,
+        'apikey': anon
       },
       body: { analysis_id: id }
     });
-    if (error || !data?.ok || !(data?.deleted > 0)) return false;
+    if (error) return await deleteAnalysisRlsFallback(id, session.access_token, status || 500, error.message || "invoke_failed");
+    if (!data?.ok || (typeof data?.deleted === 'number' && data.deleted <= 0)) {
+      // Fallback: tentar deletar diretamente via RLS (token do usuário)
+      return await deleteAnalysisRlsFallback(id, session.access_token, status || 200, data?.error || "not_deleted");
+    }
   } catch {
-    return false;
+    return { ok: false, deleted: 0, status: 500, error: "exception" };
   }
 
   const history = getAnalysisHistory();
@@ -142,7 +190,35 @@ export async function deleteAnalysis(id: string): Promise<boolean> {
       localStorage.setItem("maximare_history", JSON.stringify(filtered));
     }
   } catch {}
-  return true;
+  return { ok: true, deleted: 1, status: 200 };
+}
+
+async function deleteAnalysisRlsFallback(id: string, userJwt: string, prevStatus: number, prevError?: string): Promise<{ ok: boolean; deleted: number; status: number; error?: string }> {
+  try {
+    // Usa o cliente atual (já autenticado) — RLS aplica auth.jwt do usuário
+    let total = 0;
+    const delHist = await supabase.from('analysis_history').delete({ count: 'exact' }).filter('result_json->>id', 'eq', id);
+    total += delHist.count || 0;
+    if (total === 0) {
+      const delFace = await supabase.from('face_analysis_events').delete({ count: 'exact' }).filter('result_json->>id', 'eq', id);
+      total += delFace.count || 0;
+    }
+    if (total > 0) {
+      const history = getAnalysisHistory();
+      const filtered = history.filter((item) => item.id !== id);
+      try {
+        if (filtered.length === 0) {
+          localStorage.removeItem("maximare_history");
+        } else {
+          localStorage.setItem("maximare_history", JSON.stringify(filtered));
+        }
+      } catch {}
+      return { ok: true, deleted: total, status: 200 };
+    }
+    return { ok: false, deleted: 0, status: prevStatus, error: prevError || delHist?.error?.message || "rls_not_deleted" };
+  } catch (e: any) {
+    return { ok: false, deleted: 0, status: prevStatus, error: e?.message || "rls_fallback_error" };
+  }
 }
 
 import { supabase } from "@/integrations/supabase/client";
