@@ -73,14 +73,18 @@ export function CancelSubscriptionWizard({ open, onOpenChange }: Props) {
       if (error) {
         const msg = typeof error === "object" && error !== null && "message" in error ? (error as any).message : "Erro ao cancelar assinatura";
         toast.error(String(msg));
-      } else {
-        if (data?.is_within_7_days && data?.refund_status === "approved") {
-          toast.success("Assinatura cancelada e estorno solicitado.");
-        } else if (data?.is_within_7_days && data?.refund_status !== "approved") {
-          toast.success("Assinatura cancelada. Estorno não confirmado.");
+        return;
+      }
+      if (data?.is_within_7_days) {
+        if (data?.refund_status === "approved") {
+          toast.success("Assinatura cancelada e estorno aprovado.");
+          onClose(false);
         } else {
-          toast.success("Assinatura cancelada. Sem estorno.");
+          toast.error("Estorno obrigatório falhou. Tente novamente em instantes.");
+          return;
         }
+      } else {
+        toast.success("Assinatura cancelada. Sem estorno.");
         onClose(false);
       }
     } catch {

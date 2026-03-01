@@ -337,7 +337,12 @@ export default function Profile() {
                  {expiresAt && (
                     <div className="mt-3 pt-3 border-t border-amber-200/50 flex items-center gap-2 text-[10px] text-amber-800/70">
                         <CreditCard className="h-3 w-3" />
-                        <span>Renova em: <strong>{formatDate(expiresAt)}</strong></span>
+                        <span>
+                          {subscriptionStatus === 'canceled' 
+                            ? 'Sua assinatura expirará em: ' 
+                            : 'Renova em: '}
+                          <strong>{formatDate(expiresAt)}</strong>
+                        </span>
                     </div>
                  )}
               </div>

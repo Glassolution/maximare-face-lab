@@ -168,6 +168,15 @@ serve(async (req) => {
 
     console.log("Payment created:", payment.id, payment.status);
 
+    // Ensure profile exists
+    try {
+      await supabaseAdmin.from('profiles').upsert({
+        id: userId,
+        user_id: userId,
+        full_name: ((payer?.first_name || '') + ' ' + (payer?.last_name || '')).trim() || null
+      }, { onConflict: 'id', ignoreDuplicates: true });
+    } catch {}
+
     // 4. Update Profile (Immediate access if approved)
     if (payment.status === 'approved') {
        // Calculate expiration
@@ -178,18 +187,21 @@ serve(async (req) => {
        const expiresAt = new Date();
        expiresAt.setDate(expiresAt.getDate() + days);
 
+       const nowIso = new Date().toISOString();
        const { error: updateError } = await supabaseAdmin.from('profiles').update({
          subscription_status: 'active',
          is_premium: true,
-         premium_since: new Date().toISOString(),
+         premium_since: nowIso,
          subscription_expires_at: expiresAt.toISOString(),
          premium_plan_id: plan_id,
          plan_type: planData.interval, // Legacy field support
          payment_provider: 'mercadopago',
          payment_id: payment.id.toString(),
          payment_status: 'approved',
-         updated_at: new Date().toISOString()
-       }).eq('id', userId);
+         first_payment_at: nowIso,
+         last_payment_at: nowIso,
+         updated_at: nowIso
+       }).or(`id.eq.${userId},user_id.eq.${userId}`);
 
        if (updateError) console.error("Failed to update profile:", updateError);
     }
@@ -204,7 +216,8 @@ serve(async (req) => {
         status: payment.status,
         amount: payment.transaction_amount,
         currency: payment.currency_id,
-        metadata: payment.metadata
+        metadata: payment.metadata,
+        created_at: new Date().toISOString()
     });
 
     if (insertError) {
