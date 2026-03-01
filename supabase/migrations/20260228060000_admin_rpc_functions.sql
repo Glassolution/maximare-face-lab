@@ -1,3 +1,7 @@
+-- Drop functions first to allow return type changes
+DROP FUNCTION IF EXISTS get_admin_users();
+DROP FUNCTION IF EXISTS get_admin_purchases();
+
 -- Função para listar usuários (admin only)
 CREATE OR REPLACE FUNCTION get_admin_users()
 RETURNS TABLE (
