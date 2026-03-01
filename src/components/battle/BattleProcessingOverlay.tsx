@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { Swords } from "lucide-react";
 
@@ -25,6 +25,12 @@ export function BattleProcessingOverlay({ userAvatar, opponentAvatar, isReady, o
   const [progress, setProgress] = useState(0);
   const [userAvatarFailed, setUserAvatarFailed] = useState(false);
   const [opponentAvatarFailed, setOpponentAvatarFailed] = useState(false);
+
+  useEffect(() => {
+    // Reset failed state when avatars change
+    if (userAvatar) setUserAvatarFailed(false);
+    if (opponentAvatar) setOpponentAvatarFailed(false);
+  }, [userAvatar, opponentAvatar]);
 
   useEffect(() => {
     let currentStage = 0;
@@ -104,16 +110,8 @@ export function BattleProcessingOverlay({ userAvatar, opponentAvatar, isReady, o
             <div className="relative">
                 <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full" />
                 <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-blue-500/30 shadow-[0_0_20px_rgba(59,130,246,0.4)]">
-                    {userAvatar && !userAvatarFailed ? (
-                      <img
-                        src={userAvatar}
-                        alt="Avatar do usuário"
-                        className="w-full h-full object-cover rounded-full"
-                        onError={() => setUserAvatarFailed(true)}
-                      />
-                    ) : (
-                      <AvatarFallback className="bg-zinc-900 text-zinc-500">YOU</AvatarFallback>
-                    )}
+                    <AvatarImage src={userAvatar || undefined} className="object-cover" />
+                    <AvatarFallback className="bg-zinc-900 text-zinc-500">YOU</AvatarFallback>
                 </Avatar>
             </div>
             <span className="text-blue-500 font-bold tracking-widest text-sm uppercase">Você</span>
@@ -148,16 +146,8 @@ export function BattleProcessingOverlay({ userAvatar, opponentAvatar, isReady, o
             <div className="relative">
                 <div className="absolute inset-0 bg-red-500/20 blur-xl rounded-full" />
                 <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-red-500/30 shadow-[0_0_20px_rgba(239,68,68,0.4)]">
-                    {opponentAvatar && !opponentAvatarFailed ? (
-                      <img
-                        src={opponentAvatar}
-                        alt="Avatar do oponente"
-                        className="w-full h-full object-cover rounded-full"
-                        onError={() => setOpponentAvatarFailed(true)}
-                      />
-                    ) : (
-                      <AvatarFallback className="bg-zinc-900 text-zinc-500">VS</AvatarFallback>
-                    )}
+                    <AvatarImage src={opponentAvatar || undefined} className="object-cover" />
+                    <AvatarFallback className="bg-zinc-900 text-zinc-500">VS</AvatarFallback>
                 </Avatar>
             </div>
             <span className="text-red-500 font-bold tracking-widest text-sm uppercase">Oponente</span>
