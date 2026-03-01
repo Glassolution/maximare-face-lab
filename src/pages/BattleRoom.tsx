@@ -53,6 +53,7 @@ export default function BattleRoom() {
     if (!battle) return;
     if (battle.challenger_photo_url && !stableCreatorPhotoUrl) setStableCreatorPhotoUrl(battle.challenger_photo_url);
     if (battle.opponent_photo_url && !stableOpponentPhotoUrl) setStableOpponentPhotoUrl(battle.opponent_photo_url);
+    if (battle.ready_at && !photosPreloaded) setPhotosPreloaded(true); // Fallback if images fail
   }, [battle, stableCreatorPhotoUrl, stableOpponentPhotoUrl]);
 
   const isCreator = battle?.created_by === userProfile?.id;
