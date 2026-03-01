@@ -91,7 +91,7 @@ export function useBattles() {
         .select('id')
         .eq('created_by', user.id)
         .eq('opponent_id', opponentId)
-        .eq('status', 'waiting_for_opponent')
+        .eq('status', 'waiting')
         .maybeSingle();
       
       if (existing) {
@@ -103,7 +103,7 @@ export function useBattles() {
       const { data, error } = await supabase.from('battles').insert({
         created_by: user.id,
         opponent_id: opponentId,
-        status: 'waiting_for_opponent',
+        status: 'waiting',
         mode: 'front_lateral',
         room_version: 1,
         expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24h
@@ -126,7 +126,7 @@ export function useBattles() {
       const { error } = await supabase
         .from('battles')
         .update({ 
-          status: 'active', 
+          status: 'waiting', // Mantém waiting até fotos serem enviadas
           matched_at: new Date().toISOString() 
         })
         .eq('id', battleId)
@@ -135,7 +135,7 @@ export function useBattles() {
       if (error) throw error;
 
       toast.success('Desafio aceito! Redirecionando...');
-      fetchBattles();
+      // No need to fetch, navigation usually happens in UI component
       return true;
     } catch (err: any) {
       toast.error(err.message || 'Erro ao aceitar desafio');
