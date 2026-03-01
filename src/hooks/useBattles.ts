@@ -59,6 +59,16 @@ export function useBattles() {
             opponent_profile: otherProfile ? { ...otherProfile, avatar_url: avatarUrl, display_name: displayName } : undefined,
             is_creator: isCreator
           };
+        })
+        .filter(b => {
+          // Filter out stale waiting battles (older than 24h)
+          if (b.status === 'waiting_for_opponent') {
+            const createdAt = new Date(b.created_at).getTime();
+            const now = Date.now();
+            const hoursDiff = (now - createdAt) / (1000 * 60 * 60);
+            return hoursDiff < 24;
+          }
+          return true;
         });
 
         setBattles(enriched);
