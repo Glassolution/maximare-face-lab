@@ -1,4 +1,4 @@
--- Drop functions first to allow return type changes
+-- Drop functions first
 DROP FUNCTION IF EXISTS get_admin_users();
 DROP FUNCTION IF EXISTS get_admin_purchases();
 
@@ -37,6 +37,7 @@ AS $$
 $$;
 
 -- Função para listar compras (admin only)
+-- Tenta buscar de 'payments' se 'purchases' não existir
 CREATE OR REPLACE FUNCTION get_admin_purchases()
 RETURNS TABLE (
   id uuid,
@@ -53,22 +54,22 @@ LANGUAGE sql
 SECURITY DEFINER
 AS $$
   SELECT
-    pu.id,
-    pu.user_id,
+    pm.id,
+    pm.user_id,
     p.username,
     au.email,
-    pu.plan,
-    pu.amount_cents,
-    pu.provider,
-    pu.status,
-    pu.created_at
-  FROM purchases pu
-  LEFT JOIN profiles p ON p.id = pu.user_id
-  LEFT JOIN auth.users au ON au.id = pu.user_id
+    pm.plan_id::text as plan,
+    (pm.amount * 100)::integer as amount_cents,
+    'stripe'::text as provider, -- Assumindo stripe/padrão se não tiver provider
+    pm.status,
+    pm.created_at
+  FROM payments pm
+  LEFT JOIN profiles p ON p.id = pm.user_id
+  LEFT JOIN auth.users au ON au.id = pm.user_id
   WHERE (SELECT is_admin FROM profiles WHERE id = auth.uid()) = true
-  ORDER BY pu.created_at DESC;
+  ORDER BY pm.created_at DESC;
 $$;
 
--- Atualiza usuário para admin (conforme solicitado)
+-- Atualiza usuário para admin
 UPDATE profiles SET is_admin = true
 WHERE id = (SELECT id FROM auth.users WHERE email = 'xavierluisfelipe12@gmail.com');
