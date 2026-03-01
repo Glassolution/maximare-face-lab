@@ -15,7 +15,7 @@ export default function BattleRoom() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { profile: userProfile } = useAuth();
-  const { battle, opponentProfile, submissions, result, loading, error, submitPhotos, serverTimeOffsetMs } = useBattleRoom(id!);
+  const { battle, opponentProfile, submissions, result, loading, error, submitPhotos, serverTimeOffsetMs, refresh } = useBattleRoom(id!);
   const [frontFile, setFrontFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showResultScreen, setShowResultScreen] = useState(false);
@@ -48,6 +48,7 @@ export default function BattleRoom() {
   const [stableCreatorPhotoUrl, setStableCreatorPhotoUrl] = useState<string | null>(null);
   const [stableOpponentPhotoUrl, setStableOpponentPhotoUrl] = useState<string | null>(null);
   const [photosPreloaded, setPhotosPreloaded] = useState(false);
+  const [processingDeadlineMs, setProcessingDeadlineMs] = useState<number | null>(null);
 
   useEffect(() => {
     if (!battle) return;
@@ -59,6 +60,25 @@ export default function BattleRoom() {
   const isCreator = battle?.created_by === userProfile?.id;
   const myStablePhotoUrl = isCreator ? stableCreatorPhotoUrl : stableOpponentPhotoUrl;
   const opponentStablePhotoUrl = isCreator ? stableOpponentPhotoUrl : stableCreatorPhotoUrl;
+
+  useEffect(() => {
+    if (!battle) return;
+    const nowServerApprox = Date.now() + serverTimeOffsetMs;
+
+    if (battle.status === 'canceled' || battle.status === 'expired' || battle.status === 'finished') {
+      setProcessingDeadlineMs(null);
+      return;
+    }
+
+    if ((battle.status === 'ready' || battle.status === 'running') && !result) {
+      const base = battle.start_at ? new Date(battle.start_at).getTime() : nowServerApprox;
+      const nextDeadline = base + 20000;
+      setProcessingDeadlineMs((prev) => (prev ? Math.min(prev, nextDeadline) : nextDeadline));
+      return;
+    }
+
+    setProcessingDeadlineMs(null);
+  }, [battle, result, serverTimeOffsetMs]);
 
   useEffect(() => {
     if (!myStablePhotoUrl || !opponentStablePhotoUrl) return;
@@ -133,13 +153,42 @@ export default function BattleRoom() {
     return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-8 w-8" /></div>;
   }
 
+  if (battle.status === 'canceled' || battle.status === 'expired') {
+    return (
+      <div className="container max-w-md mx-auto py-10 px-4 text-center space-y-6">
+        <h1 className="text-2xl font-bold">Batalha cancelada</h1>
+        <p className="text-sm text-muted-foreground">Não foi possível concluir esta batalha. Tente novamente.</p>
+        <div className="flex gap-3">
+          <Button className="flex-1" onClick={() => navigate('/battles')}>Tentar novamente</Button>
+          <Button variant="outline" className="flex-1" onClick={() => refresh()}>Recarregar</Button>
+        </div>
+      </div>
+    );
+  }
+
+  const nowServerApprox = Date.now() + serverTimeOffsetMs;
+  const hardTimedOut = !!processingDeadlineMs && nowServerApprox >= processingDeadlineMs && battle.status !== 'finished' && !result;
+
+  if (hardTimedOut) {
+    return (
+      <div className="container max-w-md mx-auto py-10 px-4 text-center space-y-6">
+        <h1 className="text-2xl font-bold">Não conseguimos obter o resultado agora</h1>
+        <p className="text-sm text-muted-foreground">Você pode tentar recarregar o resultado ou reiniciar a batalha.</p>
+        <div className="flex gap-3">
+          <Button className="flex-1" onClick={() => refresh()}>Recarregar resultado</Button>
+          <Button variant="outline" className="flex-1" onClick={() => navigate('/battles')}>Reiniciar batalha</Button>
+        </div>
+      </div>
+    );
+  }
+
   // 1. PROCESSING OVERLAY (Highest Priority during processing phase)
   // Show if:
   // - Status is 'processing'
   // - OR Status is advanced ('reveal_loser' or 'completed') BUT animation hasn't finished yet
   // - AND both users have submitted (to be safe)
   const shouldShowProcessing =
-      (battle.status === 'ready' || battle.status === 'running') && !!myStablePhotoUrl && !!opponentStablePhotoUrl;
+      (battle.status === 'ready' || battle.status === 'running') && !!myStablePhotoUrl && !!opponentStablePhotoUrl && !hardTimedOut;
 
   if (shouldShowProcessing) {
       const myAvatar = myStablePhotoUrl || getAvatarUrl(userProfile?.avatar_url);

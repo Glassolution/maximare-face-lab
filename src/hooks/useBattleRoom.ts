@@ -58,9 +58,12 @@ export function useBattleRoom(battleId: string) {
       const { data: subs } = await supabase.from('battle_submissions').select('*').eq('battle_id', battleId);
       if (subs) setSubmissions(subs as BattleSubmission[]);
 
-      // 4. Get Result if needed (status is completed or reveal_loser)
-      if (battleData.status === 'finished') {
-        const { data: res } = await supabase.from('battle_results').select('*').eq('battle_id', battleId).single();
+      if (battleData.status !== 'waiting') {
+        const { data: res } = await supabase
+          .from('battle_results')
+          .select('*')
+          .eq('battle_id', battleId)
+          .maybeSingle();
         if (res) setResult(res as BattleResult);
       }
 
@@ -71,6 +74,23 @@ export function useBattleRoom(battleId: string) {
       setLoading(false);
     }
   }, [battleId, user]);
+
+  const ensureBattleProgress = useCallback(async () => {
+    try {
+      const { data, error: rpcError } = await supabase.rpc('ensure_battle_progress_v3', {
+        p_battle_id: battleId,
+      });
+      if (rpcError) {
+        console.error('[Battle] ensure_battle_progress_v3 failed', { battleId, rpcError });
+        return;
+      }
+      if (data && (data as any).success === false) {
+        console.error('[Battle] ensure_battle_progress_v3 rejected', { battleId, data });
+      }
+    } catch (e) {
+      console.error('[Battle] ensure_battle_progress_v3 exception', { battleId, e });
+    }
+  }, [battleId]);
 
   // Realtime Subscription
   useEffect(() => {
@@ -137,32 +157,24 @@ export function useBattleRoom(battleId: string) {
 
       const now = Date.now() + serverTimeOffsetMs;
 
-      // Safety: Ensure ready -> running
-      if (b.status === 'ready' && b.start_at) {
-        const startAt = new Date(b.start_at).getTime();
-        if (now > startAt + 3000) { // 3s buffer
-          console.log('[Safety] Triggering mark_battle_running_v3');
-          supabase.rpc('mark_battle_running_v3', { p_battle_id: battleId });
-        }
-      }
-
-      // Safety: Ensure running -> finished
-      if (b.status === 'running' && b.start_at) {
-        const startAt = new Date(b.start_at).getTime();
-        // Normal duration is ~9-10s. If we are at 15s, something is stuck.
-        if (now > startAt + 15000) { 
-          console.log('[Safety] Triggering mock_process_battle_result');
-          supabase.rpc('mock_process_battle_result', { p_battle_id: battleId });
-        }
-      }
+      console.log('[Battle][poll]', {
+        battleId,
+        status: b.status,
+        ready_at: (b as any).ready_at,
+        start_at: (b as any).start_at,
+        now_server_approx: new Date(now).toISOString(),
+      });
 
       const needsResult = b.status === 'finished' && !result;
       const notFinished = b.status !== 'finished' && b.status !== 'canceled' && b.status !== 'expired';
       
+      if (notFinished) {
+        ensureBattleProgress();
+      }
       if (needsResult || notFinished) {
         fetchBattleState();
       }
-    }, 4000);
+    }, 2000);
 
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
@@ -178,7 +190,7 @@ export function useBattleRoom(battleId: string) {
       if (watchdogRef.current) clearInterval(watchdogRef.current);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [battleId, user, fetchBattleState, fetchServerTimeOffset, result, serverTimeOffsetMs]);
+  }, [battleId, user, fetchBattleState, fetchServerTimeOffset, result, serverTimeOffsetMs, ensureBattleProgress]);
 
   // Actions
   const submitPhotos = async (frontFile: File, sideFile?: File) => {
@@ -204,24 +216,10 @@ export function useBattleRoom(battleId: string) {
       toast.success('Fotos enviadas!');
 
       // If the battle becomes ready/running, we let start_at synchronize animations.
-      // Trigger mock processing after a safe delay (only once battle is running).
-      setTimeout(async () => {
-        const { data: current } = await supabase
-          .from('battles')
-          .select('status, start_at')
-          .eq('id', battleId)
-          .single();
-
-        if (current?.status === 'ready' || current?.status === 'running') {
-          const startAtMs = current?.start_at ? new Date(current.start_at).getTime() : Date.now();
-          const fireIn = Math.max(0, startAtMs + 9000 - (Date.now() + serverTimeOffsetMs));
-          setTimeout(() => {
-            supabase.rpc('mock_process_battle_result', { p_battle_id: battleId });
-          }, fireIn);
-        }
-      }, 300);
+      ensureBattleProgress();
 
     } catch (err: any) {
+      console.error('[Battle] submitPhotos failed', { battleId, err });
       toast.error(err.message || 'Erro ao enviar fotos');
     }
   };
@@ -235,5 +233,9 @@ export function useBattleRoom(battleId: string) {
     error,
     submitPhotos,
     serverTimeOffsetMs,
+    refresh: async () => {
+      await ensureBattleProgress();
+      await fetchBattleState();
+    },
   };
 }

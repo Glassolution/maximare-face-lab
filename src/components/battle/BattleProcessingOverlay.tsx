@@ -23,14 +23,6 @@ const STAGES = [
 export function BattleProcessingOverlay({ userAvatar, opponentAvatar, isReady, onComplete, startTime }: BattleProcessingOverlayProps) {
   const [stageIndex, setStageIndex] = useState(0);
   const [progress, setProgress] = useState(0);
-  const [userAvatarFailed, setUserAvatarFailed] = useState(false);
-  const [opponentAvatarFailed, setOpponentAvatarFailed] = useState(false);
-
-  useEffect(() => {
-    // Reset failed state when avatars change
-    if (userAvatar) setUserAvatarFailed(false);
-    if (opponentAvatar) setOpponentAvatarFailed(false);
-  }, [userAvatar, opponentAvatar]);
 
   useEffect(() => {
     let currentStage = 0;
