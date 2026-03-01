@@ -117,56 +117,32 @@ export function clearLocalHistory() {
     localStorage.removeItem("maximare_history");
 }
 
-export async function deleteAnalysis(id: string) {
-  // 1. Remove localmente
+export async function deleteAnalysis(id: string): Promise<boolean> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return false;
+    const { data, error } = await supabase.functions.invoke('delete-analysis', {
+      headers: {
+        'sb-access-token': session.access_token,
+        'apikey': (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '',
+      },
+      body: { analysis_id: id }
+    });
+    if (error || !data?.ok || !(data?.deleted > 0)) return false;
+  } catch {
+    return false;
+  }
+
   const history = getAnalysisHistory();
   const filtered = history.filter((item) => item.id !== id);
-  
   try {
     if (filtered.length === 0) {
       localStorage.removeItem("maximare_history");
     } else {
       localStorage.setItem("maximare_history", JSON.stringify(filtered));
     }
-  } catch (e) {
-    console.error("Erro ao atualizar localStorage:", e);
-  }
-
-  // 2. Remove do Supabase
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-        // Tentar todas as estratégias possíveis para deletar
-        
-        // 1. Pela PK 'id' da tabela analysis_history (se o ID passado for um UUID válido)
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-        
-        if (isUuid) {
-            const { error: errorPK, count: countPK } = await supabase
-                .from('analysis_history')
-                .delete({ count: 'exact' })
-                .eq('user_id', session.user.id)
-                .eq('id', id); // Tenta deletar pela PK 'id'
-            
-            if (countPK && countPK > 0) {
-                return; // Sucesso, paramos por aqui
-            }
-        }
-
-        // 2. Pelo ID dentro do JSONB 'result_json->id' (Formato atual de salvamento)
-        const { error: errorJSON, count: countJSON } = await supabase
-            .from('analysis_history')
-            .delete({ count: 'exact' })
-            .eq('user_id', session.user.id)
-            .filter('result_json->>id', 'eq', id);
-            
-        if (errorJSON) {
-            console.error("Erro ao deletar por JSON:", errorJSON);
-        }
-    }
-  } catch (err) {
-    console.error("Erro de conexão ao deletar:", err);
-  }
+  } catch {}
+  return true;
 }
 
 import { supabase } from "@/integrations/supabase/client";

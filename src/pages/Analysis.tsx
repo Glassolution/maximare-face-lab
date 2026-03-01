@@ -22,6 +22,7 @@ import { PaywallDialog } from "@/components/paywall/PaywallDialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { saveAnalysis, getAnalysisHistory, deleteAnalysis, syncHistoryWithSupabase, type AnalysisResult } from "@/lib/mockData";
+import { toast } from "sonner";
 import { generateExtendedMockAnalysis, getTier, getMindset, getStrategy, type ExtendedAnalysisResult } from "@/lib/rankingSystem";
 import { generatePersonalizedPlan } from "@/lib/smartTrendsEngine";
 import faceScanHero from "@/assets/clark.png";
@@ -189,7 +190,12 @@ export default function Analysis() {
   const primaryBottleneck = plan.hasAnalysis && plan.bottlenecks.length > 0 ? plan.bottlenecks[0] : null;
 
   const handleDeleteHistory = async (id: string) => {
-    await deleteAnalysis(id);
+    const ok = await deleteAnalysis(id);
+    if (!ok) {
+      toast.error("Falha ao excluir. Tente novamente.");
+      return;
+    }
+    await syncHistoryWithSupabase();
     setHistory(getAnalysisHistory());
   };
 
