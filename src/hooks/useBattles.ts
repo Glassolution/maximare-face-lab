@@ -122,20 +122,15 @@ export function useBattles() {
 
   const acceptBattle = async (battleId: string) => {
     try {
-      // Direct update to active
-      const { error } = await supabase
-        .from('battles')
-        .update({ 
-          status: 'waiting', // Mantém waiting até fotos serem enviadas
-          matched_at: new Date().toISOString() 
-        })
-        .eq('id', battleId)
-        .eq('opponent_id', user.id); // Security check
+      // Use RPC to avoid RLS issues and ensure atomicity
+      const { data, error } = await supabase.rpc('accept_battle_challenge_v2', {
+        p_battle_id: battleId
+      });
 
       if (error) throw error;
+      if (data && (data as any).success === false) throw new Error((data as any).error);
 
       toast.success('Desafio aceito! Redirecionando...');
-      // No need to fetch, navigation usually happens in UI component
       return true;
     } catch (err: any) {
       toast.error(err.message || 'Erro ao aceitar desafio');
