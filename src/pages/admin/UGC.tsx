@@ -31,7 +31,10 @@ interface AdminUser {
   avatar_url: string;
   is_premium: boolean;
   plan_type: string;
+  premium_plan?: string | null;
+  ugc_enabled: boolean;
   is_ugc: boolean;
+  is_banned: boolean;
   banned: boolean;
   created_at: string;
 }
@@ -43,6 +46,7 @@ const AdminUGC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<AdminUser[]>([]);
   const [searching, setSearching] = useState(false);
+  const [busyByUserId, setBusyByUserId] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     fetchCreators();
@@ -53,7 +57,7 @@ const AdminUGC = () => {
     try {
       const { data, error } = await supabase.rpc('get_admin_users');
       if (error) throw error;
-      setCreators((data || []).filter((u: AdminUser) => u.is_ugc));
+      setCreators((data || []).filter((u: AdminUser) => (u.ugc_enabled || u.is_ugc) && !(u.is_banned || u.banned)));
     } catch (error) {
       console.error("Error fetching creators:", error);
       toast.error("Erro ao carregar criadores");
@@ -74,7 +78,7 @@ const AdminUGC = () => {
       const results = (data || []).filter((u: AdminUser) => 
         (u.email?.toLowerCase().includes(searchTerm.toLowerCase()) || 
          u.username?.toLowerCase().includes(searchTerm.toLowerCase())) &&
-        !u.is_ugc
+        !(u.ugc_enabled || u.is_ugc)
       );
       setSearchResults(results);
     } catch (error) {
@@ -87,17 +91,8 @@ const AdminUGC = () => {
 
   const handleAddCreator = async (userId: string) => {
     try {
-      // Grant UGC and Premium
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          is_ugc: true,
-          is_premium: true,
-          plan_type: 'ugc_gift',
-          subscription_status: 'active'
-        })
-        .eq('id', userId);
-
+      setBusyByUserId((prev) => ({ ...prev, [userId]: true }));
+      const { error } = await supabase.rpc('grant_ugc', { target_user_id: userId });
       if (error) throw error;
       
       toast.success("Criador adicionado com sucesso");
@@ -106,7 +101,9 @@ const AdminUGC = () => {
       setSearchResults(prev => prev.filter(u => u.id !== userId));
     } catch (error) {
       console.error("Error adding creator:", error);
-      toast.error("Erro ao adicionar criador");
+      toast.error((error as any)?.message || "Erro ao adicionar criador");
+    } finally {
+      setBusyByUserId((prev) => ({ ...prev, [userId]: false }));
     }
   };
 
@@ -114,18 +111,17 @@ const AdminUGC = () => {
     if (!confirm("Remover status de criador?")) return;
     
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ is_ugc: false })
-        .eq('id', userId);
-
+      setBusyByUserId((prev) => ({ ...prev, [userId]: true }));
+      const { error } = await supabase.rpc('revoke_ugc', { target_user_id: userId });
       if (error) throw error;
       
       toast.success("Status de criador removido");
       fetchCreators();
     } catch (error) {
       console.error("Error removing creator:", error);
-      toast.error("Erro ao remover criador");
+      toast.error((error as any)?.message || "Erro ao remover criador");
+    } finally {
+      setBusyByUserId((prev) => ({ ...prev, [userId]: false }));
     }
   };
 
@@ -171,7 +167,7 @@ const AdminUGC = () => {
                         <span className="text-xs text-muted-foreground">{user.email}</span>
                       </div>
                     </div>
-                    <Button size="sm" onClick={() => handleAddCreator(user.id)}>
+                    <Button size="sm" disabled={!!busyByUserId[user.id]} onClick={() => handleAddCreator(user.id)}>
                       Adicionar
                     </Button>
                   </div>
@@ -231,6 +227,7 @@ const AdminUGC = () => {
                     <Button 
                       size="sm" 
                       variant="destructive"
+                      disabled={!!busyByUserId[user.id]}
                       onClick={() => handleRemoveCreator(user.id)}
                     >
                       Remover

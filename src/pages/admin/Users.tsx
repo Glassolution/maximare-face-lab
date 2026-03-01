@@ -13,6 +13,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 interface AdminUser {
   id: string;
@@ -22,8 +30,16 @@ interface AdminUser {
   avatar_url: string;
   is_premium: boolean;
   plan_type: string;
+  subscription_status?: string | null;
+  subscription_expires_at?: string | null;
+  premium_plan?: string | null;
+  premium_until?: string | null;
+  ugc_enabled: boolean;
   is_ugc: boolean;
+  is_banned: boolean;
   banned: boolean;
+  banned_reason?: string | null;
+  banned_at?: string | null;
   created_at: string;
 }
 
@@ -57,6 +73,13 @@ const AdminUsers = () => {
   const [search, setSearch] = useState("");
   const [filterPlan, setFilterPlan] = useState("all");
   const [page, setPage] = useState(1);
+  const [busyByUserId, setBusyByUserId] = useState<Record<string, boolean>>({});
+  const [premiumDialogOpen, setPremiumDialogOpen] = useState(false);
+  const [premiumTargetUser, setPremiumTargetUser] = useState<AdminUser | null>(null);
+  const [premiumPlan, setPremiumPlan] = useState<string>("monthly");
+  const [banDialogOpen, setBanDialogOpen] = useState(false);
+  const [banTargetUser, setBanTargetUser] = useState<AdminUser | null>(null);
+  const [banReason, setBanReason] = useState("");
 
   useEffect(() => { fetchUsers(); }, []);
 
@@ -74,54 +97,85 @@ const AdminUsers = () => {
     }
   };
 
-  const handleGrantPremium = async (userId: string) => {
+  const setBusy = (userId: string, busy: boolean) => {
+    setBusyByUserId((prev) => (prev[userId] === busy ? prev : { ...prev, [userId]: busy }));
+  };
+
+  const applyProfileUpdate = (userId: string, profile: any) => {
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id !== userId
+          ? u
+          : {
+              ...u,
+              is_premium: !!profile.is_premium,
+              plan_type: profile.plan_type ?? u.plan_type,
+              premium_plan: profile.premium_plan ?? profile.plan_type ?? u.premium_plan,
+              subscription_status: profile.subscription_status ?? u.subscription_status,
+              subscription_expires_at: profile.subscription_expires_at ?? u.subscription_expires_at,
+              premium_until: profile.premium_until ?? profile.subscription_expires_at ?? u.premium_until,
+              ugc_enabled: profile.ugc_enabled ?? profile.is_ugc ?? u.ugc_enabled,
+              is_ugc: profile.is_ugc ?? profile.ugc_enabled ?? u.is_ugc,
+              is_banned: profile.is_banned ?? profile.banned ?? u.is_banned,
+              banned: profile.banned ?? profile.is_banned ?? u.banned,
+              banned_reason: profile.banned_reason ?? u.banned_reason,
+              banned_at: profile.banned_at ?? u.banned_at,
+            },
+      ),
+    );
+  };
+
+  const handleGrantPremium = async (userId: string, plan: string) => {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          is_premium: true,
-          plan_type: 'annual',
-          subscription_status: 'active',
-          subscription_expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-        })
-        .eq('id', userId);
+      setBusy(userId, true);
+      const { data, error } = await supabase.rpc('grant_premium', {
+        target_user_id: userId,
+        plan,
+      });
       if (error) throw error;
+      if (data) applyProfileUpdate(userId, data);
       toast.success("Premium concedido com sucesso");
       fetchUsers();
     } catch (error) {
       console.error("Error granting premium:", error);
-      toast.error("Erro ao conceder premium");
+      toast.error((error as any)?.message || "Erro ao conceder premium");
+    } finally {
+      setBusy(userId, false);
     }
   };
 
   const handleGrantUGC = async (userId: string, currentStatus: boolean) => {
     try {
-      const updates: any = { is_ugc: !currentStatus };
-      if (!currentStatus) {
-        updates.is_premium = true;
-        updates.plan_type = 'ugc_gift';
-        updates.subscription_status = 'active';
-      }
-      const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
+      setBusy(userId, true);
+      const fn = currentStatus ? 'revoke_ugc' : 'grant_ugc';
+      const { data, error } = await supabase.rpc(fn, { target_user_id: userId });
       if (error) throw error;
+      if (data) applyProfileUpdate(userId, data);
       toast.success(`Tag UGC ${!currentStatus ? 'concedida' : 'removida'}`);
       fetchUsers();
     } catch (error) {
       console.error("Error toggling UGC:", error);
-      toast.error("Erro ao alterar status UGC");
+      toast.error((error as any)?.message || "Erro ao alterar status UGC");
+    } finally {
+      setBusy(userId, false);
     }
   };
 
-  const handleBan = async (userId: string, currentStatus: boolean) => {
-    if (!confirm(`Tem certeza que deseja ${currentStatus ? 'desbanir' : 'banir'} este usuário?`)) return;
+  const handleBan = async (userId: string, currentStatus: boolean, reason?: string) => {
     try {
-      const { error } = await supabase.from('profiles').update({ banned: !currentStatus }).eq('id', userId);
+      setBusy(userId, true);
+      const { data, error } = currentStatus
+        ? await supabase.rpc('unban_user', { target_user_id: userId })
+        : await supabase.rpc('ban_user', { target_user_id: userId, reason: reason || "" });
       if (error) throw error;
+      if (data) applyProfileUpdate(userId, data);
       toast.success(`Usuário ${!currentStatus ? 'banido' : 'desbanido'}`);
       fetchUsers();
     } catch (error) {
       console.error("Error banning user:", error);
-      toast.error("Erro ao banir usuário");
+      toast.error((error as any)?.message || "Erro ao banir usuário");
+    } finally {
+      setBusy(userId, false);
     }
   };
 
@@ -130,10 +184,11 @@ const AdminUsers = () => {
       user.email?.toLowerCase().includes(search.toLowerCase()) ||
       user.username?.toLowerCase().includes(search.toLowerCase()) ||
       user.display_name?.toLowerCase().includes(search.toLowerCase());
+    const plan = user.premium_plan || user.plan_type;
     const matchesPlan = filterPlan === "all" ||
       (filterPlan === "premium" && user.is_premium) ||
       (filterPlan === "free" && !user.is_premium) ||
-      (filterPlan === user.plan_type);
+      (filterPlan === plan);
     return matchesSearch && matchesPlan;
   });
 
@@ -192,6 +247,12 @@ const AdminUsers = () => {
               <TableRow><TableCell colSpan={6} className="text-center py-12 text-gray-400">Nenhum usuário encontrado</TableCell></TableRow>
             ) : (
               paginatedUsers.map((user) => (
+                (() => {
+                  const isBusy = !!busyByUserId[user.id];
+                  const isBanned = user.is_banned ?? user.banned;
+                  const isUgc = user.ugc_enabled ?? user.is_ugc;
+                  const plan = user.premium_plan || user.plan_type;
+                  return (
                 <TableRow key={user.id} className="hover:bg-gray-50/60 border-b border-gray-50">
                   <TableCell className="pl-6 py-4">
                     <div className="flex items-center gap-3">
@@ -208,9 +269,9 @@ const AdminUsers = () => {
                     </div>
                   </TableCell>
                   <TableCell className="text-sm text-gray-600">{user.email || '-'}</TableCell>
-                  <TableCell><PlanBadge plan={user.plan_type} /></TableCell>
+                  <TableCell><PlanBadge plan={plan} /></TableCell>
                   <TableCell>
-                    <StatusDot active={!user.banned && (user.is_premium || user.plan_type === 'free' || !!user.plan_type)} />
+                    <StatusDot active={!isBanned} />
                   </TableCell>
                   <TableCell className="text-sm text-gray-500">
                     {format(new Date(user.created_at), 'dd/MM/yyyy')}
@@ -218,27 +279,48 @@ const AdminUsers = () => {
                   <TableCell className="text-right pr-6">
                     <div className="flex items-center justify-end gap-2">
                       {!user.is_premium && (
-                        <Button size="sm" className="bg-gray-900 hover:bg-gray-800 text-white rounded-lg text-xs h-8 px-3" onClick={() => handleGrantPremium(user.id)}>
+                        <Button
+                          size="sm"
+                          className="bg-gray-900 hover:bg-gray-800 text-white rounded-lg text-xs h-8 px-3"
+                          disabled={isBusy || isBanned}
+                          onClick={() => {
+                            setPremiumTargetUser(user);
+                            setPremiumPlan(plan || "monthly");
+                            setPremiumDialogOpen(true);
+                          }}
+                        >
                           Dar Premium
                         </Button>
                       )}
                       <Button
                         size="sm"
-                        className={`rounded-lg text-xs h-8 px-3 ${user.is_ugc ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-gray-900 hover:bg-gray-800 text-white'}`}
-                        onClick={() => handleGrantUGC(user.id, user.is_ugc)}
+                        className={`rounded-lg text-xs h-8 px-3 ${isUgc ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-gray-900 hover:bg-gray-800 text-white'}`}
+                        disabled={isBusy || isBanned}
+                        onClick={() => handleGrantUGC(user.id, isUgc)}
                       >
-                        {user.is_ugc ? "Remover UGC" : "Dar UGC"}
+                        {isUgc ? "Remover UGC" : "Dar UGC"}
                       </Button>
                       <Button
                         size="sm"
-                        className={`rounded-lg text-xs h-8 px-3 ${user.banned ? 'bg-gray-500 hover:bg-gray-600 text-white' : 'bg-red-600 hover:bg-red-700 text-white'}`}
-                        onClick={() => handleBan(user.id, user.banned)}
+                        className={`rounded-lg text-xs h-8 px-3 ${isBanned ? 'bg-gray-500 hover:bg-gray-600 text-white' : 'bg-red-600 hover:bg-red-700 text-white'}`}
+                        disabled={isBusy}
+                        onClick={() => {
+                          if (isBanned) {
+                            handleBan(user.id, true);
+                            return;
+                          }
+                          setBanTargetUser(user);
+                          setBanReason("");
+                          setBanDialogOpen(true);
+                        }}
                       >
-                        {user.banned ? "Desbanir" : "Banir"}
+                        {isBanned ? "Desbanir" : "Banir"}
                       </Button>
                     </div>
                   </TableCell>
                 </TableRow>
+                  );
+                })()
               ))
             )}
           </TableBody>
@@ -281,6 +363,93 @@ const AdminUsers = () => {
           </div>
         </div>
       </div>
+
+      <Dialog
+        open={premiumDialogOpen}
+        onOpenChange={(open) => {
+          setPremiumDialogOpen(open);
+          if (!open) setPremiumTargetUser(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Conceder Premium</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="text-sm text-muted-foreground">
+              {premiumTargetUser?.email || premiumTargetUser?.username || premiumTargetUser?.display_name}
+            </div>
+            <Select value={premiumPlan} onValueChange={setPremiumPlan}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione o plano" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="weekly">weekly</SelectItem>
+                <SelectItem value="monthly">monthly</SelectItem>
+                <SelectItem value="annual">annual</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPremiumDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!premiumTargetUser) return;
+                setPremiumDialogOpen(false);
+                await handleGrantPremium(premiumTargetUser.id, premiumPlan);
+              }}
+            >
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={banDialogOpen}
+        onOpenChange={(open) => {
+          setBanDialogOpen(open);
+          if (!open) setBanTargetUser(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Banir usuário</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="text-sm text-muted-foreground">
+              {banTargetUser?.email || banTargetUser?.username || banTargetUser?.display_name}
+            </div>
+            <Textarea
+              placeholder="Motivo do banimento..."
+              value={banReason}
+              onChange={(e) => setBanReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBanDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (!banTargetUser) return;
+                const reason = banReason.trim();
+                if (!reason) {
+                  toast.error("Informe um motivo");
+                  return;
+                }
+                setBanDialogOpen(false);
+                await handleBan(banTargetUser.id, false, reason);
+              }}
+            >
+              Banir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
