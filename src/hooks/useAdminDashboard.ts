@@ -19,9 +19,7 @@ export interface DashboardData {
   };
   visitorsChart: {
     name: string;
-    users: number;
-    organic: number;
-    direct: number;
+    usuarios: number;
   }[];
   salesByCategory: {
     name: string;
@@ -106,10 +104,8 @@ export function useAdminDashboard() {
           const date = subMonths(now, i);
           const monthProfiles = profilesForStats.filter(p => isSameMonth(new Date(p.created_at), date));
           visitorsChart.push({
-            name: format(date, "MMM", { locale: ptBR }),
-            users: monthProfiles.length,
-            organic: Math.floor(monthProfiles.length * 0.7), 
-            direct: Math.floor(monthProfiles.length * 0.3)
+            name: format(date, "MMM/yy", { locale: ptBR }),
+            usuarios: monthProfiles.length
           });
         }
 
