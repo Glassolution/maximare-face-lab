@@ -38,7 +38,7 @@ const AdminFinance = () => {
       const { data, error } = await supabase.rpc('get_admin_purchases');
       if (error) throw error;
       
-      const purchaseList = data || [];
+      const purchaseList = data as AdminPurchase[] || [];
       setPurchases(purchaseList);
 
       // Calculate stats

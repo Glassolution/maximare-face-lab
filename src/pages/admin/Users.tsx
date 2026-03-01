@@ -51,10 +51,10 @@ const AdminUsers = () => {
     try {
       const { data, error } = await supabase.rpc('get_admin_users');
       if (error) throw error;
-      setUsers(data || []);
-    } catch (error) {
+      setUsers(data as AdminUser[] || []);
+    } catch (error: any) {
       console.error("Error fetching users:", error);
-      toast.error("Erro ao carregar usuários");
+      toast.error(error.message || "Erro ao carregar usuários");
     } finally {
       setLoading(false);
     }
