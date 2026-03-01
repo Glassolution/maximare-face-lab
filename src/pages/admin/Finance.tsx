@@ -783,7 +783,7 @@ const AdminFinance = () => {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="font-normal text-gray-500 border-gray-200 bg-white">
-                          {purchase.provider === 'stripe' ? 'Stripe' : purchase.provider === 'mercadopago' ? 'Mercado Pago' : purchase.provider}
+                          {purchase.provider === 'stripe' ? 'Mercado Pago' : purchase.provider === 'mercadopago' ? 'Mercado Pago' : purchase.provider}
                         </Badge>
                       </TableCell>
                       <TableCell>
