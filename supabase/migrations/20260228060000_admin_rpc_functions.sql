@@ -29,11 +29,11 @@ AS $$
     p.banned,
     p.display_name,
     p.avatar_url,
-    p.created_at
+    au.created_at
   FROM profiles p
   LEFT JOIN auth.users au ON au.id = p.id
   WHERE (SELECT is_admin FROM profiles WHERE id = auth.uid()) = true
-  ORDER BY p.created_at DESC;
+  ORDER BY au.created_at DESC;
 $$;
 
 -- Função para listar compras (admin only)
