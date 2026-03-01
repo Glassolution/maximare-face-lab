@@ -9,8 +9,8 @@ if (SUPABASE_URL) {
     try {
         const url = new URL(SUPABASE_URL);
         console.log(`[Supabase] Client initialized. Host: ${url.hostname}`);
-        if (!url.hostname.includes("nmygcbzkgpjrueetdktz")) {
-             console.warn("[Supabase] WARNING: You might be connected to the wrong project. Expected ID: nmygcbzkgpjrueetdktz");
+        if (!url.hostname.includes("xbtendfjajspaidpktsw")) {
+             console.warn("[Supabase] WARNING: You might be connected to the wrong project. Expected ID: xbtendfjajspaidpktsw");
         }
     } catch (e) {
         console.error("[Supabase] Invalid VITE_SUPABASE_URL", e);

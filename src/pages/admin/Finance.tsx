@@ -499,7 +499,7 @@ const AdminFinance = () => {
       ) : (
         <>
       {/* SEÇÃO 1 – CARDS SUPERIORES */}
-      <div className="grid gap-6 md:grid-cols-3 lg:grid-cols-6">
+      <div className="grid gap-6 md:grid-cols-2">
         {/* Card 1: Receita Hoje */}
         <Card className="border-none shadow-sm bg-white overflow-hidden relative group transition-all hover:shadow-md">
           <CardContent className="p-6">
@@ -528,64 +528,6 @@ const AdminFinance = () => {
                 <TrendingUp className="w-3 h-3 mr-1" />
                 +12.1%
               </Badge>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Card 3: Lucro Líquido */}
-        <Card className="border-none shadow-sm bg-white overflow-hidden relative group transition-all hover:shadow-md">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-xs font-medium text-gray-500 mb-1">Lucro Líquido</p>
-                <h3 className="text-xl font-bold text-emerald-600">R$ {stats.netRevenue.toFixed(2)}</h3>
-              </div>
-              <div className="p-1.5 bg-emerald-50 rounded-full text-emerald-600">
-                <DollarSign className="w-4 h-4" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Card 4: Estornos */}
-        <Card className="border-none shadow-sm bg-white overflow-hidden relative group transition-all hover:shadow-md">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-xs font-medium text-gray-500 mb-1">Estornos (Mês)</p>
-                <h3 className="text-xl font-bold text-red-600">R$ {stats.refunds.toFixed(2)}</h3>
-              </div>
-              <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50">
-                Churn
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Card 5: Churn Rate */}
-        <Card className="border-none shadow-sm bg-white overflow-hidden relative group transition-all hover:shadow-md">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-xs font-medium text-gray-500 mb-1">Taxa de Churn</p>
-                <h3 className="text-xl font-bold text-gray-900">{stats.churnRate.toFixed(1)}%</h3>
-              </div>
-              <div className="p-1.5 bg-gray-50 rounded-full text-gray-600">
-                <Users className="w-4 h-4" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Card 6: MRR */}
-        <Card className="border-none shadow-sm bg-white overflow-hidden relative group transition-all hover:shadow-md">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-xs font-medium text-gray-500 mb-1">MRR (Mensal)</p>
-                <h3 className="text-xl font-bold text-gray-900">R$ {stats.mrr.toFixed(0)}</h3>
-              </div>
-              <span className="text-[10px] text-gray-400 self-end mb-1">Est.</span>
             </div>
           </CardContent>
         </Card>

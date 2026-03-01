@@ -78,7 +78,7 @@ serve(async (req) => {
         const normalized = payloadB64.replace(/-/g, "+").replace(/_/g, "/");
         const json = atob(normalized);
         const payload = JSON.parse(json) as { sub?: string; iss?: string; aud?: string };
-        if (payload?.iss?.includes("nmygcbzkgpjrueetdktz")) {
+        if (payload?.iss?.includes("xbtendfjajspaidpktsw")) {
           userId = payload?.sub || null;
         }
       } catch (_e) {
