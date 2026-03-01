@@ -1,6 +1,6 @@
-const url = 'https://xbtendfjajspaidpktsw.supabase.co/functions/v1/subscription-cancel-admin-test';
+const url = 'https://nmygcbzkgpjrueetdktz.supabase.co/functions/v1/subscription-cancel-admin-test';
 const anon =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhidGVuZGZqYWpzcGFpZHBrdHN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3NDI1NjIsImV4cCI6MjA4NzMxODU2Mn0.iDqorReGJNx7zlWOVCaoWlf7i-7TWZxtAYRW20jQLBE';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5teWdjYnprZ3BqcnVlZXRka3R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0MjY0MDAsImV4cCI6MjA4NjAwMjQwMH0.z9ukafxP1VsZI9a7C4KL27jqRPEtBzl05avPnSpzavE';
 const headers = {
   'x-internal-key': 'test-8d2c9cfe-76a8-44d2-9c23-7a4b5fbf7f2a',
   'Content-Type': 'application/json',

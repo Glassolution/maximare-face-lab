@@ -3,22 +3,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
-import type { ChartDataPoint } from "@/pages/admin/Dashboard";
+import type { DashboardData } from "@/hooks/useAdminDashboard";
 
 interface Props {
-  chartData: ChartDataPoint[];
+  chartData: DashboardData['visitorsChart'];
 }
 
 export const DashboardVisitorsChart = ({ chartData }: Props) => (
   <Card className="col-span-12 lg:col-span-7 border-none shadow-sm rounded-xl bg-white">
     <CardHeader className="flex flex-row items-center justify-between pb-2">
-      <CardTitle className="text-lg font-bold text-gray-800">Unique Visitors</CardTitle>
+      <CardTitle className="text-lg font-bold text-gray-800">Novos Usuários por Mês</CardTitle>
       <div className="flex gap-4 text-xs">
         <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-blue-500" /> Direct
+          <span className="w-2 h-2 rounded-full bg-blue-500" /> Direto
         </div>
         <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-yellow-400" /> Organic
+          <span className="w-2 h-2 rounded-full bg-yellow-400" /> Orgânico
         </div>
       </div>
     </CardHeader>
