@@ -51,7 +51,7 @@ export default function BattleRoom() {
 
   useEffect(() => {
     if (!battle) return;
-    if (battle.creator_photo_url && !stableCreatorPhotoUrl) setStableCreatorPhotoUrl(battle.creator_photo_url);
+    if (battle.challenger_photo_url && !stableCreatorPhotoUrl) setStableCreatorPhotoUrl(battle.challenger_photo_url);
     if (battle.opponent_photo_url && !stableOpponentPhotoUrl) setStableOpponentPhotoUrl(battle.opponent_photo_url);
   }, [battle, stableCreatorPhotoUrl, stableOpponentPhotoUrl]);
 

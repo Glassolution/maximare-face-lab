@@ -18,7 +18,7 @@ export interface Battle {
   room_version: number;
   result_ready_at?: string;
 
-  creator_photo_url?: string | null;
+  challenger_photo_url?: string | null;
   opponent_photo_url?: string | null;
   ready_at?: string | null;
   start_at?: string | null;
