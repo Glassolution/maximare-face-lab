@@ -74,10 +74,11 @@ export default function BattleRoom() {
 
   useEffect(() => {
     if (!battle) return;
-    if (battle.challenger_photo_url && !stableCreatorPhotoUrl) setStableCreatorPhotoUrl(battle.challenger_photo_url);
-    if (battle.opponent_photo_url && !stableOpponentPhotoUrl) setStableOpponentPhotoUrl(battle.opponent_photo_url);
+    // Always update the stable URLs when battle data changes
+    if (battle.challenger_photo_url) setStableCreatorPhotoUrl(battle.challenger_photo_url);
+    if (battle.opponent_photo_url) setStableOpponentPhotoUrl(battle.opponent_photo_url);
     if (battle.ready_at && !photosPreloaded) setPhotosPreloaded(true); // Fallback if images fail
-  }, [battle, stableCreatorPhotoUrl, stableOpponentPhotoUrl]);
+  }, [battle, photosPreloaded]);
 
   const isCreator = battle?.created_by === userProfile?.id;
   const myStablePhotoUrl = isCreator ? stableCreatorPhotoUrl : stableOpponentPhotoUrl;
