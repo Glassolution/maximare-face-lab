@@ -53,27 +53,38 @@ export function useReferralCode() {
     if (!user?.email) return;
 
     const initializeReferralCode = async () => {
-      // Priority 1: Check if profile already has referral code
-      if (profile && (profile as any).referral_code) {
-        setReferralCode((profile as any).referral_code);
-        return;
-      }
-
-      // Priority 2: Check database for existing code
+      console.log('🔍 Initializing referral code for user:', user.email);
+      
+      // Priority 1: Check database FIRST (most reliable)
+      console.log('📋 Checking database for existing code...');
       const existingCode = await loadExistingCode(user.id);
       if (existingCode) {
+        console.log('✅ Found existing code in database:', existingCode);
         setReferralCode(existingCode);
         return;
       }
+      console.log('❌ No existing code found in database');
 
-      // Priority 3: Generate unique code and save
+      // Priority 2: Check if profile already has referral code
+      console.log('👤 Checking profile for referral code...');
+      if (profile && (profile as any).referral_code) {
+        console.log('✅ Found code in profile:', (profile as any).referral_code);
+        setReferralCode((profile as any).referral_code);
+        return;
+      }
+      console.log('❌ No code found in profile');
+
+      // Priority 3: Generate unique code and save (LAST resort)
+      console.log('🎲 Generating new unique code...');
       const uniqueCode = await generateUniqueCode(user.email);
+      console.log('✅ Generated unique code:', uniqueCode);
       setReferralCode(uniqueCode);
+      console.log('💾 Saving code to database...');
       saveCodeToDatabase(uniqueCode);
     };
 
     initializeReferralCode();
-  }, [user?.email, profile]);
+  }, [user?.email]); // Remove profile from dependencies
 
   // Check if code already exists in database
   const checkCodeUniqueness = async (code: string) => {
@@ -135,19 +146,26 @@ export function useReferralCode() {
 
   // Save code to database
   const saveCodeToDatabase = async (code: string) => {
-    if (!user || !profile?.is_ugc) return;
+    if (!user || !profile?.is_ugc) {
+      console.log('❌ Cannot save code: user or is_ugc missing');
+      return;
+    }
+    
+    console.log('💾 Attempting to save code to database:', code);
     
     try {
-      const { error } = await supabase.rpc('generate_referral_code', {
+      const { data, error } = await supabase.rpc('generate_referral_code', {
         p_creator_id: user.id,
         p_code: code
       });
 
       if (error) {
-        console.error('Error saving referral code:', error);
+        console.error('❌ Error saving referral code:', error);
+      } else {
+        console.log('✅ Code saved successfully to database:', data);
       }
     } catch (error) {
-      console.error('Error saving referral code:', error);
+      console.error('❌ Exception saving referral code:', error);
     }
   };
 
