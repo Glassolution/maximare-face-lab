@@ -5,7 +5,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, subMonths } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { 
   TrendingUp, 
@@ -15,7 +14,7 @@ import {
   Target,
   ArrowUpRight
 } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Legend } from 'recharts';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -29,6 +28,7 @@ interface AdminPurchase {
   plan: string;
   amount_cents: number;
   provider: string;
+  payment_method?: string | null;
   status: string;
   created_at: string;
 }
@@ -53,68 +53,6 @@ const getUserColor = (username: string) => {
   return colors[Math.abs(hash) % colors.length];
 };
 
-const getLast12Months = () => {
-  const months: { key: string; label: string }[] = [];
-
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(1);
-    d.setMonth(d.getMonth() - i);
-    months.push({
-      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-      label: d.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }),
-    });
-  }
-
-  return months;
-};
-
-const PaymentBehaviorTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload || !payload.length) return null;
-
-  const receita = payload.find((p: any) => p.dataKey === "receita")?.value ?? 0;
-  const novosAssinantes = payload.find((p: any) => p.dataKey === "novosAssinantes")?.value ?? 0;
-  const cancelamentos = payload.find((p: any) => p.dataKey === "cancelamentos")?.value ?? 0;
-  const taxaConversao = payload[0]?.payload?.taxaConversao ?? 0;
-
-  return (
-    <div className="bg-white p-4 rounded-xl shadow-lg border border-slate-100 min-w-[200px]">
-      <p className="text-sm font-bold text-gray-900 mb-3">{label}</p>
-      <div className="space-y-2 text-xs">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#E91E63]" />
-            <span className="text-gray-500">Receita</span>
-          </div>
-          <span className="font-semibold text-gray-900">
-            R$ {Number(receita).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-          </span>
-        </div>
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#4CAF50]" />
-            <span className="text-gray-500">Novos Assin.</span>
-          </div>
-          <span className="font-semibold text-gray-900">{novosAssinantes}</span>
-        </div>
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#2196F3]" />
-            <span className="text-gray-500">Cancelamentos</span>
-          </div>
-          <span className="font-semibold text-gray-900">{cancelamentos}</span>
-        </div>
-        <div className="flex justify-between items-center border-t border-slate-100 pt-2 mt-1">
-          <span className="text-gray-500">Conv. Rate</span>
-          <span className="font-semibold text-gray-900">
-            {Number(taxaConversao).toFixed(1)}%
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const AdminFinance = () => {
   const [purchases, setPurchases] = useState<AdminPurchase[]>([]);
   const [loading, setLoading] = useState(true);
@@ -125,27 +63,28 @@ const AdminFinance = () => {
     refunds: 0,
     churnRate: 0,
     netRevenue: 0,
-    mrr: 0,
-    mrrReal: 0,
-    arrReal: 0,
+    mrr: 0,            // Projeção
+    mrrReal: 0,        // Real (últimos 30 dias)
+    arrReal: 0,        // Real (12 meses)
     totalSubscribers: 0
   });
+  const [mode, setMode] = useState<'real' | 'projection'>(() => (localStorage.getItem('finance_mode') as 'real' | 'projection') || 'projection');
   const [showNetRevenue, setShowNetRevenue] = useState(false);
-  const [viewMode, setViewMode] = useState<'real' | 'projection'>('projection');
   const [revenueChartData, setRevenueChartData] = useState<any[]>([]);
   const [revenueDays, setRevenueDays] = useState(30);
-  const [paymentBehaviorData, setPaymentBehaviorData] = useState<any[]>([]);
-  const [paymentBehaviorLoading, setPaymentBehaviorLoading] = useState(true);
-  const [paymentBehaviorError, setPaymentBehaviorError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<{ label: string; count: number; percent: number; color: string }[]>([]);
+  const [recentEvents, setRecentEvents] = useState<Array<{ id: string; title: string; when: string; amount: string; cls: string; icon: 'up' | 'down' | 'pending' | 'rejected' }>>([]);
+  const [methodPieData, setMethodPieData] = useState<Array<{ name: string; value: number; color: string }>>([]);
+  const [methodTotal, setMethodTotal] = useState(0);
 
-  // Hook para buscar receita diária real (tabela payments)
+  // Hook para buscar receita diária real
   const fetchRevenueChartData = async (days: number) => {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
     const { data, error } = await supabase
-      .from('payments')
-      .select('amount, status, created_at')
+      .from('purchases')
+      .select('amount_cents, created_at')
       .eq('status', 'approved')
       .gte('created_at', startDate.toISOString())
       .order('created_at', { ascending: true });
@@ -158,11 +97,11 @@ const AdminFinance = () => {
     // Agrupa por dia
     const grouped: Record<string, number> = {};
     
-    (data || []).forEach((payment: any) => {
-      const day = new Date(payment.created_at).toLocaleDateString('pt-BR', {
+    (data || []).forEach((purchase: any) => {
+      const day = new Date(purchase.created_at).toLocaleDateString('pt-BR', {
         day: '2-digit', month: 'short'
       });
-      grouped[day] = (grouped[day] || 0) + Number(payment.amount || 0);
+      grouped[day] = (grouped[day] || 0) + (purchase.amount_cents / 100);
     });
 
     // Preenche dias sem vendas com 0
@@ -180,70 +119,6 @@ const AdminFinance = () => {
     setRevenueChartData(result);
   };
 
-  const fetchPaymentBehavior = async () => {
-    try {
-      setPaymentBehaviorLoading(true);
-      setPaymentBehaviorError(null);
-
-      const oneYearAgo = new Date();
-      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-
-      const { data: payments, error } = await supabase
-        .from("payments")
-        .select("amount, status, plan_id, created_at, metadata")
-        .gte("created_at", oneYearAgo.toISOString());
-
-      console.log("payments error (growth chart):", error);
-      console.log("payments count (growth chart):", payments?.length);
-
-      if (error) {
-        throw new Error(`Erro payments: ${error.message}`);
-      }
-
-      const months: any[] = [];
-
-      for (let i = 11; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(1);
-        d.setMonth(d.getMonth() - i);
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-        const label = d.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" });
-
-        const mp =
-          (payments ?? []).filter(
-            (p: any) => p.created_at && String(p.created_at).startsWith(key)
-          ) ?? [];
-
-        const receita = mp
-          .filter((p: any) => p.status === "approved")
-          .reduce((s: number, p: any) => s + Number(p.amount ?? 0), 0);
-
-        const novosAssinantes = mp.filter((p: any) => p.status === "approved").length;
-
-        const cancelamentos = 0; // ainda sem source confiável por mês
-
-        months.push({
-          month: label.toUpperCase(),
-          receita,
-          novosAssinantes,
-          cancelamentos,
-          taxaConversao: 0,
-        });
-      }
-
-      console.log("Final growth chart months:", months);
-      setPaymentBehaviorData(months);
-    } catch (error: any) {
-      console.error("Chart fetch error (payment behavior):", error);
-      setPaymentBehaviorError(
-        error?.message || "Erro ao carregar dados de crescimento e receita"
-      );
-      setPaymentBehaviorData([]);
-    } finally {
-      setPaymentBehaviorLoading(false);
-    }
-  };
-
   useEffect(() => {
     fetchRevenueChartData(revenueDays);
   }, [revenueDays]);
@@ -252,6 +127,16 @@ const AdminFinance = () => {
   const basicChartData = [
     { name: '1 Fev', value: 0 },
     { name: '28 Fev', value: 0 },
+  ];
+
+  // Advanced chart data matching the reference image
+  const advancedChartData = [
+    { name: 'JAN 2024', receita: 1.38, ocupacao: 1.50, vacancia: 1.46, aluguel: 1.45 },
+    { name: 'ABR', receita: 1.41, ocupacao: 1.52, vacancia: 1.48, aluguel: 1.46 },
+    { name: 'JUL', receita: 1.49, ocupacao: 1.65, vacancia: 1.41, aluguel: 1.48 },
+    { name: 'OUT', receita: 1.53, ocupacao: 1.67, vacancia: 1.40, aluguel: 1.51 },
+    { name: 'JAN 2025', receita: 1.58, ocupacao: 1.70, vacancia: 1.39, aluguel: 1.54 },
+    { name: 'ABR', receita: 1.63, ocupacao: 1.72, vacancia: 1.38, aluguel: 1.56 },
   ];
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -265,7 +150,6 @@ const AdminFinance = () => {
       setIsAdvancedMode(savedMode === 'true');
     }
     fetchPurchases();
-    fetchPaymentBehavior();
   }, []);
 
   const toggleAdvancedMode = (checked: boolean) => {
@@ -286,12 +170,13 @@ const AdminFinance = () => {
       // 2. Fetch Active Subscribers for MRR
       const { data: subscribersData, error: subError } = await supabase
         .from('profiles')
-        .select('plan_type, premium_status')
-        .eq('premium_status', true);
+        .select('plan_type')
+        .eq('is_premium', true)
+        .eq('subscription_status', 'active');
       
       if (subError) throw subError;
 
-      // 3. Fetch Churn Data (aproximado, usando updated_at e base atual de assinantes)
+      // 3. Fetch Churn Data
       const now = new Date();
       const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       
@@ -301,6 +186,12 @@ const AdminFinance = () => {
         .select('*', { count: 'exact', head: true })
         .in('subscription_status', ['canceled', 'expired'])
         .gte('updated_at', startOfCurrentMonth);
+
+      // Total no início do mês (aproximado: criados antes do mês e premium)
+      const { count: totalStartMonth } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .lt('created_at', startOfCurrentMonth);
 
       // --- Calculations ---
 
@@ -326,7 +217,7 @@ const AdminFinance = () => {
         .filter((p: any) => (p.status === 'refunded' || p.status === 'charged_back') && p.created_at >= startOfCurrentMonth)
         .reduce((acc: number, p: any) => acc + (p.amount_cents || 0), 0);
 
-      // MRR Calculation based on active plans
+      // MRR Projection based on active plans
       // Weekly: 24.90 * 4.33 approx
       // Monthly: 49.90
       // Annual: 499.90 / 12
@@ -336,27 +227,61 @@ const AdminFinance = () => {
         annual: 499.90 / 12 
       };
       
-      const mrr = (subscribersData || []).reduce((sum, p) => sum + (priceMap[p.plan_type || ''] || 0), 0);
+      const mrrProjection = (subscribersData || []).reduce((sum, p) => sum + (priceMap[p.plan_type || ''] || 0), 0);
+
+      // Real metrics
+      const last30Days = new Date();
+      last30Days.setDate(last30Days.getDate() - 30);
+      const last12Months = subMonths(new Date(), 12);
+
+      const mrrReal = purchaseList
+        .filter((p: any) => (p.status === 'approved' || p.status === 'paid') && new Date(p.created_at) >= last30Days)
+        .reduce((acc: number, p: any) => acc + (p.amount_cents || 0), 0) / 100;
+
+      const arrReal = purchaseList
+        .filter((p: any) => (p.status === 'approved' || p.status === 'paid') && new Date(p.created_at) >= last12Months)
+        .reduce((acc: number, p: any) => acc + (p.amount_cents || 0), 0) / 100;
+
+      // Categories by plan (distribution)
+      const counts = { weekly: 0, monthly: 0, annual: 0 } as Record<string, number>;
+      (subscribersData || []).forEach((p: any) => { if (p.plan_type) counts[p.plan_type] = (counts[p.plan_type] || 0) + 1; });
+      const totalActive = Object.values(counts).reduce((a, b) => a + b, 0);
+      setCategories([
+        { label: 'Semanal (R$24,90/sem)', count: counts.weekly || 0, percent: totalActive ? Math.round((counts.weekly || 0) / totalActive * 100) : 0, color: 'bg-blue-600' },
+        { label: 'Mensal (R$49,90/mês)', count: counts.monthly || 0, percent: totalActive ? Math.round((counts.monthly || 0) / totalActive * 100) : 0, color: 'bg-emerald-500' },
+        { label: 'Anual (R$499,90/ano)', count: counts.annual || 0, percent: totalActive ? Math.round((counts.annual || 0) / totalActive * 100) : 0, color: 'bg-purple-500' },
+      ]);
+
+      // Recent activity from real purchases (last 10)
+      const toAgo = (iso: string) => {
+        const diff = Date.now() - new Date(iso).getTime();
+        const mins = Math.floor(diff / 60000);
+        if (mins < 60) return `Há ${mins} minutos`;
+        const hours = Math.floor(mins / 60);
+        if (hours < 24) return `Há ${hours} horas`;
+        const days = Math.floor(hours / 24);
+        return `Há ${days} dias`;
+      };
+      const recent = [...purchaseList]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 10)
+        .map((p) => {
+          let title = 'Transação';
+          let cls = 'text-gray-900';
+          let icon: 'up' | 'down' | 'pending' | 'rejected' = 'up';
+          if (p.status === 'approved' || p.status === 'paid') { title = 'Novo Assinante'; cls = 'text-emerald-600'; icon = 'up'; }
+          else if (p.status === 'refunded' || p.status === 'charged_back') { title = 'Reembolso'; cls = 'text-red-500'; icon = 'down'; }
+          else if (p.status === 'pending') { title = 'Pagamento Pendente'; cls = 'text-amber-600'; icon = 'pending'; }
+          else { title = 'Pagamento Recusado'; cls = 'text-gray-500'; icon = 'rejected'; }
+          const sign = (p.status === 'refunded' || p.status === 'charged_back') ? '-' : (p.status === 'approved' || p.status === 'paid') ? '+' : '';
+          const amount = `${sign} R$ ${(p.amount_cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+          return { id: p.id, title, when: toAgo(p.created_at), amount, cls, icon };
+        });
+      setRecentEvents(recent);
 
       // Churn Rate
-      const totalStart = (subscribersData?.length || 0) || 1; // base aproximada: assinantes premium atuais
+      const totalStart = totalStartMonth || 1; // avoid division by zero
       const churnRate = ((canceledCount || 0) / totalStart) * 100;
-
-      // MRR Real (Last 30 days approved revenue)
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
-      const mrrReal = purchaseList
-        .filter((p: any) => new Date(p.created_at) >= thirtyDaysAgo && (p.status === 'approved' || p.status === 'paid'))
-        .reduce((acc: number, p: any) => acc + (p.amount_cents || 0), 0);
-
-      // ARR Real (Last 365 days approved revenue)
-      const oneYearAgo = new Date();
-      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-      
-      const arrReal = purchaseList
-        .filter((p: any) => new Date(p.created_at) >= oneYearAgo && (p.status === 'approved' || p.status === 'paid'))
-        .reduce((acc: number, p: any) => acc + (p.amount_cents || 0), 0);
 
       setStats({
         today: todayRevenue / 100,
@@ -365,11 +290,31 @@ const AdminFinance = () => {
         refunds: refundsMonth / 100,
         churnRate: churnRate,
         netRevenue: (monthRevenue - refundsMonth) / 100,
-        mrr: mrr,
-        mrrReal: mrrReal / 100,
-        arrReal: arrReal / 100,
+        mrr: mrrProjection,
+        mrrReal,
+        arrReal,
         totalSubscribers: subscribersData?.length || 0
       });
+      const { data: pmRows } = await supabase
+        .from('purchases')
+        .select('payment_method, provider, amount_cents, status')
+        .in('status', ['approved', 'paid']);
+      const totals: Record<string, number> = {};
+      (pmRows || []).forEach((r: any) => {
+        const m = (r.payment_method || '').toString().toLowerCase() || '';
+        const method =
+          m === 'pix' ? 'pix'
+          : m === 'credit_card' || m === 'card' || m === 'stripe' ? 'credit_card'
+          : 'credit_card';
+        totals[method] = (totals[method] || 0) + (r.amount_cents || 0) / 100;
+      });
+      const pie = Object.entries(totals).map(([method, value]) => ({
+        name: method === 'pix' ? 'PIX' : 'Cartão de Crédito',
+        value,
+        color: method === 'pix' ? '#00C853' : '#2979FF'
+      }));
+      setMethodPieData(pie);
+      setMethodTotal(pie.reduce((a, b) => a + b.value, 0));
 
     } catch (error) {
       console.error("Error fetching finance data:", error);
@@ -392,15 +337,26 @@ const AdminFinance = () => {
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">Financeiro</h1>
           <p className="text-gray-500 mt-1">Gerencie suas receitas e transações de forma simplificada.</p>
         </div>
-        <div className="flex items-center space-x-2 bg-white p-2 rounded-lg border shadow-sm">
-          <Switch 
-            id="advanced-mode" 
-            checked={isAdvancedMode}
-            onCheckedChange={toggleAdvancedMode}
-          />
-          <Label htmlFor="advanced-mode" className="text-sm font-medium cursor-pointer">
-            Modo avançado
-          </Label>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center space-x-2 bg-white p-2 rounded-lg border shadow-sm">
+            <Switch 
+              id="advanced-mode" 
+              checked={isAdvancedMode}
+              onCheckedChange={toggleAdvancedMode}
+            />
+            <Label htmlFor="advanced-mode" className="text-sm font-medium cursor-pointer">
+              Modo avançado
+            </Label>
+          </div>
+          <div className="flex items-center gap-2 bg-white p-2 rounded-lg border shadow-sm">
+            <span className={mode === 'real' ? 'text-sm font-bold text-gray-900' : 'text-sm text-gray-400'}>Real</span>
+            <Switch
+              id="mode-toggle"
+              checked={mode === 'projection'}
+              onCheckedChange={(checked) => { const m = checked ? 'projection' : 'real'; setMode(m); localStorage.setItem('finance_mode', m); }}
+            />
+            <span className={mode === 'projection' ? 'text-sm font-bold text-gray-900' : 'text-sm text-gray-400'}>Projeção</span>
+          </div>
         </div>
       </div>
 
@@ -420,28 +376,34 @@ const AdminFinance = () => {
               </div>
               <p className="text-xs text-slate-400 mt-2">vs. mês anterior</p>
             </div>
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group" title={mode === 'real' ? 'MRR Real: Soma de transações aprovadas nos últimos 30 dias' : 'MRR Projeção: Assinantes ativos normalizados por mês'}>
               <div className="flex justify-between items-start mb-4">
                 <span className="text-slate-500 text-sm font-medium">MRR (Mensal)</span>
                 <div className="p-1.5 bg-gray-50 rounded-full text-gray-400">
                   <TrendingUp className="w-4 h-4" />
                 </div>
               </div>
-              <h2 className="text-2xl font-bold tracking-tight">R$ {stats.mrr.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h2>
+              <h2 className="text-2xl font-bold tracking-tight">
+                R$ {(mode === 'real' ? stats.mrrReal : stats.mrr).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </h2>
               <p className="text-xs text-slate-400 mt-2 flex items-center">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2"></span>
-                Projeção planos ativos
+                <span className={`w-1.5 h-1.5 rounded-full mr-2 ${mode === 'real' ? 'bg-blue-500' : 'bg-emerald-500'}`}></span>
+                {mode === 'real' ? '● Receita real últimos 30 dias' : '● Projeção planos ativos'}
               </p>
             </div>
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group" title={mode === 'real' ? 'ARR Real: Soma de transações aprovadas nos últimos 12 meses' : 'ARR Projeção: MRR projetado × 12'}>
               <div className="flex justify-between items-start mb-4">
                 <span className="text-slate-500 text-sm font-medium">ARR (Anual)</span>
                 <div className="p-1.5 bg-gray-50 rounded-full text-gray-400">
                   <TrendingUp className="w-4 h-4" />
                 </div>
               </div>
-              <h2 className="text-2xl font-bold tracking-tight">R$ {(stats.mrr * 12).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h2>
-              <p className="text-xs text-slate-400 mt-2">Projeção anual (MRR x 12)</p>
+              <h2 className="text-2xl font-bold tracking-tight">
+                R$ {(mode === 'real' ? stats.arrReal : (stats.mrr * 12)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </h2>
+              <p className="text-xs text-slate-400 mt-2">
+                {mode === 'real' ? 'Receita real últimos 12 meses' : 'Projeção anual (MRR × 12)'}
+              </p>
             </div>
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
               <div className="flex justify-between items-start mb-4">
@@ -458,93 +420,183 @@ const AdminFinance = () => {
             </div>
           </div>
 
-          {/* Gráfico Avançado - Crescimento & Receita */}
+          {/* Gráfico Avançado - Comportamento de Pagamento */}
           <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm mb-10">
             <div className="flex justify-between items-center mb-8">
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold text-gray-900">Crescimento & Receita</h3>
-                <span className="text-xs text-gray-400 font-medium">
-                  Últimos 12 meses · Receita, novos assinantes e cancelamentos
-                </span>
+                <h3 className="text-lg font-bold text-gray-900">Comportamento de Pagamento</h3>
+                <div className="text-gray-400 cursor-pointer">ⓘ</div>
+              </div>
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#EC4899]"></div>
+                  <span className="text-xs text-gray-500 font-medium">Receita</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#10B981]"></div>
+                  <span className="text-xs text-gray-500 font-medium">Ocupação</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#3B82F6]"></div>
+                  <span className="text-xs text-gray-500 font-medium">Vacância</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-gray-300"></div>
+                  <span className="text-xs text-gray-500 font-medium">Aluguel Efetivo</span>
+                </div>
               </div>
             </div>
 
             <div className="relative h-[400px] w-full">
-              {paymentBehaviorLoading ? (
-                <div className="h-full flex items-center justify-center text-xs text-gray-400">
-                  Carregando dados de crescimento e receita...
-                </div>
-              ) : paymentBehaviorError ? (
-                <div className="h-full flex items-center justify-center text-xs text-red-500 text-center px-4">
-                  Erro ao carregar dados de crescimento e receita: {paymentBehaviorError}
-                </div>
-              ) : !paymentBehaviorData || paymentBehaviorData.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-xs text-gray-400">
-                  Sem dados para os últimos 12 meses.
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={paymentBehaviorData}
-                    margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
+              <div className="absolute top-0 left-0 z-10">
+                <Badge className="bg-[#EC4899] hover:bg-[#db2777] text-white border-none text-xs font-bold px-2 py-0.5 rounded-sm">
+                  1.76M
+                </Badge>
+              </div>
+              
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={advancedChartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fontSize: 10, fill: '#94a3b8', fontWeight: 500}} 
+                    dy={20}
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fontSize: 10, fill: '#94a3b8', fontWeight: 500}} 
+                    tickFormatter={(val) => `${val}M`} 
+                    domain={[1.3, 1.8]}
+                    ticks={[1.3, 1.4, 1.5, 1.6, 1.7, 1.8]}
+                  />
+                  <Tooltip 
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="bg-white p-4 rounded-xl shadow-lg border border-slate-100 min-w-[180px]">
+                            <p className="text-sm font-bold text-gray-900 mb-3">{label === 'OUT' ? 'Abril 2025' : label}</p>
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-1.5 h-1.5 rounded-full border-2 border-[#EC4899]"></div>
+                                  <span className="text-xs text-gray-500">Receita</span>
+                                </div>
+                                <span className="text-xs font-bold text-gray-900">$1.63M</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-1.5 h-1.5 rounded-full border-2 border-[#10B981]"></div>
+                                  <span className="text-xs text-gray-500">Ocupação</span>
+                                </div>
+                                <span className="text-xs font-bold text-gray-900">85%</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-1.5 h-1.5 rounded-full border-2 border-[#3B82F6]"></div>
+                                  <span className="text-xs text-gray-500">Vacância</span>
+                                </div>
+                                <span className="text-xs font-bold text-gray-900">15%</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-1.5 h-1.5 rounded-full border-2 border-gray-300"></div>
+                                  <span className="text-xs text-gray-500">Aluguel Efet.</span>
+                                </div>
+                                <span className="text-xs font-bold text-gray-900">1.425 $/ft²</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="receita" 
+                    stroke="#EC4899" 
+                    strokeWidth={2} 
+                    dot={false}
+                    activeDot={{ r: 4, strokeWidth: 0, fill: '#EC4899' }} 
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="ocupacao" 
+                    stroke="#10B981" 
+                    strokeWidth={2} 
+                    dot={false}
+                    activeDot={{ r: 4, strokeWidth: 0, fill: '#10B981' }} 
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="vacancia" 
+                    stroke="#3B82F6" 
+                    strokeWidth={2} 
+                    dot={false}
+                    activeDot={{ r: 4, strokeWidth: 0, fill: '#3B82F6' }} 
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="aluguel" 
+                    stroke="#CBD5E1" 
+                    strokeWidth={2} 
+                    dot={false}
+                    activeDot={{ r: 4, strokeWidth: 0, fill: '#CBD5E1' }} 
+                  />
+                  {/* Linha vertical pontilhada em OUT */}
+                  <line x1="58%" y1="20" x2="58%" y2="380" stroke="#94a3b8" strokeWidth={1} strokeDasharray="4 4" />
+                  {/* Bolinhas brancas na interseção da linha vertical */}
+                  <circle cx="58%" cy="135" r="3" fill="white" stroke="#10B981" strokeWidth={2} />
+                  <circle cx="58%" cy="225" r="3" fill="white" stroke="#EC4899" strokeWidth={2} />
+                  <circle cx="58%" cy="315" r="3" fill="white" stroke="#3B82F6" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+              <h3 className="text-lg font-bold text-gray-900">Métodos de Pagamento</h3>
+              <p className="text-xs text-slate-400 mb-2">Distribuição por receita</p>
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <PieChart width={300} height={250}>
+                  <Pie
+                    data={methodPieData}
+                    cx={150}
+                    cy={110}
+                    innerRadius={60}
+                    outerRadius={90}
+                    paddingAngle={3}
+                    dataKey="value"
                   >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis 
-                      dataKey="month" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{fontSize: 10, fill: '#94a3b8', fontWeight: 500}} 
-                      dy={20}
-                    />
-                    <YAxis 
-                      yAxisId="revenue"
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{fontSize: 10, fill: '#94a3b8', fontWeight: 500}} 
-                      tickFormatter={(val) => `R$${Number(val).toFixed(0)}`} 
-                      domain={[0, 'auto']}
-                    />
-                    <YAxis
-                      yAxisId="count"
-                      orientation="right"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 10, fill: "#94a3b8", fontWeight: 500 }}
-                      allowDecimals={false}
-                      domain={[0, 'auto']}
-                    />
-                    <Tooltip content={<PaymentBehaviorTooltip />} />
-                    <Legend />
-                    <Line 
-                      yAxisId="revenue"
-                      type="monotone" 
-                      dataKey="receita" 
-                      stroke="#E91E63" 
-                      strokeWidth={2} 
-                      dot={false}
-                      activeDot={{ r: 4, strokeWidth: 0, fill: '#E91E63' }} 
-                    />
-                    <Line 
-                      yAxisId="count"
-                      type="monotone" 
-                      dataKey="novosAssinantes" 
-                      stroke="#4CAF50" 
-                      strokeWidth={2} 
-                      dot={false}
-                      activeDot={{ r: 4, strokeWidth: 0, fill: '#4CAF50' }} 
-                    />
-                    <Line 
-                      yAxisId="count"
-                      type="monotone" 
-                      dataKey="cancelamentos" 
-                      stroke="#2196F3" 
-                      strokeWidth={2} 
-                      dot={false}
-                      activeDot={{ r: 4, strokeWidth: 0, fill: '#2196F3' }} 
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              )}
+                    {methodPieData.map((entry, i) => (
+                      <Cell key={i} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: any) => `R$ ${Number(value).toFixed(2)}`} />
+                  <Legend />
+                </PieChart>
+                <div className="flex-1 w-full space-y-1">
+                  {methodPieData.map((item) => (
+                    <div key={item.name} className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: item.color }}></span>
+                        {item.name}
+                      </span>
+                      <span className="text-gray-700">
+                        {methodTotal ? `${((item.value / methodTotal) * 100).toFixed(1)}%` : '0%'} · R$ {item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Observações</h3>
+              <p className="text-xs text-slate-500">PIX liquida imediatamente. Cartões podem permanecer como “pending”.</p>
             </div>
           </div>
 
@@ -552,69 +604,42 @@ const AdminFinance = () => {
              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                 <h3 className="text-lg font-bold text-gray-900 mb-6">Receita por Categoria</h3>
                 <div className="space-y-6">
-                  <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-gray-600 font-medium">Assinaturas SaaS</span>
-                      <span className="text-gray-900 font-bold">72%</span>
+                  {categories.map((c) => (
+                    <div key={c.label}>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span className="text-gray-600 font-medium">
+                          {c.label}
+                        </span>
+                        <span className="text-gray-900 font-bold">{c.percent}% ({c.count} assinantes)</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2">
+                        <div className={`h-2 rounded-full ${c.color}`} style={{ width: `${c.percent}%` }}></div>
+                      </div>
                     </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
-                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: '72%' }}></div>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-gray-600 font-medium">Serviços de Consultoria</span>
-                      <span className="text-gray-900 font-bold">18%</span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
-                      <div className="bg-emerald-500 h-2 rounded-full" style={{ width: '18%' }}></div>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-gray-600 font-medium">Taxas de Instalação</span>
-                      <span className="text-gray-900 font-bold">10%</span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
-                      <div className="bg-slate-400 h-2 rounded-full" style={{ width: '10%' }}></div>
-                    </div>
-                  </div>
+                  ))}
                 </div>
              </div>
              
              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                 <h3 className="text-lg font-bold text-gray-900 mb-6">Atividade Recente</h3>
                 <div className="space-y-6">
-                   <div className="flex items-start space-x-4">
-                      <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 mt-1">
-                         <ArrowUpRight className="w-4 h-4" />
+                  {recentEvents.map((e) => (
+                    <div key={e.id} className="flex items-start space-x-4">
+                      <div className={`p-2 rounded-lg mt-1 ${
+                        e.icon === 'up' ? 'bg-emerald-50 text-emerald-600' :
+                        e.icon === 'down' ? 'bg-red-50 text-red-600' :
+                        e.icon === 'pending' ? 'bg-amber-50 text-amber-600' :
+                        'bg-gray-50 text-gray-500'
+                      }`}>
+                        <ArrowUpRight className={`w-4 h-4 ${e.icon === 'down' ? 'rotate-180' : ''}`} />
                       </div>
                       <div className="flex-1">
-                         <p className="text-sm font-bold text-gray-900">Novo Assinante</p>
-                         <p className="text-xs text-gray-400">Há 5 minutos</p>
+                        <p className="text-sm font-bold text-gray-900">{e.title}</p>
+                        <p className="text-xs text-gray-400">{e.when}</p>
                       </div>
-                      <span className="text-sm font-bold text-gray-900">+ R$ 450,00</span>
-                   </div>
-                   <div className="flex items-start space-x-4">
-                      <div className="p-2 rounded-lg bg-red-50 text-red-600 mt-1">
-                         <ArrowUpRight className="w-4 h-4 rotate-180" />
-                      </div>
-                      <div className="flex-1">
-                         <p className="text-sm font-bold text-gray-900">Reembolso Processado</p>
-                         <p className="text-xs text-gray-400">Há 2 horas</p>
-                      </div>
-                      <span className="text-sm font-bold text-red-500">- R$ 1.200,00</span>
-                   </div>
-                   <div className="flex items-start space-x-4">
-                      <div className="p-2 rounded-lg bg-blue-50 text-blue-600 mt-1">
-                         <Target className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1">
-                         <p className="text-sm font-bold text-gray-900">Upgrade de Plano</p>
-                         <p className="text-xs text-gray-400">Há 4 horas</p>
-                      </div>
-                      <span className="text-sm font-bold text-emerald-500">+ R$ 890,00</span>
-                   </div>
+                      <span className={`text-sm font-bold ${e.cls}`}>{e.amount}</span>
+                    </div>
+                  ))}
                 </div>
              </div>
           </div>
@@ -863,15 +888,23 @@ const AdminFinance = () => {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className={`text-sm font-bold ${purchase.status === 'refunded' || purchase.status === 'charged_back' ? 'text-red-600' : 'text-gray-900'}`}>
+                      <span className={`text-sm font-bold ${purchase.status === 'refunded' || purchase.status === 'charged_back' ? 'text-red-600' : 'text-gray-900'}`}>
                           {purchase.status === 'refunded' || purchase.status === 'charged_back' ? '-' : ''} 
                           R$ {(purchase.amount_cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="font-normal text-gray-500 border-gray-200 bg-white">
-                          {purchase.provider === 'stripe' ? 'Mercado Pago' : purchase.provider === 'mercadopago' ? 'Mercado Pago' : purchase.provider}
+                      {purchase.payment_method === 'pix' ? (
+                        <Badge className="bg-emerald-50 text-emerald-600 border-none font-medium flex items-center gap-1">
+                          <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+                          PIX
                         </Badge>
+                      ) : (
+                        <Badge className="bg-blue-50 text-blue-600 border-none font-medium flex items-center gap-1">
+                          <span className="inline-block w-2 h-2 rounded-full bg-blue-500"></span>
+                          Cartão
+                        </Badge>
+                      )}
                       </TableCell>
                       <TableCell>
                         <Badge 
