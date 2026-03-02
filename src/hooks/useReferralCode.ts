@@ -109,9 +109,18 @@ export function useReferralCode() {
 
   // Generate unique code with retry logic
   const generateUniqueCode = async (email: string, maxRetries = 10) => {
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      const code = generateCodeFromEmail(email + attempt); // Add attempt to change seed
-      
+    // Generate code once based on original email (no attempt variation)
+    const baseCode = generateCodeFromEmail(email);
+    
+    // Check if base code is unique
+    const isUnique = await checkCodeUniqueness(baseCode);
+    if (isUnique) {
+      return baseCode;
+    }
+    
+    // If not unique, try variations with different suffixes
+    for (let attempt = 1; attempt < maxRetries; attempt++) {
+      const code = generateCodeFromEmail(email) + attempt; // Add simple suffix
       const isUnique = await checkCodeUniqueness(code);
       if (isUnique) {
         return code;
