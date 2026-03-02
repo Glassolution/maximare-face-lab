@@ -81,7 +81,7 @@ export default function CreatorMetrics() {
               </svg>
             </div>
             <p className="text-slate-400 text-sm font-medium mb-4">Usos Totais</p>
-            <div className="text-4xl font-bold mb-6">1.240</div>
+            <div className="text-4xl font-bold mb-6">0</div>
             <div className="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
               <div className="bg-sky-500 h-full w-[65%] rounded-full shadow-[0_0_10px_rgba(14,165,233,0.5)]" />
             </div>
@@ -100,7 +100,7 @@ export default function CreatorMetrics() {
               </svg>
             </div>
             <p className="text-slate-400 text-sm font-medium mb-4">Comissão Gerada</p>
-            <div className="text-4xl font-bold mb-6">R$ 5.000,00</div>
+            <div className="text-4xl font-bold mb-6">R$ 0,00</div>
             <div className="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
               <div className="bg-sky-500 h-full w-[45%] rounded-full shadow-[0_0_10px_rgba(14,165,233,0.5)]" />
             </div>
@@ -134,7 +134,7 @@ export default function CreatorMetrics() {
                   <p className="text-sm text-slate-400">Há 5 minutos</p>
                 </div>
               </div>
-              <div className="text-emerald-400 font-bold">+ R$ 45,00</div>
+              <div className="text-emerald-400 font-bold">+ R$ 0,00</div>
             </div>
 
             <div className="bg-[#17212b] p-4 rounded-xl border border-gray-800 flex items-center justify-between">
@@ -160,7 +160,7 @@ export default function CreatorMetrics() {
                   <p className="text-sm text-slate-400">Há 2 horas</p>
                 </div>
               </div>
-              <div className="text-emerald-400 font-bold">+ R$ 12,50</div>
+              <div className="text-emerald-400 font-bold">+ R$ 0,00</div>
             </div>
           </div>
         </section>
