@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -43,7 +43,14 @@ export default function Trends() {
   const [expandedTrend, setExpandedTrend] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("All Protocols");
   const { checkGate, isPaywallOpen, closePaywall } = usePaywallGate();
-  const { isPremium } = usePremiumStatus();
+  const { isPremium, loading } = usePremiumStatus();
+
+  // Premium-only: entrada bloqueada para FREE
+  useEffect(() => {
+    if (loading) return;
+    if (isPremium) return;
+    checkGate({ trigger: "feature_locked", featureName: "personalized_plan" });
+  }, [checkGate, isPremium, loading]);
 
   const plan = useMemo(() => {
     const history = getAnalysisHistory();
@@ -75,6 +82,39 @@ export default function Trends() {
     ];
   }, [plan.bottlenecks]);
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0F] pt-6 pb-20 px-4 flex flex-col items-center justify-center">
+        <div className="h-20 w-20 rounded-full bg-white/5 flex items-center justify-center mb-6">
+          <Sparkles className="h-10 w-10 text-white/70 animate-pulse" />
+        </div>
+        <h1 className="font-bold text-2xl text-white mb-2">Carregando...</h1>
+        <p className="text-white/60 text-center max-w-xs mb-6">
+          Preparando seu plano personalizado.
+        </p>
+      </div>
+    );
+  }
+
+  if (!isPremium) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0F] pt-6 pb-20 px-4 flex flex-col items-center justify-center">
+        <div className="h-20 w-20 rounded-full bg-white/5 flex items-center justify-center mb-6">
+          <ShieldCheck className="h-10 w-10 text-white/70" />
+        </div>
+        <h1 className="font-bold text-2xl text-white mb-2">Recurso Premium</h1>
+        <p className="text-white/60 text-center max-w-xs mb-6">
+          O plano personalizado é exclusivo para assinantes Premium.
+        </p>
+        <Button
+          onClick={() => checkGate({ trigger: "feature_locked", featureName: "personalized_plan" })}
+          className="rounded-full bg-white text-black hover:bg-gray-200"
+        >
+          Desbloquear Premium
+        </Button>
+      </div>
+    );
+  }
 
   if (!plan.hasAnalysis) {
     return (

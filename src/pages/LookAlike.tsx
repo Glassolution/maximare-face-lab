@@ -53,7 +53,48 @@ export default function LookAlike() {
   const [analysisStage, setAnalysisStage] = useState(0); // 0-4 for checklist
   const [consent, setConsent] = useState(false);
   const { checkGate } = usePaywallGate();
-  const { isPremium } = usePremiumStatus();
+  const { isPremium, loading } = usePremiumStatus();
+
+  // Premium-only: bloqueia o recurso inteiro (não só o reveal)
+  useEffect(() => {
+    if (loading) return;
+    if (isPremium) return;
+    checkGate({ trigger: "feature_locked", featureName: "lookalike" });
+  }, [checkGate, isPremium, loading]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen pt-20 px-4 flex flex-col items-center text-center max-w-md mx-auto">
+        <div className="mb-8 relative">
+          <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full" />
+          <Search className="h-20 w-20 text-primary relative z-10 animate-pulse" />
+        </div>
+        <h1 className="font-heading text-3xl font-bold mb-4">Carregando...</h1>
+        <p className="text-muted-foreground mb-8">Só um instante.</p>
+      </div>
+    );
+  }
+
+  if (!isPremium) {
+    return (
+      <div className="min-h-screen pt-20 px-4 flex flex-col items-center text-center max-w-md mx-auto">
+        <div className="mb-8 relative">
+          <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full" />
+          <Lock className="h-20 w-20 text-primary relative z-10" />
+        </div>
+        <h1 className="font-heading text-3xl font-bold mb-4">Recurso Premium</h1>
+        <p className="text-muted-foreground mb-8">
+          “Quem é seu sósia?” é exclusivo para assinantes Premium.
+        </p>
+        <Button
+          onClick={() => checkGate({ trigger: "feature_locked", featureName: "lookalike" })}
+          className="w-full max-w-xs rounded-2xl py-6 text-base glow-primary"
+        >
+          Desbloquear Premium
+        </Button>
+      </div>
+    );
+  }
 
   const startWebcam = useCallback(async () => {
     if (isPremium) {

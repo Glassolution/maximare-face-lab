@@ -72,14 +72,8 @@ const CONTEXT_CONFIG: Record<string, { title: string; description: string; benef
 
 export const PaywallModal = ({ open, onClose, onUpgrade, context }: Props) => {
   const { profile } = useAuth();
-  
-  // Verificação definitiva de premium - não renderiza NADA se for premium
-  const isPremiumProfile = profile?.premium === true || profile?.is_premium === true || profile?.subscription_status === 'active';
-  if (isPremiumProfile) {
-    return null;
-  }
-  
-  // Use Global Store to manage visibility of second modal
+
+  // Hooks sempre no topo (evita violação das Rules of Hooks)
   const { isPopupOpen, closePopup, popupContext } = usePaywallStore();
   const navigate = useNavigate();
   const { isPremium } = usePremiumStatus();
@@ -89,6 +83,12 @@ export const PaywallModal = ({ open, onClose, onUpgrade, context }: Props) => {
       onClose();
     }
   }, [open, isPremium, onClose]);
+
+  // Verificação definitiva de premium - não renderiza NADA se for premium
+  // (usa o mesmo critério "strict" do app em vez de checar campos soltos do profile)
+  if (isPremium) {
+    return null;
+  }
 
   // If Main modal is open, Popup modal should be closed by store logic
   // Here we just render Popup if state says so
