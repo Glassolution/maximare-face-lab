@@ -71,6 +71,14 @@ export default function BattleRoom() {
   const [stableOpponentPhotoUrl, setStableOpponentPhotoUrl] = useState<string | null>(null);
   const [photosPreloaded, setPhotosPreloaded] = useState(false);
   const [processingDeadlineMs, setProcessingDeadlineMs] = useState<number | null>(null);
+  
+  // Estado persistente para as URLs finais do resultado (não dependem de battle estar disponível)
+  const [finalResultPhotos, setFinalResultPhotos] = useState<{
+    winner: string | null;
+    loser: string | null;
+    creatorId: string | null;
+    opponentId: string | null;
+  }>({ winner: null, loser: null, creatorId: null, opponentId: null });
 
   useEffect(() => {
     if (!battle) return;
@@ -78,11 +86,47 @@ export default function BattleRoom() {
     if (battle.challenger_photo_url) setStableCreatorPhotoUrl(battle.challenger_photo_url);
     if (battle.opponent_photo_url) setStableOpponentPhotoUrl(battle.opponent_photo_url);
     if (battle.ready_at && !photosPreloaded) setPhotosPreloaded(true); // Fallback if images fail
+    
+    // Salvar as URLs finais quando a batalha termina para garantir que tenhamos no resultado
+    if (battle.status === 'finished' && battle.challenger_photo_url && battle.opponent_photo_url) {
+      setFinalResultPhotos({
+        creatorId: battle.created_by,
+        opponentId: battle.opponent_id,
+        winner: null, // Será definido quando tivermos o resultado
+        loser: null    // Será definido quando tivermos o resultado
+      });
+    }
   }, [battle, photosPreloaded]);
 
   const isCreator = battle?.created_by === userProfile?.id;
   const myStablePhotoUrl = isCreator ? stableCreatorPhotoUrl : stableOpponentPhotoUrl;
   const opponentStablePhotoUrl = isCreator ? stableOpponentPhotoUrl : stableCreatorPhotoUrl;
+
+  // Atualizar as fotos do resultado quando o resultado for recebido
+  useEffect(() => {
+    if (result && stableCreatorPhotoUrl && stableOpponentPhotoUrl) {
+      const creatorPhoto = isCreator ? myStablePhotoUrl : opponentStablePhotoUrl;
+      const opponentPhoto = isCreator ? opponentStablePhotoUrl : myStablePhotoUrl;
+      
+      const winnerPhoto = result.winner_id === battle?.created_by ? creatorPhoto : opponentPhoto;
+      const loserPhoto = result.loser_id === battle?.created_by ? creatorPhoto : opponentPhoto;
+      
+      setFinalResultPhotos(prev => ({
+        ...prev,
+        winner: winnerPhoto,
+        loser: loserPhoto
+      }));
+      
+      console.log('[BattleRoom] RESULT PHOTOS UPDATED:', {
+        result,
+        creatorPhoto,
+        opponentPhoto,
+        winnerPhoto,
+        loserPhoto,
+        isCreator
+      });
+    }
+  }, [result, stableCreatorPhotoUrl, stableOpponentPhotoUrl, isCreator, myStablePhotoUrl, opponentStablePhotoUrl, battle?.created_by]);
 
   useEffect(() => {
     if (!battle) return;
@@ -243,8 +287,36 @@ export default function BattleRoom() {
   if ((battle.status === 'finished' || showResultScreen) && result) {
        // Logic to determine labels and colors based on winner/loser
       // Assuming user logged in is viewing
-      const winnerPhotoUrl = result.winner_id === userProfile?.id ? myBattlePhotoUrl : opponentBattlePhotoUrl;
-      const loserPhotoUrl = result.loser_id === userProfile?.id ? myBattlePhotoUrl : opponentBattlePhotoUrl;
+      
+      console.log('[BattleRoom] RESULT SCREEN DEBUG:', {
+        result,
+        battle: !!battle,
+        battleChallengerPhoto: battle?.challenger_photo_url,
+        battleOpponentPhoto: battle?.opponent_photo_url,
+        myStablePhotoUrl,
+        opponentStablePhotoUrl,
+        myBattlePhotoUrl,
+        opponentBattlePhotoUrl,
+        userProfileId: userProfile?.id,
+        opponentProfileId: opponentProfile?.id,
+        isCreator
+      });
+      
+      const winnerPhotoUrl = finalResultPhotos.winner || 
+    (result.winner_id === userProfile?.id ? myBattlePhotoUrl : opponentBattlePhotoUrl) ||
+    getAvatarUrl(result.winner_id === userProfile?.id ? userProfile : opponentProfile);
+  const loserPhotoUrl = finalResultPhotos.loser || 
+    (result.loser_id === userProfile?.id ? myBattlePhotoUrl : opponentBattlePhotoUrl) ||
+    getAvatarUrl(result.loser_id === userProfile?.id ? userProfile : opponentProfile);
+  
+  console.log('[BattleRoom] FINAL PHOTO URLS (CORRECTED):', {
+    finalResultPhotos,
+    winnerPhotoUrl,
+    loserPhotoUrl,
+    winnerId: result.winner_id,
+    loserId: result.loser_id,
+    fallbackUsed: !finalResultPhotos.winner || !finalResultPhotos.loser
+  });
 
       return (
           <div className="container max-w-lg mx-auto py-8 px-4 space-y-8 animate-in fade-in duration-500 pb-32">
