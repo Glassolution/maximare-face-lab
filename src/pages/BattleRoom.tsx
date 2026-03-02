@@ -232,8 +232,22 @@ export default function BattleRoom() {
   const mySubmission = submissions.find(s => s.user_id === userProfile?.id);
   const opponentSubmission = submissions.find(s => s.user_id !== userProfile?.id);
 
-  const myBattlePhotoUrl = myStablePhotoUrl || getBattlePhotoUrl(mySubmission) || getAvatarUrl(userProfile?.avatar_url);
-  const opponentBattlePhotoUrl = opponentStablePhotoUrl || getBattlePhotoUrl(opponentSubmission) || getAvatarUrl(opponentProfile?.avatar_url);
+  const myBattlePhotoUrl = myStablePhotoUrl || getBattlePhotoUrl(mySubmission) || (() => {
+      console.log('[DEBUG MY AVATAR]:', {
+        'userProfile': userProfile,
+        'userProfile?.avatar_url': userProfile?.avatar_url,
+        'typeof avatar_url': typeof userProfile?.avatar_url
+      });
+      return getAvatarUrl(userProfile?.avatar_url);
+    })();
+  const opponentBattlePhotoUrl = opponentStablePhotoUrl || getBattlePhotoUrl(opponentSubmission) || (() => {
+      console.log('[DEBUG OPPONENT AVATAR]:', {
+        'opponentProfile': opponentProfile,
+        'opponentProfile?.avatar_url': opponentProfile?.avatar_url,
+        'typeof avatar_url': typeof opponentProfile?.avatar_url
+      });
+      return getAvatarUrl(opponentProfile?.avatar_url);
+    })();
 
   if ((battle.status === 'ready' || battle.status === 'running' || battle.status === 'finished') && !photosPreloaded) {
     return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-8 w-8" /></div>;
