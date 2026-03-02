@@ -4,11 +4,13 @@ import { PaywallContext, shouldShowPaywall, recordPaywallShow, recordPaywallDism
 import { usePaywallStore } from '@/lib/paywallStore';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { usePremiumStatus } from '@/hooks/usePremiumStatus';
 
 export function usePaywallGate() {
   const navigate = useNavigate();
   const { openMain, closeMain, isMainOpen, mainContext } = usePaywallStore();
   const { profile } = useAuth();
+  const { isPremium } = usePremiumStatus();
   
   // TODOS os hooks primeiro, sem exceção
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
@@ -33,9 +35,6 @@ export function usePaywallGate() {
 
   // Verificação de premium DENTRO da função, não no corpo do hook
   const checkGate = useCallback(async (triggerContext: PaywallContext): Promise<boolean> => {
-    // Verificação de premium DENTRO da função
-    const isPremium = profile?.is_premium === true || profile?.subscription_status === 'active';
-    
     console.log('[PaywallGate] checkGate chamado:', {
       trigger: triggerContext.trigger,
       isPremium,
@@ -85,7 +84,7 @@ export function usePaywallGate() {
       console.error("Error checking paywall gate:", error);
       return true; // Fail safe: allow access if error
     }
-  }, [navigate, openMain, setIsPaywallOpen]);
+  }, [navigate, openMain, setIsPaywallOpen, isPremium, profile?.is_premium, profile?.subscription_status]);
 
   return {
     checkGate,

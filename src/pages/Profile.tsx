@@ -202,12 +202,19 @@ export default function Profile() {
     (user && (user.user_metadata?.full_name || user.user_metadata?.name || user.email)) || "Usuário MAXIMARE";
 
   const isAdmin = profile?.is_admin || user?.email === 'xavierluisfelipe12@gmail.com';
+  const isCreator = !!profile?.is_ugc;
 
   const menuItems: MenuItem[] = [
     { label: "Plano Pro", icon: Crown, desc: isPremium ? "Gerenciar assinatura" : "Desbloqueie tudo", path: isPremium ? "#" : "/premium", onClick: isPremium ? () => setShowSubscription(true) : undefined },
     { label: "Progresso", icon: TrendingUp, desc: "Seu histórico", path: "/progress" },
     { label: "Configurações", icon: Settings, desc: "Preferências", path: "#", onClick: () => setShowPreferences(true) },
     { label: "Privacidade", icon: Shield, desc: "Seus dados", path: "/privacy" },
+    ...(isCreator ? [{
+      label: "Painel de Criador",
+      icon: LayoutDashboard,
+      desc: "Ferramentas para criador UGC",
+      path: "/creator"
+    }] : []),
     ...(isAdmin ? [{
       label: "Admin Dashboard",
       icon: LayoutDashboard,

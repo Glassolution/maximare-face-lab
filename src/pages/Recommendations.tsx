@@ -198,11 +198,18 @@ export default function Recommendations() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [tutorialTrend, setTutorialTrend] = useState<SmartTrend | null>(null);
   const { checkGate } = usePaywallGate();
-  const { isPremium } = usePremiumStatus();
+  const { isPremium, loading } = usePremiumStatus();
 
   useEffect(() => {
+    if (loading) return;
     if (isPremium) return;
+    // Premium-only: bloqueia entrada e evita gerar/renderizar o plano para free
     checkGate({ trigger: "feature_locked", featureName: "recommendations_plan" });
+  }, [checkGate, isPremium, loading]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!isPremium) return;
     const history = getAnalysisHistory();
     if (history.length > 0) {
       const latest = history[0];
@@ -212,7 +219,32 @@ export default function Recommendations() {
         setExpanded(generatedPlan.trends[0].id);
       }
     }
-  }, [isPremium]);
+  }, [isPremium, loading]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen pt-24 flex flex-col items-center justify-center px-4 text-center">
+        <Zap className="h-10 w-10 text-muted-foreground/40 mb-4 animate-pulse" />
+        <h2 className="text-lg font-semibold mb-2">Carregando seu plano...</h2>
+        <p className="text-sm text-muted-foreground mb-6 max-w-xs">Só um instante.</p>
+      </div>
+    );
+  }
+
+  if (!isPremium) {
+    return (
+      <div className="min-h-screen pt-24 flex flex-col items-center justify-center px-4 text-center">
+        <Zap className="h-10 w-10 text-muted-foreground/40 mb-4" />
+        <h2 className="text-lg font-semibold mb-2">Recurso Premium</h2>
+        <p className="text-sm text-muted-foreground mb-6 max-w-xs">
+          O plano personalizado é exclusivo para assinantes Premium.
+        </p>
+        <Button onClick={() => checkGate({ trigger: "feature_locked", featureName: "recommendations_plan" })}>
+          Desbloquear Premium
+        </Button>
+      </div>
+    );
+  }
 
   if (!plan) {
     return (
