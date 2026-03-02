@@ -1,14 +1,37 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { getAnalysisHistory } from "@/lib/mockData";
+import { getAnalysisHistory, deleteAnalysis, clearLocalHistory, syncHistoryWithSupabase } from "@/lib/mockData";
 import { Link } from "react-router-dom";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { Button } from "@/components/ui/button";
-import { Calendar, TrendingUp, ArrowUp } from "lucide-react";
+import { Calendar, TrendingUp, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function ProgressPage() {
-  const history = getAnalysisHistory();
+  const [history, setHistory] = useState(getAnalysisHistory());
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  useEffect(() => {
+    setHistory(getAnalysisHistory());
+  }, []);
+
+  const handleClearAll = async () => {
+    if (history.length === 0) return;
+    let removed = 0;
+    for (const h of history) {
+      try {
+        const r = await deleteAnalysis(h.id);
+        if (r.ok && r.deleted > 0) removed += r.deleted;
+      } catch {}
+    }
+    try { clearLocalHistory(); } catch {}
+    await syncHistoryWithSupabase();
+    setHistory(getAnalysisHistory());
+    // Sem toast aqui para manter a página limpa; o usuário verá a lista vazia
+    console.log(`[Progress] Histórico limpo. Removidos no servidor: ${removed}`);
+  };
 
   const chartData = [...history].reverse().map((a) => ({
     date: format(new Date(a.date), "dd/MM", { locale: ptBR }),
@@ -87,7 +110,16 @@ export default function ProgressPage() {
 
             {/* Timeline */}
             <div className="space-y-2.5">
-              <h3 className="font-heading text-sm font-bold text-foreground">Histórico</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-heading text-sm font-bold text-foreground">Histórico</h3>
+                <button
+                  onClick={() => setConfirmOpen(true)}
+                  title="Limpar histórico"
+                  className="p-1 rounded-md text-destructive hover:text-destructive/90 hover:bg-muted/40 transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
               {history.map((a, i) => (
                 <motion.div key={a.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15 + i * 0.04 }}>
                   <Link to={`/results/${a.id}`}
@@ -115,6 +147,24 @@ export default function ProgressPage() {
           </div>
         )}
       </div>
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="rounded-2xl glass-strong border border-muted max-w-[340px] p-5">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-lg">Você tem certeza desta ação?</DialogTitle>
+          </DialogHeader>
+          <div className="mt-3 text-base text-foreground/90">
+            Isso vai limpar seu histórico por aqui. Quer continuar?
+          </div>
+          <div className="mt-6 flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setConfirmOpen(false)} className="rounded-xl">
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={async () => { setConfirmOpen(false); await handleClearAll(); }} className="rounded-xl">
+              Confirmar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -15,7 +15,11 @@ import {
   Target,
   ArrowUpRight
 } from "lucide-react";
+<<<<<<< HEAD
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
+=======
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Legend } from 'recharts';
+>>>>>>> recuperado
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -29,6 +33,7 @@ interface AdminPurchase {
   plan: string;
   amount_cents: number;
   provider: string;
+  payment_method?: string | null;
   status: string;
   created_at: string;
 }
@@ -125,18 +130,32 @@ const AdminFinance = () => {
     refunds: 0,
     churnRate: 0,
     netRevenue: 0,
+<<<<<<< HEAD
     mrr: 0,
     mrrReal: 0,
     arrReal: 0,
+=======
+    mrr: 0,            // Projeção
+    mrrReal: 0,        // Real (últimos 30 dias)
+    arrReal: 0,        // Real (12 meses)
+>>>>>>> recuperado
     totalSubscribers: 0
   });
+  const [mode, setMode] = useState<'real' | 'projection'>(() => (localStorage.getItem('finance_mode') as 'real' | 'projection') || 'projection');
   const [showNetRevenue, setShowNetRevenue] = useState(false);
   const [viewMode, setViewMode] = useState<'real' | 'projection'>('projection');
   const [revenueChartData, setRevenueChartData] = useState<any[]>([]);
   const [revenueDays, setRevenueDays] = useState(30);
+<<<<<<< HEAD
   const [paymentBehaviorData, setPaymentBehaviorData] = useState<any[]>([]);
   const [paymentBehaviorLoading, setPaymentBehaviorLoading] = useState(true);
   const [paymentBehaviorError, setPaymentBehaviorError] = useState<string | null>(null);
+=======
+  const [categories, setCategories] = useState<{ label: string; count: number; percent: number; color: string }[]>([]);
+  const [recentEvents, setRecentEvents] = useState<Array<{ id: string; title: string; when: string; amount: string; cls: string; icon: 'up' | 'down' | 'pending' | 'rejected' }>>([]);
+  const [methodPieData, setMethodPieData] = useState<Array<{ name: string; value: number; color: string }>>([]);
+  const [methodTotal, setMethodTotal] = useState(0);
+>>>>>>> recuperado
 
   // Hook para buscar receita diária real (tabela payments)
   const fetchRevenueChartData = async (days: number) => {
@@ -286,8 +305,14 @@ const AdminFinance = () => {
       // 2. Fetch Active Subscribers for MRR
       const { data: subscribersData, error: subError } = await supabase
         .from('profiles')
+<<<<<<< HEAD
         .select('plan_type, premium_status')
         .eq('premium_status', true);
+=======
+        .select('plan_type')
+        .eq('is_premium', true)
+        .eq('subscription_status', 'active');
+>>>>>>> recuperado
       
       if (subError) throw subError;
 
@@ -326,7 +351,7 @@ const AdminFinance = () => {
         .filter((p: any) => (p.status === 'refunded' || p.status === 'charged_back') && p.created_at >= startOfCurrentMonth)
         .reduce((acc: number, p: any) => acc + (p.amount_cents || 0), 0);
 
-      // MRR Calculation based on active plans
+      // MRR Projection based on active plans
       // Weekly: 24.90 * 4.33 approx
       // Monthly: 49.90
       // Annual: 499.90 / 12
@@ -336,7 +361,57 @@ const AdminFinance = () => {
         annual: 499.90 / 12 
       };
       
-      const mrr = (subscribersData || []).reduce((sum, p) => sum + (priceMap[p.plan_type || ''] || 0), 0);
+      const mrrProjection = (subscribersData || []).reduce((sum, p) => sum + (priceMap[p.plan_type || ''] || 0), 0);
+
+      // Real metrics
+      const last30Days = new Date();
+      last30Days.setDate(last30Days.getDate() - 30);
+      const last12Months = subMonths(new Date(), 12);
+
+      const mrrReal = purchaseList
+        .filter((p: any) => (p.status === 'approved' || p.status === 'paid') && new Date(p.created_at) >= last30Days)
+        .reduce((acc: number, p: any) => acc + (p.amount_cents || 0), 0) / 100;
+
+      const arrReal = purchaseList
+        .filter((p: any) => (p.status === 'approved' || p.status === 'paid') && new Date(p.created_at) >= last12Months)
+        .reduce((acc: number, p: any) => acc + (p.amount_cents || 0), 0) / 100;
+
+      // Categories by plan (distribution)
+      const counts = { weekly: 0, monthly: 0, annual: 0 } as Record<string, number>;
+      (subscribersData || []).forEach((p: any) => { if (p.plan_type) counts[p.plan_type] = (counts[p.plan_type] || 0) + 1; });
+      const totalActive = Object.values(counts).reduce((a, b) => a + b, 0);
+      setCategories([
+        { label: 'Semanal (R$24,90/sem)', count: counts.weekly || 0, percent: totalActive ? Math.round((counts.weekly || 0) / totalActive * 100) : 0, color: 'bg-blue-600' },
+        { label: 'Mensal (R$49,90/mês)', count: counts.monthly || 0, percent: totalActive ? Math.round((counts.monthly || 0) / totalActive * 100) : 0, color: 'bg-emerald-500' },
+        { label: 'Anual (R$499,90/ano)', count: counts.annual || 0, percent: totalActive ? Math.round((counts.annual || 0) / totalActive * 100) : 0, color: 'bg-purple-500' },
+      ]);
+
+      // Recent activity from real purchases (last 10)
+      const toAgo = (iso: string) => {
+        const diff = Date.now() - new Date(iso).getTime();
+        const mins = Math.floor(diff / 60000);
+        if (mins < 60) return `Há ${mins} minutos`;
+        const hours = Math.floor(mins / 60);
+        if (hours < 24) return `Há ${hours} horas`;
+        const days = Math.floor(hours / 24);
+        return `Há ${days} dias`;
+      };
+      const recent = [...purchaseList]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 10)
+        .map((p) => {
+          let title = 'Transação';
+          let cls = 'text-gray-900';
+          let icon: 'up' | 'down' | 'pending' | 'rejected' = 'up';
+          if (p.status === 'approved' || p.status === 'paid') { title = 'Novo Assinante'; cls = 'text-emerald-600'; icon = 'up'; }
+          else if (p.status === 'refunded' || p.status === 'charged_back') { title = 'Reembolso'; cls = 'text-red-500'; icon = 'down'; }
+          else if (p.status === 'pending') { title = 'Pagamento Pendente'; cls = 'text-amber-600'; icon = 'pending'; }
+          else { title = 'Pagamento Recusado'; cls = 'text-gray-500'; icon = 'rejected'; }
+          const sign = (p.status === 'refunded' || p.status === 'charged_back') ? '-' : (p.status === 'approved' || p.status === 'paid') ? '+' : '';
+          const amount = `${sign} R$ ${(p.amount_cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+          return { id: p.id, title, when: toAgo(p.created_at), amount, cls, icon };
+        });
+      setRecentEvents(recent);
 
       // Churn Rate
       const totalStart = (subscribersData?.length || 0) || 1; // base aproximada: assinantes premium atuais
@@ -365,11 +440,37 @@ const AdminFinance = () => {
         refunds: refundsMonth / 100,
         churnRate: churnRate,
         netRevenue: (monthRevenue - refundsMonth) / 100,
+<<<<<<< HEAD
         mrr: mrr,
         mrrReal: mrrReal / 100,
         arrReal: arrReal / 100,
+=======
+        mrr: mrrProjection,
+        mrrReal,
+        arrReal,
+>>>>>>> recuperado
         totalSubscribers: subscribersData?.length || 0
       });
+      const { data: pmRows } = await supabase
+        .from('purchases')
+        .select('payment_method, provider, amount_cents, status')
+        .in('status', ['approved', 'paid']);
+      const totals: Record<string, number> = {};
+      (pmRows || []).forEach((r: any) => {
+        const m = (r.payment_method || '').toString().toLowerCase() || '';
+        const method =
+          m === 'pix' ? 'pix'
+          : m === 'credit_card' || m === 'card' || m === 'stripe' ? 'credit_card'
+          : 'credit_card';
+        totals[method] = (totals[method] || 0) + (r.amount_cents || 0) / 100;
+      });
+      const pie = Object.entries(totals).map(([method, value]) => ({
+        name: method === 'pix' ? 'PIX' : 'Cartão de Crédito',
+        value,
+        color: method === 'pix' ? '#00C853' : '#2979FF'
+      }));
+      setMethodPieData(pie);
+      setMethodTotal(pie.reduce((a, b) => a + b.value, 0));
 
     } catch (error) {
       console.error("Error fetching finance data:", error);
@@ -392,15 +493,26 @@ const AdminFinance = () => {
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">Financeiro</h1>
           <p className="text-gray-500 mt-1">Gerencie suas receitas e transações de forma simplificada.</p>
         </div>
-        <div className="flex items-center space-x-2 bg-white p-2 rounded-lg border shadow-sm">
-          <Switch 
-            id="advanced-mode" 
-            checked={isAdvancedMode}
-            onCheckedChange={toggleAdvancedMode}
-          />
-          <Label htmlFor="advanced-mode" className="text-sm font-medium cursor-pointer">
-            Modo avançado
-          </Label>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center space-x-2 bg-white p-2 rounded-lg border shadow-sm">
+            <Switch 
+              id="advanced-mode" 
+              checked={isAdvancedMode}
+              onCheckedChange={toggleAdvancedMode}
+            />
+            <Label htmlFor="advanced-mode" className="text-sm font-medium cursor-pointer">
+              Modo avançado
+            </Label>
+          </div>
+          <div className="flex items-center gap-2 bg-white p-2 rounded-lg border shadow-sm">
+            <span className={mode === 'real' ? 'text-sm font-bold text-gray-900' : 'text-sm text-gray-400'}>Real</span>
+            <Switch
+              id="mode-toggle"
+              checked={mode === 'projection'}
+              onCheckedChange={(checked) => { const m = checked ? 'projection' : 'real'; setMode(m); localStorage.setItem('finance_mode', m); }}
+            />
+            <span className={mode === 'projection' ? 'text-sm font-bold text-gray-900' : 'text-sm text-gray-400'}>Projeção</span>
+          </div>
         </div>
       </div>
 
@@ -420,28 +532,34 @@ const AdminFinance = () => {
               </div>
               <p className="text-xs text-slate-400 mt-2">vs. mês anterior</p>
             </div>
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group" title={mode === 'real' ? 'MRR Real: Soma de transações aprovadas nos últimos 30 dias' : 'MRR Projeção: Assinantes ativos normalizados por mês'}>
               <div className="flex justify-between items-start mb-4">
                 <span className="text-slate-500 text-sm font-medium">MRR (Mensal)</span>
                 <div className="p-1.5 bg-gray-50 rounded-full text-gray-400">
                   <TrendingUp className="w-4 h-4" />
                 </div>
               </div>
-              <h2 className="text-2xl font-bold tracking-tight">R$ {stats.mrr.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h2>
+              <h2 className="text-2xl font-bold tracking-tight">
+                R$ {(mode === 'real' ? stats.mrrReal : stats.mrr).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </h2>
               <p className="text-xs text-slate-400 mt-2 flex items-center">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2"></span>
-                Projeção planos ativos
+                <span className={`w-1.5 h-1.5 rounded-full mr-2 ${mode === 'real' ? 'bg-blue-500' : 'bg-emerald-500'}`}></span>
+                {mode === 'real' ? '● Receita real últimos 30 dias' : '● Projeção planos ativos'}
               </p>
             </div>
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group" title={mode === 'real' ? 'ARR Real: Soma de transações aprovadas nos últimos 12 meses' : 'ARR Projeção: MRR projetado × 12'}>
               <div className="flex justify-between items-start mb-4">
                 <span className="text-slate-500 text-sm font-medium">ARR (Anual)</span>
                 <div className="p-1.5 bg-gray-50 rounded-full text-gray-400">
                   <TrendingUp className="w-4 h-4" />
                 </div>
               </div>
-              <h2 className="text-2xl font-bold tracking-tight">R$ {(stats.mrr * 12).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h2>
-              <p className="text-xs text-slate-400 mt-2">Projeção anual (MRR x 12)</p>
+              <h2 className="text-2xl font-bold tracking-tight">
+                R$ {(mode === 'real' ? stats.arrReal : (stats.mrr * 12)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </h2>
+              <p className="text-xs text-slate-400 mt-2">
+                {mode === 'real' ? 'Receita real últimos 12 meses' : 'Projeção anual (MRR × 12)'}
+              </p>
             </div>
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
               <div className="flex justify-between items-start mb-4">
@@ -549,72 +667,88 @@ const AdminFinance = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+              <h3 className="text-lg font-bold text-gray-900">Métodos de Pagamento</h3>
+              <p className="text-xs text-slate-400 mb-2">Distribuição por receita</p>
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <PieChart width={300} height={250}>
+                  <Pie
+                    data={methodPieData}
+                    cx={150}
+                    cy={110}
+                    innerRadius={60}
+                    outerRadius={90}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {methodPieData.map((entry, i) => (
+                      <Cell key={i} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: any) => `R$ ${Number(value).toFixed(2)}`} />
+                  <Legend />
+                </PieChart>
+                <div className="flex-1 w-full space-y-1">
+                  {methodPieData.map((item) => (
+                    <div key={item.name} className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: item.color }}></span>
+                        {item.name}
+                      </span>
+                      <span className="text-gray-700">
+                        {methodTotal ? `${((item.value / methodTotal) * 100).toFixed(1)}%` : '0%'} · R$ {item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Observações</h3>
+              <p className="text-xs text-slate-500">PIX liquida imediatamente. Cartões podem permanecer como “pending”.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                 <h3 className="text-lg font-bold text-gray-900 mb-6">Receita por Categoria</h3>
                 <div className="space-y-6">
-                  <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-gray-600 font-medium">Assinaturas SaaS</span>
-                      <span className="text-gray-900 font-bold">72%</span>
+                  {categories.map((c) => (
+                    <div key={c.label}>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span className="text-gray-600 font-medium">
+                          {c.label}
+                        </span>
+                        <span className="text-gray-900 font-bold">{c.percent}% ({c.count} assinantes)</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2">
+                        <div className={`h-2 rounded-full ${c.color}`} style={{ width: `${c.percent}%` }}></div>
+                      </div>
                     </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
-                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: '72%' }}></div>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-gray-600 font-medium">Serviços de Consultoria</span>
-                      <span className="text-gray-900 font-bold">18%</span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
-                      <div className="bg-emerald-500 h-2 rounded-full" style={{ width: '18%' }}></div>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-gray-600 font-medium">Taxas de Instalação</span>
-                      <span className="text-gray-900 font-bold">10%</span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
-                      <div className="bg-slate-400 h-2 rounded-full" style={{ width: '10%' }}></div>
-                    </div>
-                  </div>
+                  ))}
                 </div>
              </div>
              
              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                 <h3 className="text-lg font-bold text-gray-900 mb-6">Atividade Recente</h3>
                 <div className="space-y-6">
-                   <div className="flex items-start space-x-4">
-                      <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 mt-1">
-                         <ArrowUpRight className="w-4 h-4" />
+                  {recentEvents.map((e) => (
+                    <div key={e.id} className="flex items-start space-x-4">
+                      <div className={`p-2 rounded-lg mt-1 ${
+                        e.icon === 'up' ? 'bg-emerald-50 text-emerald-600' :
+                        e.icon === 'down' ? 'bg-red-50 text-red-600' :
+                        e.icon === 'pending' ? 'bg-amber-50 text-amber-600' :
+                        'bg-gray-50 text-gray-500'
+                      }`}>
+                        <ArrowUpRight className={`w-4 h-4 ${e.icon === 'down' ? 'rotate-180' : ''}`} />
                       </div>
                       <div className="flex-1">
-                         <p className="text-sm font-bold text-gray-900">Novo Assinante</p>
-                         <p className="text-xs text-gray-400">Há 5 minutos</p>
+                        <p className="text-sm font-bold text-gray-900">{e.title}</p>
+                        <p className="text-xs text-gray-400">{e.when}</p>
                       </div>
-                      <span className="text-sm font-bold text-gray-900">+ R$ 450,00</span>
-                   </div>
-                   <div className="flex items-start space-x-4">
-                      <div className="p-2 rounded-lg bg-red-50 text-red-600 mt-1">
-                         <ArrowUpRight className="w-4 h-4 rotate-180" />
-                      </div>
-                      <div className="flex-1">
-                         <p className="text-sm font-bold text-gray-900">Reembolso Processado</p>
-                         <p className="text-xs text-gray-400">Há 2 horas</p>
-                      </div>
-                      <span className="text-sm font-bold text-red-500">- R$ 1.200,00</span>
-                   </div>
-                   <div className="flex items-start space-x-4">
-                      <div className="p-2 rounded-lg bg-blue-50 text-blue-600 mt-1">
-                         <Target className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1">
-                         <p className="text-sm font-bold text-gray-900">Upgrade de Plano</p>
-                         <p className="text-xs text-gray-400">Há 4 horas</p>
-                      </div>
-                      <span className="text-sm font-bold text-emerald-500">+ R$ 890,00</span>
-                   </div>
+                      <span className={`text-sm font-bold ${e.cls}`}>{e.amount}</span>
+                    </div>
+                  ))}
                 </div>
              </div>
           </div>
@@ -863,15 +997,23 @@ const AdminFinance = () => {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className={`text-sm font-bold ${purchase.status === 'refunded' || purchase.status === 'charged_back' ? 'text-red-600' : 'text-gray-900'}`}>
+                      <span className={`text-sm font-bold ${purchase.status === 'refunded' || purchase.status === 'charged_back' ? 'text-red-600' : 'text-gray-900'}`}>
                           {purchase.status === 'refunded' || purchase.status === 'charged_back' ? '-' : ''} 
                           R$ {(purchase.amount_cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="font-normal text-gray-500 border-gray-200 bg-white">
-                          {purchase.provider === 'stripe' ? 'Mercado Pago' : purchase.provider === 'mercadopago' ? 'Mercado Pago' : purchase.provider}
+                      {purchase.payment_method === 'pix' ? (
+                        <Badge className="bg-emerald-50 text-emerald-600 border-none font-medium flex items-center gap-1">
+                          <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+                          PIX
                         </Badge>
+                      ) : (
+                        <Badge className="bg-blue-50 text-blue-600 border-none font-medium flex items-center gap-1">
+                          <span className="inline-block w-2 h-2 rounded-full bg-blue-500"></span>
+                          Cartão
+                        </Badge>
+                      )}
                       </TableCell>
                       <TableCell>
                         <Badge 
