@@ -134,6 +134,8 @@ export function useReferralCode() {
 
   // Load existing referral code from database
   const loadExistingCode = async (userId: string) => {
+    console.log('📋 Loading existing code for userId:', userId);
+    
     try {
       const { data, error } = await supabase
         .from('referral_codes')
@@ -141,14 +143,18 @@ export function useReferralCode() {
         .eq('creator_id', userId)
         .single();
 
+      console.log('📊 Database query result:', { data, error });
+
       if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-        console.error('Error loading existing code:', error);
+        console.error('❌ Error loading existing code:', error);
         return null;
       }
 
-      return data?.code || null;
+      const code = data?.code || null;
+      console.log('📋 Code loaded from database:', code);
+      return code;
     } catch (error) {
-      console.error('Error loading existing code:', error);
+      console.error('❌ Exception loading existing code:', error);
       return null;
     }
   };
@@ -160,13 +166,19 @@ export function useReferralCode() {
       return;
     }
     
-    console.log('💾 Attempting to save code to database:', code);
+    console.log('💾 Attempting to save code to database:', { 
+      userId: user.id, 
+      code: code,
+      is_ugc: profile?.is_ugc 
+    });
     
     try {
       const { data, error } = await supabase.rpc('generate_referral_code', {
         p_creator_id: user.id,
         p_code: code
       });
+
+      console.log('📊 Save operation result:', { data, error });
 
       if (error) {
         console.error('❌ Error saving referral code:', error);
