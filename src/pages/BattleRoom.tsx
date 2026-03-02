@@ -40,9 +40,31 @@ export default function BattleRoom() {
   };
 
   const getAvatarUrl = (pathOrUrl: string | null | undefined) => {
-      if (!pathOrUrl) return null;
-      if (pathOrUrl.startsWith('http') || pathOrUrl.startsWith('data:')) return pathOrUrl;
-      return supabase.storage.from('avatars').getPublicUrl(pathOrUrl).data.publicUrl;
+    if (!pathOrUrl) return null;
+    if (pathOrUrl.startsWith('http') || pathOrUrl.startsWith('data:')) return pathOrUrl;
+    return supabase.storage.from('avatars').getPublicUrl(pathOrUrl).data.publicUrl;
+  };
+
+  const getBattlePhotoUrl = (submission: any | null | undefined) => {
+    if (!submission) return null;
+    const raw =
+      submission.front_url ||
+      submission.front_photo_url ||
+      submission.photo_url ||
+      submission.image_url ||
+      submission.front_photo_path;
+
+    if (!raw) return null;
+    if (typeof raw === 'string' && (raw.startsWith('http') || raw.startsWith('data:'))) {
+      return raw;
+    }
+
+    try {
+      const { data } = supabase.storage.from('battle-photos').getPublicUrl(raw);
+      return data.publicUrl;
+    } catch {
+      return null;
+    }
   };
 
   const [stableCreatorPhotoUrl, setStableCreatorPhotoUrl] = useState<string | null>(null);
@@ -149,6 +171,9 @@ export default function BattleRoom() {
   const mySubmission = submissions.find(s => s.user_id === userProfile?.id);
   const opponentSubmission = submissions.find(s => s.user_id !== userProfile?.id);
 
+  const myBattlePhotoUrl = myStablePhotoUrl || getBattlePhotoUrl(mySubmission) || getAvatarUrl(userProfile?.avatar_url);
+  const opponentBattlePhotoUrl = opponentStablePhotoUrl || getBattlePhotoUrl(opponentSubmission) || getAvatarUrl(opponentProfile?.avatar_url);
+
   if ((battle.status === 'ready' || battle.status === 'running' || battle.status === 'finished') && !photosPreloaded) {
     return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-8 w-8" /></div>;
   }
@@ -191,8 +216,8 @@ export default function BattleRoom() {
       (battle.status === 'ready' || battle.status === 'running') && !!myStablePhotoUrl && !!opponentStablePhotoUrl && !hardTimedOut;
 
   if (shouldShowProcessing) {
-      const myAvatar = myStablePhotoUrl || getAvatarUrl(userProfile?.avatar_url);
-      const opponentAvatar = opponentStablePhotoUrl || getAvatarUrl(opponentProfile?.avatar_url);
+      const myAvatar = myBattlePhotoUrl;
+      const opponentAvatar = opponentBattlePhotoUrl;
 
       const startTime = battle.start_at ? new Date(battle.start_at).getTime() : (battle.matched_at ? new Date(battle.matched_at).getTime() : undefined);
       const adjustedStartTime = startTime ? startTime - serverTimeOffsetMs : undefined;
@@ -215,6 +240,9 @@ export default function BattleRoom() {
   if ((battle.status === 'finished' || showResultScreen) && result) {
        // Logic to determine labels and colors based on winner/loser
       // Assuming user logged in is viewing
+      const winnerPhotoUrl = result.winner_id === userProfile?.id ? myBattlePhotoUrl : opponentBattlePhotoUrl;
+      const loserPhotoUrl = result.loser_id === userProfile?.id ? myBattlePhotoUrl : opponentBattlePhotoUrl;
+
       return (
           <div className="container max-w-lg mx-auto py-8 px-4 space-y-8 animate-in fade-in duration-500 pb-32">
               <div className="text-center space-y-2">
@@ -232,8 +260,8 @@ export default function BattleRoom() {
                       </div>
                       <div className="pt-8 pb-4 px-2 text-center bg-card">
                           <div className="h-20 w-20 mx-auto rounded-full border-4 border-amber-500 overflow-hidden mb-2 bg-muted relative">
-                                <Avatar className="h-full w-full">
-                                    <AvatarImage src={result.winner_id === userProfile?.id ? (myStablePhotoUrl || userProfile?.avatar_url || undefined) : (opponentStablePhotoUrl || opponentProfile?.avatar_url || undefined)} />
+                              <Avatar className="h-full w-full">
+                                    <AvatarImage src={winnerPhotoUrl || undefined} />
                                     <AvatarFallback>WIN</AvatarFallback>
                                 </Avatar>
                           </div>
@@ -250,7 +278,7 @@ export default function BattleRoom() {
                       <div className="pt-8 pb-4 px-2 text-center bg-card">
                            <div className="h-20 w-20 mx-auto rounded-full border-2 border-muted overflow-hidden mb-2 bg-muted relative">
                                 <Avatar className="h-full w-full">
-                                    <AvatarImage src={result.loser_id === userProfile?.id ? (myStablePhotoUrl || userProfile?.avatar_url || undefined) : (opponentStablePhotoUrl || opponentProfile?.avatar_url || undefined)} />
+                                    <AvatarImage src={loserPhotoUrl || undefined} />
                                     <AvatarFallback>RIP</AvatarFallback>
                                 </Avatar>
                           </div>
