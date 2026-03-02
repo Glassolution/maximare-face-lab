@@ -117,7 +117,7 @@ serve(async (req) => {
             
             if (userId && payment.status === 'approved') {
                 // Determine duration via plan_id in metadata, or fallback to description
-                let planId = payment.metadata?.plan_id;
+                const planId = payment.metadata?.plan_id;
 
                 // Insert/Update Payments Table (Audit)
                 const { error: paymentError } = await supabaseAdmin.from('payments').upsert({

@@ -50,7 +50,7 @@ serve(async (req) => {
         // Logic to determine plan duration
         let planType = 'monthly';
         let days = 30;
-        let planId = payment.metadata?.plan_id;
+        const planId = payment.metadata?.plan_id;
 
         // Try to fetch plan from metadata or description
         const description = payment.description || '';

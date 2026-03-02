@@ -263,7 +263,7 @@ function backoffDelay(retryCount: number) {
 async function withTimeout<T>(p: Promise<T>, ms: number, onTimeout: () => void): Promise<T> {
   const timeout = new Promise<T>((_, reject) => {
     const id = setTimeout(() => {
-      try { onTimeout(); } catch {}
+      try { onTimeout(); } catch (err) { void err; }
       reject(new Error("job_timeout"));
     }, ms);
     // Deno timers don't need cleanup here; we clear in process path

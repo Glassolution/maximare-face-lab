@@ -82,6 +82,7 @@ export function useBattleRoom(battleId: string) {
       });
       if (rpcError) {
         console.error('[Battle] ensure_battle_progress_v3 failed', { battleId, rpcError });
+        console.error('[Battle] ensure error body:', rpcError);
         return;
       }
       if (data && (data as any).success === false) {
@@ -166,8 +167,21 @@ export function useBattleRoom(battleId: string) {
       });
 
       const needsResult = b.status === 'finished' && !result;
-      const notFinished = b.status !== 'finished' && b.status !== 'canceled' && b.status !== 'expired';
+      const shouldStop =
+        b.status === 'finished' ||
+        b.status === 'canceled' ||
+        b.status === 'expired' ||
+        !!result;
+      const notFinished = !shouldStop;
       
+      if (shouldStop) {
+        console.log('[Battle][poll] stopping', { battleId, status: b.status, hasResult: !!result });
+        if (watchdogRef.current) {
+          clearInterval(watchdogRef.current);
+          watchdogRef.current = undefined;
+        }
+        return;
+      }
       if (notFinished) {
         ensureBattleProgress();
       }

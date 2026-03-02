@@ -321,7 +321,7 @@ serve(async (req: Request) => {
     const jwt = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
     let user_id: string | null = null;
     let user_email: string | null = null;
-    let plan: "free" | "premium" = limitsDisabled ? "premium" : "free";
+    const plan: "free" | "premium" = limitsDisabled ? "premium" : "free";
     
     if (supabase && jwt) {
       try {
@@ -882,7 +882,7 @@ Seja preciso. Reconheça a beleza masculina robusta e dê a nota CHAD que ela me
       return ["dark", "sigma"];
     };
 
-    let songMatch = null;
+    const songMatch = null;
     let historyRow: { id: number; created_at: string } | null = null;
 
     if (supabase && user_id) {

@@ -1,50 +1,5 @@
--- Battle progress hardening (no realtime dependency)
-
-ALTER TABLE battles
-  ADD COLUMN IF NOT EXISTS running_at timestamptz;
-
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('battle-photos', 'battle-photos', true)
-ON CONFLICT (id) DO UPDATE SET public = true;
-
-CREATE OR REPLACE FUNCTION mark_battle_running_v3(p_battle_id uuid)
-RETURNS json
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  b battles%ROWTYPE;
-BEGIN
-  SELECT * INTO b FROM battles WHERE id = p_battle_id FOR UPDATE;
-  IF b.id IS NULL THEN RETURN json_build_object('success', false, 'error', 'Battle not found'); END IF;
-  IF b.created_by <> auth.uid() AND b.opponent_id <> auth.uid() THEN
-    RETURN json_build_object('success', false, 'error', 'Not authorized');
-  END IF;
-  IF b.status IN ('finished', 'canceled', 'expired') THEN
-    RETURN json_build_object('success', true, 'status', b.status);
-  END IF;
-
-  IF b.status = 'ready' THEN
-    IF b.challenger_photo_url IS NULL OR b.opponent_photo_url IS NULL THEN
-      RETURN json_build_object('success', false, 'error', 'Missing photos');
-    END IF;
-    IF b.start_at IS NULL OR now() < b.start_at THEN
-      RETURN json_build_object('success', true, 'status', b.status);
-    END IF;
-
-    UPDATE battles
-    SET status = 'running',
-        running_at = COALESCE(running_at, now())
-    WHERE id = p_battle_id;
-
-    INSERT INTO battle_events (battle_id, type, payload)
-    VALUES (p_battle_id, 'running', json_build_object('at', now()));
-  END IF;
-
-  RETURN json_build_object('success', true);
-END;
-$$;
-
+-- Ensure battle functions exist and are up-to-date
+-- Function: ensure_battle_progress_v3
 CREATE OR REPLACE FUNCTION ensure_battle_progress_v3(p_battle_id uuid)
 RETURNS json
 LANGUAGE plpgsql
@@ -134,5 +89,70 @@ BEGIN
     'finished_at', b.finished_at,
     'result_ready_at', b.result_ready_at
   );
+END;
+$$;
+
+-- Function: mock_process_battle_result
+CREATE OR REPLACE FUNCTION mock_process_battle_result(p_battle_id uuid)
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  b battles%ROWTYPE;
+  score1 numeric;
+  score2 numeric;
+  winner uuid;
+  loser uuid;
+  w_score numeric;
+  l_score numeric;
+BEGIN
+  SELECT * INTO b FROM battles WHERE id = p_battle_id;
+  IF b.status <> 'running' THEN
+    RETURN json_build_object('success', false, 'error', 'Battle not ready for processing');
+  END IF;
+
+  score1 := floor(random() * (99 - 70 + 1) + 70)::numeric + (floor(random() * 10) / 10.0);
+  score2 := floor(random() * (99 - 70 + 1) + 70)::numeric + (floor(random() * 10) / 10.0);
+  IF score1 = score2 THEN score1 := score1 + 0.1; END IF;
+
+  IF score1 > score2 THEN
+    winner := b.created_by;
+    loser := b.opponent_id;
+    w_score := score1;
+    l_score := score2;
+  ELSE
+    winner := b.opponent_id;
+    loser := b.created_by;
+    w_score := score2;
+    l_score := score1;
+  END IF;
+
+  INSERT INTO battle_results (battle_id, winner_id, loser_id, winner_score, loser_score, summary)
+  VALUES (
+    p_battle_id,
+    winner,
+    loser,
+    w_score,
+    l_score,
+    json_build_object(
+      'winner_pros', json_build_array('Simetria mandibular', 'Proporção áurea', 'Definição zigomática'),
+      'loser_cons', json_build_array('Assimetria leve', 'Recuo mandibular', 'Exposição escleral')
+    )
+  )
+  ON CONFLICT (battle_id) DO UPDATE SET
+    winner_id = EXCLUDED.winner_id,
+    loser_id = EXCLUDED.loser_id,
+    winner_score = EXCLUDED.winner_score,
+    loser_score = EXCLUDED.loser_score,
+    summary = EXCLUDED.summary;
+
+  UPDATE battles
+  SET status = 'finished',
+      finished_at = now(),
+      result_ready_at = COALESCE(result_ready_at, now())
+  WHERE id = p_battle_id;
+
+  RETURN json_build_object('success', true);
 END;
 $$;

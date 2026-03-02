@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useBattleRoom } from '@/hooks/useBattleRoom';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,6 +10,8 @@ import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { BattleProcessingOverlay } from '@/components/battle/BattleProcessingOverlay';
 import { supabase } from '@/integrations/supabase/client';
+import { useBattlePhotos } from '@/hooks/useBattlePhotos';
+import { useBattleTimeout } from '@/hooks/useBattleTimeout';
 
 export default function BattleRoom() {
   const { id } = useParams<{ id: string }>();
@@ -21,21 +23,13 @@ export default function BattleRoom() {
   const [showResultScreen, setShowResultScreen] = useState(false);
   
   // Controls if the processing animation has finished its mandatory cycle (7s minimum)
-  const [processingAnimationComplete, setProcessingAnimationComplete] = useState(false);
-  
-  // Controls if the "Reveal" animation (MOGGADO/ASCENDEU) has finished
-  const [revealAnimationComplete, setRevealAnimationComplete] = useState(false);
+  const processCalledRef = useRef(false);
 
   // Timer for minimum processing duration (7s)
   // This logic is now handled internally by BattleProcessingOverlay via onComplete callback
   // We just need to ensure we don't unmount it until it calls onComplete.
 
   const handleProcessingComplete = () => {
-      setProcessingAnimationComplete(true);
-  };
-
-  const handleRevealComplete = () => {
-      setRevealAnimationComplete(true);
       setShowResultScreen(true);
   };
 
@@ -191,6 +185,13 @@ export default function BattleRoom() {
       window.clearTimeout(timeout);
     };
   }, [myStablePhotoUrl, opponentStablePhotoUrl]);
+  const isCreator = battle?.created_by === userProfile?.id;
+  const { nowServerApprox, processingDeadlineMs: hookProcessingDeadlineMs, hardTimedOut } = useBattleTimeout(battle, result, serverTimeOffsetMs);
+  const { myStablePhotoUrl, opponentStablePhotoUrl } = {
+    myStablePhotoUrl: isCreator ? stableCreatorPhotoUrl : stableOpponentPhotoUrl,
+    opponentStablePhotoUrl: isCreator ? stableOpponentPhotoUrl : stableCreatorPhotoUrl,
+  };
+  const processingDeadlineMsResolved = processingDeadlineMs ?? hookProcessingDeadlineMs;
 
   useEffect(() => {
     if (!battle?.start_at) return;
@@ -200,8 +201,8 @@ export default function BattleRoom() {
     if (!Number.isFinite(startAtMs)) return;
 
     const tick = window.setInterval(() => {
-      const nowServerApprox = Date.now() + serverTimeOffsetMs;
-      if (nowServerApprox >= startAtMs) {
+      const readyNow = (Date.now() + serverTimeOffsetMs) >= startAtMs;
+      if (readyNow && isCreator) {
         supabase.rpc('mark_battle_running_v3', { p_battle_id: battle.id });
         window.clearInterval(tick);
       }
@@ -209,6 +210,28 @@ export default function BattleRoom() {
 
     return () => window.clearInterval(tick);
   }, [battle?.id, battle?.status, battle?.start_at, serverTimeOffsetMs]);
+
+  useEffect(() => {
+    if (!battle || result) return;
+    const startMs = battle.start_at ? new Date(battle.start_at).getTime() : null;
+    if (!startMs) return;
+    const ready = battle.status === 'running' && nowServerApprox >= startMs + 9000;
+    if (!ready) return;
+    if (processCalledRef.current) return;
+    processCalledRef.current = true;
+    console.log('[BattleRoom][process]', {
+      status: battle.status,
+      elapsed_ms: startMs ? (nowServerApprox - startMs) : null,
+      process_called: processCalledRef.current
+    });
+    supabase.rpc('mock_process_battle_result', { p_battle_id: battle.id }).then(({ data, error }) => {
+      console.log('[BattleRoom][process][result]', { data, error });
+      refresh();
+    }).catch((err) => {
+      console.error('[BattleRoom][process][error]', err);
+      processCalledRef.current = false;
+    });
+  }, [battle?.id, battle?.status, battle?.start_at, result, nowServerApprox]);
 
   if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-8 w-8" /></div>;
   if (error || !battle) return <div className="p-8 text-center text-red-500">Erro: {error || 'Batalha não encontrada'}</div>;
@@ -266,9 +289,6 @@ export default function BattleRoom() {
     );
   }
 
-  const nowServerApprox = Date.now() + serverTimeOffsetMs;
-  const hardTimedOut = !!processingDeadlineMs && nowServerApprox >= processingDeadlineMs && battle.status !== 'finished' && !result;
-
   if (hardTimedOut) {
     return (
       <div className="container max-w-md mx-auto py-10 px-4 text-center space-y-6">
@@ -276,7 +296,19 @@ export default function BattleRoom() {
         <p className="text-sm text-muted-foreground">Você pode tentar recarregar o resultado ou reiniciar a batalha.</p>
         <div className="flex gap-3">
           <Button className="flex-1" onClick={() => refresh()}>Recarregar resultado</Button>
-          <Button variant="outline" className="flex-1" onClick={() => navigate('/battles')}>Reiniciar batalha</Button>
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={async () => {
+              try {
+                await supabase.rpc('cancel_battle_v1', { p_battle_id: battle.id });
+              } finally {
+                navigate('/battles');
+              }
+            }}
+          >
+            Reiniciar batalha
+          </Button>
         </div>
       </div>
     );
@@ -297,7 +329,6 @@ export default function BattleRoom() {
       const startTime = battle.start_at ? new Date(battle.start_at).getTime() : (battle.matched_at ? new Date(battle.matched_at).getTime() : undefined);
       const adjustedStartTime = startTime ? startTime - serverTimeOffsetMs : undefined;
 
-      const nowServerApprox = Date.now() + serverTimeOffsetMs;
       const readyToResolve = battle.status === 'running' && !!battle.start_at && nowServerApprox >= new Date(battle.start_at).getTime() + 9000;
 
       return (
@@ -427,7 +458,7 @@ export default function BattleRoom() {
                                 </Avatar>
                           </div>
                           <div className="text-2xl font-black text-amber-500 mb-1">{result.winner_score}</div>
-                          <p className="font-bold text-sm leading-tight truncate">{result.winner_id === opponentProfile?.id ? opponentProfile.display_name : 'Você'}</p>
+                          <p className="font-bold text-sm leading-tight truncate">{result.winner_id === userProfile?.id ? 'Você' : (opponentProfile?.display_name ?? 'Oponente')}</p>
                       </div>
                   </div>
 
@@ -448,7 +479,7 @@ export default function BattleRoom() {
                                 </Avatar>
                           </div>
                           <div className="text-2xl font-bold text-muted-foreground mb-1">{result.loser_score}</div>
-                          <p className="font-bold text-sm leading-tight text-muted-foreground truncate">{result.loser_id === opponentProfile?.id ? opponentProfile.display_name : 'Você'}</p>
+                          <p className="font-bold text-sm leading-tight text-muted-foreground truncate">{result.loser_id === userProfile?.id ? 'Você' : (opponentProfile?.display_name ?? 'Oponente')}</p>
                       </div>
                   </div>
               </div>

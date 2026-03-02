@@ -17,7 +17,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export default function Battles() {
-  const { battles, loading, createBattle, acceptBattle, rejectBattle } = useBattles();
+  const { battles, loading, createBattle, acceptBattle, rejectBattle, cancelBattle } = useBattles();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("active");
@@ -67,7 +67,7 @@ export default function Battles() {
         <TabsContent value="active" className="space-y-4">
             {loading ? <div className="text-center p-4"><Loader2 className="animate-spin mx-auto"/></div> : 
              activeBattles.length === 0 ? <p className="text-center text-muted-foreground py-8">Nenhum duelo ativo.</p> :
-             activeBattles.map(b => <BattleCard key={b.id} battle={b} onClick={() => handleBattleClick(b)} onAccept={acceptBattle} onReject={rejectBattle} />)}
+             activeBattles.map(b => <BattleCard key={b.id} battle={b} onClick={() => handleBattleClick(b)} onAccept={acceptBattle} onReject={rejectBattle} onCancel={cancelBattle} />)}
         </TabsContent>
 
         <TabsContent value="pending" className="space-y-4">
@@ -86,12 +86,14 @@ export default function Battles() {
   );
 }
 
-function BattleCard({ battle, onClick, onAccept, onReject }: { 
+function BattleCard({ battle, onClick, onAccept, onReject, onCancel }: { 
     battle: EnrichedBattle, 
     onClick: () => void,
     onAccept?: (id: string) => Promise<boolean>,
-    onReject?: (id: string) => Promise<boolean>
+    onReject?: (id: string) => Promise<boolean>,
+    onCancel?: (id: string) => Promise<boolean>
 }) {
+    const [openCancel, setOpenCancel] = useState(false);
     const isPending = (battle.status === 'waiting' || battle.status === 'waiting_for_opponent') && !battle.is_creator && !battle.matched_at;
     const opponentName = battle.opponent_profile?.display_name || 'Aguardando...';
 
@@ -143,9 +145,45 @@ function BattleCard({ battle, onClick, onAccept, onReject }: {
                         </Button>
                     </div>
                 ) : (
-                    <Button size="sm" variant="secondary">
-                        Ver
-                    </Button>
+                    <div className="flex gap-2" onClick={e => e.stopPropagation()}>
+                      <Button size="sm" variant="secondary" onClick={onClick}>
+                          Ver
+                      </Button>
+                      {onCancel && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setOpenCancel(true)}
+                        >
+                          Cancelar
+                        </Button>
+                      )}
+                    </div>
+                )}
+
+                {onCancel && (
+                <Dialog open={openCancel} onOpenChange={setOpenCancel}>
+                  <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                      <DialogTitle>Cancelar duelo?</DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-muted-foreground">Esta ação não pode ser desfeita.</p>
+                    <div className="flex justify-end gap-2 pt-4">
+                      <Button variant="outline" onClick={() => setOpenCancel(false)}>
+                        Voltar
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={() => {
+                          if (onCancel) { void onCancel(battle.id); }
+                          setOpenCancel(false);
+                        }}
+                      >
+                        Confirmar cancelamento
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
                 )}
             </CardContent>
         </Card>

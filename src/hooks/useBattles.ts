@@ -167,6 +167,27 @@ export function useBattles() {
     }
   };
 
+  const cancelBattle = async (battleId: string) => {
+    try {
+      // Optimistic update: mark as canceled immediately to remove from "Ativos"
+      setBattles(prev => prev.map(b => b.id === battleId ? { ...b, status: 'canceled' } : b));
+      console.log('Cancelando duelo:', battleId);
+      const { data, error } = await supabase.rpc('cancel_battle_v1', { p_battle_id: battleId });
+      console.log('Resultado:', data, error);
+      if (error) throw error;
+      if (data && (data as any).success === false) throw new Error((data as any).error || 'Erro ao cancelar duelo');
+      toast.success('Duelo cancelado');
+      fetchBattles();
+      return true;
+    } catch (err: any) {
+      console.error('Erro ao cancelar duelo:', err);
+      toast.error(err.message || 'Erro ao cancelar duelo');
+      // Rollback by refetch if the optimistic update was wrong
+      fetchBattles();
+      return false;
+    }
+  };
+
   useEffect(() => {
     fetchBattles();
 
@@ -210,6 +231,7 @@ export function useBattles() {
     fetchBattles,
     createBattle,
     acceptBattle,
-    rejectBattle
+    rejectBattle,
+    cancelBattle
   };
 }

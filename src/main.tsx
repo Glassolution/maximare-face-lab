@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import { PostHogProvider } from "posthog-js/react";
+import { PostHogProvider } from '@posthog/react'
 
 const phKey = import.meta.env.VITE_PUBLIC_POSTHOG_KEY as string | undefined;
 const phHost = import.meta.env.VITE_PUBLIC_POSTHOG_HOST as string | undefined;

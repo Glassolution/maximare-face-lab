@@ -178,7 +178,7 @@ DECLARE
   l_score numeric;
 BEGIN
   SELECT * INTO b FROM battles WHERE id = p_battle_id;
-  IF b.status <> 'running' AND b.status <> 'ready' THEN
+  IF b.status <> 'running' THEN
     RETURN json_build_object('success', false, 'error', 'Battle not ready for processing');
   END IF;
 
