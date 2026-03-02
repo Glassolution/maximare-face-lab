@@ -111,56 +111,8 @@ export default function CreatorMetrics() {
         <section className="space-y-4 pb-4">
           <h3 className="text-xl font-bold">Atividades Recentes</h3>
           <div className="space-y-3">
-            <div className="bg-[#17212b] p-4 rounded-xl border border-gray-800 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="bg-gray-800 p-2.5 rounded-lg text-sky-500">
-                  <svg
-                    className="h-5 w-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <p className="font-bold text-gray-100">Novo Uso de Código</p>
-                  <p className="text-sm text-slate-400">Há 5 minutos</p>
-                </div>
-              </div>
-              <div className="text-emerald-400 font-bold">+ R$ 0,00</div>
-            </div>
-
-            <div className="bg-[#17212b] p-4 rounded-xl border border-gray-800 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="bg-gray-800 p-2.5 rounded-lg text-sky-500">
-                  <svg
-                    className="h-5 w-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <p className="font-bold text-gray-100">Novo Uso de Código</p>
-                  <p className="text-sm text-slate-400">Há 2 horas</p>
-                </div>
-              </div>
-              <div className="text-emerald-400 font-bold">+ R$ 0,00</div>
+            <div className="bg-[#17212b] p-8 rounded-xl border border-gray-800 text-center">
+              <p className="text-slate-400 text-sm font-medium">Nenhuma atividade recente</p>
             </div>
           </div>
         </section>
