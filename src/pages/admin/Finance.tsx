@@ -129,14 +129,14 @@ const AdminFinance = () => {
     { name: '28 Fev', value: 0 },
   ];
 
-  // Advanced chart data matching the reference image
+  // Advanced chart data matching the reference image - ZERADO
   const advancedChartData = [
-    { name: 'JAN 2024', receita: 1.38, ocupacao: 1.50, vacancia: 1.46, aluguel: 1.45 },
-    { name: 'ABR', receita: 1.41, ocupacao: 1.52, vacancia: 1.48, aluguel: 1.46 },
-    { name: 'JUL', receita: 1.49, ocupacao: 1.65, vacancia: 1.41, aluguel: 1.48 },
-    { name: 'OUT', receita: 1.53, ocupacao: 1.67, vacancia: 1.40, aluguel: 1.51 },
-    { name: 'JAN 2025', receita: 1.58, ocupacao: 1.70, vacancia: 1.39, aluguel: 1.54 },
-    { name: 'ABR', receita: 1.63, ocupacao: 1.72, vacancia: 1.38, aluguel: 1.56 },
+    { name: 'JAN 2024', receita: 0, ocupacao: 0, vacancia: 0, aluguel: 0 },
+    { name: 'ABR', receita: 0, ocupacao: 0, vacancia: 0, aluguel: 0 },
+    { name: 'JUL', receita: 0, ocupacao: 0, vacancia: 0, aluguel: 0 },
+    { name: 'OUT', receita: 0, ocupacao: 0, vacancia: 0, aluguel: 0 },
+    { name: 'JAN 2025', receita: 0, ocupacao: 0, vacancia: 0, aluguel: 0 },
+    { name: 'ABR', receita: 0, ocupacao: 0, vacancia: 0, aluguel: 0 },
   ];
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -450,7 +450,7 @@ const AdminFinance = () => {
             <div className="relative h-[400px] w-full">
               <div className="absolute top-0 left-0 z-10">
                 <Badge className="bg-[#EC4899] hover:bg-[#db2777] text-white border-none text-xs font-bold px-2 py-0.5 rounded-sm">
-                  1.76M
+                  0.00M
                 </Badge>
               </div>
               
@@ -469,8 +469,8 @@ const AdminFinance = () => {
                     tickLine={false} 
                     tick={{fontSize: 10, fill: '#94a3b8', fontWeight: 500}} 
                     tickFormatter={(val) => `${val}M`} 
-                    domain={[1.3, 1.8]}
-                    ticks={[1.3, 1.4, 1.5, 1.6, 1.7, 1.8]}
+                    domain={[0, 0.1]}
+                    ticks={[0, 0.05, 0.1]}
                   />
                   <Tooltip 
                     content={({ active, payload, label }) => {
@@ -484,28 +484,28 @@ const AdminFinance = () => {
                                   <div className="w-1.5 h-1.5 rounded-full border-2 border-[#EC4899]"></div>
                                   <span className="text-xs text-gray-500">Receita</span>
                                 </div>
-                                <span className="text-xs font-bold text-gray-900">$1.63M</span>
+                                <span className="text-xs font-bold text-gray-900">$0.00M</span>
                               </div>
                               <div className="flex justify-between items-center">
                                 <div className="flex items-center gap-2">
                                   <div className="w-1.5 h-1.5 rounded-full border-2 border-[#10B981]"></div>
                                   <span className="text-xs text-gray-500">Ocupação</span>
                                 </div>
-                                <span className="text-xs font-bold text-gray-900">85%</span>
+                                <span className="text-xs font-bold text-gray-900">0%</span>
                               </div>
                               <div className="flex justify-between items-center">
                                 <div className="flex items-center gap-2">
                                   <div className="w-1.5 h-1.5 rounded-full border-2 border-[#3B82F6]"></div>
                                   <span className="text-xs text-gray-500">Vacância</span>
                                 </div>
-                                <span className="text-xs font-bold text-gray-900">15%</span>
+                                <span className="text-xs font-bold text-gray-900">0%</span>
                               </div>
                               <div className="flex justify-between items-center">
                                 <div className="flex items-center gap-2">
                                   <div className="w-1.5 h-1.5 rounded-full border-2 border-gray-300"></div>
                                   <span className="text-xs text-gray-500">Aluguel Efet.</span>
                                 </div>
-                                <span className="text-xs font-bold text-gray-900">1.425 $/ft²</span>
+                                <span className="text-xs font-bold text-gray-900">$0.00 /ft²</span>
                               </div>
                             </div>
                           </div>
@@ -658,7 +658,7 @@ const AdminFinance = () => {
               </div>
               <Badge className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border-none">
                 <TrendingUp className="w-3 h-3 mr-1" />
-                +2.5%
+                0%
               </Badge>
             </div>
           </CardContent>
@@ -674,7 +674,7 @@ const AdminFinance = () => {
               </div>
               <Badge className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border-none">
                 <TrendingUp className="w-3 h-3 mr-1" />
-                +12.1%
+                0%
               </Badge>
             </div>
           </CardContent>
