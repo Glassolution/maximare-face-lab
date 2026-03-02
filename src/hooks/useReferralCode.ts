@@ -22,38 +22,63 @@ export function useReferralCode() {
   const [referralStats, setReferralStats] = useState<ReferralStats | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Load referral code from profile
+  // Generate referral code from email on mount
   useEffect(() => {
-    if (profile?.referral_code) {
-      setReferralCode(profile.referral_code);
+    if (user?.email && !referralCode) {
+      generateCodeFromEmail(user.email);
+    }
+  }, [user?.email]);
+
+  // Load referral code from profile if available
+  useEffect(() => {
+    if (profile && (profile as any).referral_code) {
+      setReferralCode((profile as any).referral_code);
     }
   }, [profile]);
 
-  // Generate referral code for creator
-  const generateReferralCode = async () => {
-    if (!user || !profile?.is_ugc) {
-      toast.error('Apenas criadores podem ter códigos de apoiador');
-      return;
+  // Generate code from email locally
+  const generateCodeFromEmail = (email: string) => {
+    // Extract name before @
+    const namePart = email.split('@')[0];
+    
+    // Prefixo fixo
+    const prefix = 'MIX';
+    
+    // Extract letters: first 2 + middle + last 2
+    let letters = '';
+    if (namePart.length >= 6) {
+      letters = namePart.substring(0, 2) + 
+               namePart.substring(2, Math.floor(namePart.length / 2)) + 
+               namePart.substring(namePart.length - 2);
+    } else {
+      letters = namePart.substring(0, Math.min(namePart.length, 5));
     }
+    
+    // Random suffix 10-99
+    const randomSuffix = Math.floor(Math.random() * 90) + 10;
+    
+    const code = prefix + letters.toUpperCase().substring(0, 5) + randomSuffix;
+    setReferralCode(code);
+    
+    // Save to database in background
+    saveCodeToDatabase(code);
+  };
 
-    setLoading(true);
+  // Save code to database
+  const saveCodeToDatabase = async (code: string) => {
+    if (!user || !profile?.is_ugc) return;
+    
     try {
-      const code = `${profile?.username?.replace(/\s/g, '').toUpperCase().slice(0, 6) || ''}10`;
-      
       const { error } = await supabase.rpc('generate_referral_code', {
         p_creator_id: user.id,
         p_code: code
       });
 
-      if (error) throw error;
-
-      setReferralCode(code);
-      toast.success('Código de apoiador gerado com sucesso!');
-    } catch (error: any) {
-      console.error('Error generating referral code:', error);
-      toast.error('Erro ao gerar código de apoiador');
-    } finally {
-      setLoading(false);
+      if (error) {
+        console.error('Error saving referral code:', error);
+      }
+    } catch (error) {
+      console.error('Error saving referral code:', error);
     }
   };
 
@@ -115,7 +140,6 @@ export function useReferralCode() {
     referralCode,
     referralStats,
     loading,
-    generateReferralCode,
     loadReferralStats,
     applyReferralCode
   };
