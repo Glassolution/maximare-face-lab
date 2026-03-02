@@ -22,21 +22,18 @@ export function useReferralCode() {
   const [referralStats, setReferralStats] = useState<ReferralStats | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Generate referral code from email on mount
-  useEffect(() => {
-    if (user?.email && !referralCode) {
-      generateCodeFromEmail(user.email);
+  // Generate consistent random number based on email (seed)
+  const getSeededRandom = (email: string) => {
+    let hash = 0;
+    for (let i = 0; i < email.length; i++) {
+      const char = email.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
     }
-  }, [user?.email]);
+    return Math.abs(hash) % 90 + 10; // 10-99 range
+  };
 
-  // Load referral code from profile if available
-  useEffect(() => {
-    if (profile && (profile as any).referral_code) {
-      setReferralCode((profile as any).referral_code);
-    }
-  }, [profile]);
-
-  // Generate code from email locally
+  // Generate code from email locally (consistent)
   const generateCodeFromEmail = (email: string) => {
     // Extract name before @
     const namePart = email.split('@')[0];
@@ -54,14 +51,59 @@ export function useReferralCode() {
       letters = namePart.substring(0, Math.min(namePart.length, 5));
     }
     
-    // Random suffix 10-99
-    const randomSuffix = Math.floor(Math.random() * 90) + 10;
+    // Use seeded random for consistency
+    const randomSuffix = getSeededRandom(email);
     
     const code = prefix + letters.toUpperCase().substring(0, 5) + randomSuffix;
-    setReferralCode(code);
-    
-    // Save to database in background
-    saveCodeToDatabase(code);
+    return code;
+  };
+
+  // Load referral code with proper persistence logic
+  useEffect(() => {
+    if (!user?.email) return;
+
+    const initializeReferralCode = async () => {
+      // Priority 1: Check if profile already has referral code
+      if (profile && (profile as any).referral_code) {
+        setReferralCode((profile as any).referral_code);
+        return;
+      }
+
+      // Priority 2: Check database for existing code
+      const existingCode = await loadExistingCode(user.id);
+      if (existingCode) {
+        setReferralCode(existingCode);
+        return;
+      }
+
+      // Priority 3: Generate new code (consistent)
+      const newCode = generateCodeFromEmail(user.email);
+      setReferralCode(newCode);
+      saveCodeToDatabase(newCode);
+    };
+
+    initializeReferralCode();
+  }, [user?.email, profile]);
+
+  // Load existing referral code from database
+  const loadExistingCode = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('referral_codes')
+        .select('code')
+        .eq('creator_id', userId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+        console.error('Error loading existing code:', error);
+        return null;
+      }
+
+      return data?.code || null;
+    } catch (error) {
+      console.error('Error loading existing code:', error);
+      return null;
+    }
   };
 
   // Save code to database
