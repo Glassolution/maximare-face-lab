@@ -16,6 +16,8 @@ import Friends from "@/pages/Friends";
 import Battles from "@/pages/Battles";
 import BattleRoom from "@/pages/BattleRoom";
 import Profile from "@/pages/Profile";
+import CreatorDashboard from "@/pages/CreatorDashboard";
+import CreatorMetrics from "@/pages/CreatorMetrics";
 import LookAlike from "@/pages/LookAlike";
 import NotFound from "@/pages/NotFound";
 import Login from "@/pages/Login";
@@ -125,6 +127,8 @@ function Layout() {
         <Route path="/battles" element={<Battles />} />
         <Route path="/battle/:id" element={<BattleRoom />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/creator" element={<CreatorDashboard />} />
+        <Route path="/creator/metrics" element={<CreatorMetrics />} />
         <Route path="/look-alike" element={<LookAlike />} />
         <Route path="/login" element={<Login />} />
         <Route path="/premium" element={<Premium />} />
