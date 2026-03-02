@@ -1,8 +1,10 @@
 import { useAuth } from "@/hooks/useAuth";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 
 export default function CreatorMetrics() {
   const { user, profile } = useAuth();
+  const navigate = useNavigate();
 
   if (!user) {
     return <Navigate to="/login" replace />;
@@ -16,7 +18,15 @@ export default function CreatorMetrics() {
     <div className="flex flex-col min-h-screen bg-[#0f171e] text-white">
       {/* Header */}
       <header className="sticky top-0 z-10 bg-[#0f171e] border-b border-gray-800 py-6 px-4">
-        <h1 className="text-xl font-bold text-center">Métricas de Influenciador</h1>
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => navigate(-1)}
+            className="text-slate-400 hover:text-white transition-colors p-2 rounded-lg hover:bg-gray-800"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <h1 className="text-xl font-bold text-center">Métricas de Influenciador</h1>
+        </div>
       </header>
 
       <main className="flex-grow p-4 space-y-6 pb-20">
@@ -83,7 +93,7 @@ export default function CreatorMetrics() {
             <p className="text-slate-400 text-sm font-medium mb-4">Usos Totais</p>
             <div className="text-4xl font-bold mb-6">0</div>
             <div className="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
-              <div className="bg-sky-500 h-full w-[65%] rounded-full shadow-[0_0_10px_rgba(14,165,233,0.5)]" />
+              <div className="bg-sky-500 h-full w-[0%] rounded-full shadow-[0_0_10px_rgba(14,165,233,0.5)]" />
             </div>
           </div>
 
@@ -102,7 +112,7 @@ export default function CreatorMetrics() {
             <p className="text-slate-400 text-sm font-medium mb-4">Comissão Gerada</p>
             <div className="text-4xl font-bold mb-6">R$ 0,00</div>
             <div className="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
-              <div className="bg-sky-500 h-full w-[45%] rounded-full shadow-[0_0_10px_rgba(14,165,233,0.5)]" />
+              <div className="bg-sky-500 h-full w-[0%] rounded-full shadow-[0_0_10px_rgba(14,165,233,0.5)]" />
             </div>
           </div>
         </section>

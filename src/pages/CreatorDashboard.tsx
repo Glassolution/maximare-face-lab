@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate, useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 
 export default function CreatorDashboard() {
   const { user, profile } = useAuth();
@@ -16,6 +17,15 @@ export default function CreatorDashboard() {
   return (
     <div className="min-h-screen bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100">
       <main className="flex-1 p-4 space-y-4 max-w-2xl mx-auto w-full pt-8 pb-24 relative">
+        <div className="flex items-center justify-between mb-6">
+          <button
+            onClick={() => navigate(-1)}
+            className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <h1 className="text-2xl font-bold text-center">Painel do Criador</h1>
+        </div>
         {/* Lucro Card */}
         <div className="flex items-center justify-between gap-4 rounded-xl bg-slate-100 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
           <div className="flex flex-col gap-1">
