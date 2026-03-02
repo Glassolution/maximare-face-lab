@@ -40,9 +40,16 @@ export default function BattleRoom() {
   };
 
   const getAvatarUrl = (pathOrUrl: string | null | undefined) => {
-    console.log('[getAvatarUrl] INPUT:', pathOrUrl);
+    console.log('[getAvatarUrl] INPUT:', pathOrUrl, 'TYPE:', typeof pathOrUrl);
+    
+    // PROTEÇÃO CONTRA OBJETOS
+    if (typeof pathOrUrl !== 'string') {
+      console.log('[getAvatarUrl] RETURN null - not a string, type:', typeof pathOrUrl);
+      return null;
+    }
+    
     if (!pathOrUrl) {
-      console.log('[getAvatarUrl] RETURN null - no pathOrUrl');
+      console.log('[getAvatarUrl] RETURN null - empty string');
       return null;
     }
     if (pathOrUrl.startsWith('http') || pathOrUrl.startsWith('data:')) {
@@ -325,10 +332,10 @@ export default function BattleRoom() {
       
       const winnerPhotoUrl = finalResultPhotos.winner || 
     (result.winner_id === userProfile?.id ? myBattlePhotoUrl : opponentBattlePhotoUrl) ||
-    getAvatarUrl(result.winner_id === userProfile?.id ? userProfile : opponentProfile);
+    getAvatarUrl(result.winner_id === userProfile?.id ? userProfile?.avatar_url : opponentProfile?.avatar_url);
   const loserPhotoUrl = finalResultPhotos.loser || 
     (result.loser_id === userProfile?.id ? myBattlePhotoUrl : opponentBattlePhotoUrl) ||
-    getAvatarUrl(result.loser_id === userProfile?.id ? userProfile : opponentProfile);
+    getAvatarUrl(result.loser_id === userProfile?.id ? userProfile?.avatar_url : opponentProfile?.avatar_url);
   
   console.log('[BattleRoom] FINAL PHOTO URLS (CORRECTED):', {
     finalResultPhotos,
@@ -346,7 +353,7 @@ export default function BattleRoom() {
     '3. userProfile?.id': userProfile?.id,
     '4. myBattlePhotoUrl': myBattlePhotoUrl,
     '5. opponentBattlePhotoUrl': opponentBattlePhotoUrl,
-    '6. getAvatarUrl()': getAvatarUrl(result.winner_id === userProfile?.id ? userProfile : opponentProfile),
+    '6. getAvatarUrl()': getAvatarUrl(result.winner_id === userProfile?.id ? userProfile?.avatar_url : opponentProfile?.avatar_url),
     '7. winnerPhotoUrl FINAL': winnerPhotoUrl,
     '8. typeof winnerPhotoUrl': typeof winnerPhotoUrl,
     '9. winnerPhotoUrl length': winnerPhotoUrl?.length
