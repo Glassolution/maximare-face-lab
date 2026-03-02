@@ -332,10 +332,34 @@ export default function BattleRoom() {
       
       const winnerPhotoUrl = finalResultPhotos.winner || 
     (result.winner_id === userProfile?.id ? myBattlePhotoUrl : opponentBattlePhotoUrl) ||
-    getAvatarUrl(result.winner_id === userProfile?.id ? userProfile?.avatar_url : opponentProfile?.avatar_url);
+    (() => {
+      const profile = result.winner_id === userProfile?.id ? userProfile : opponentProfile;
+      const avatarUrl = profile?.avatar_url;
+      console.log('[DEBUG WINNER]:', {
+        'result.winner_id': result.winner_id,
+        'userProfile?.id': userProfile?.id,
+        'condition': result.winner_id === userProfile?.id,
+        'selected profile': profile,
+        'profile?.avatar_url': avatarUrl,
+        'typeof avatarUrl': typeof avatarUrl
+      });
+      return getAvatarUrl(avatarUrl);
+    })();
   const loserPhotoUrl = finalResultPhotos.loser || 
     (result.loser_id === userProfile?.id ? myBattlePhotoUrl : opponentBattlePhotoUrl) ||
-    getAvatarUrl(result.loser_id === userProfile?.id ? userProfile?.avatar_url : opponentProfile?.avatar_url);
+    (() => {
+      const profile = result.loser_id === userProfile?.id ? userProfile : opponentProfile;
+      const avatarUrl = profile?.avatar_url;
+      console.log('[DEBUG LOSER]:', {
+        'result.loser_id': result.loser_id,
+        'userProfile?.id': userProfile?.id,
+        'condition': result.loser_id === userProfile?.id,
+        'selected profile': profile,
+        'profile?.avatar_url': avatarUrl,
+        'typeof avatarUrl': typeof avatarUrl
+      });
+      return getAvatarUrl(avatarUrl);
+    })();
   
   console.log('[BattleRoom] FINAL PHOTO URLS (CORRECTED):', {
     finalResultPhotos,
@@ -353,7 +377,10 @@ export default function BattleRoom() {
     '3. userProfile?.id': userProfile?.id,
     '4. myBattlePhotoUrl': myBattlePhotoUrl,
     '5. opponentBattlePhotoUrl': opponentBattlePhotoUrl,
-    '6. getAvatarUrl()': getAvatarUrl(result.winner_id === userProfile?.id ? userProfile?.avatar_url : opponentProfile?.avatar_url),
+    '6. getAvatarUrl()': (() => {
+      const profile = result.winner_id === userProfile?.id ? userProfile : opponentProfile;
+      return getAvatarUrl(profile?.avatar_url);
+    })(),
     '7. winnerPhotoUrl FINAL': winnerPhotoUrl,
     '8. typeof winnerPhotoUrl': typeof winnerPhotoUrl,
     '9. winnerPhotoUrl length': winnerPhotoUrl?.length
