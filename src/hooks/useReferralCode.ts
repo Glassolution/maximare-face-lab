@@ -22,39 +22,29 @@ export function useReferralCode() {
   const [referralStats, setReferralStats] = useState<ReferralStats | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Generate consistent random number based on email (seed)
-  const getSeededRandom = (email: string) => {
+  // Generate consistent 4-digit number based on email (seed)
+  const getSeededRandom4Digits = (email: string) => {
     let hash = 0;
     for (let i = 0; i < email.length; i++) {
       const char = email.charCodeAt(i);
       hash = ((hash << 5) - hash) + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
-    return Math.abs(hash) % 90 + 10; // 10-99 range
+    return Math.abs(hash) % 10000; // 0-9999 range
   };
 
-  // Generate code from email locally (consistent)
+  // Generate code from email locally (MAX + 4 digits)
   const generateCodeFromEmail = (email: string) => {
-    // Extract name before @
-    const namePart = email.split('@')[0];
-    
     // Prefixo fixo
-    const prefix = 'MIX';
-    
-    // Extract letters: first 2 + middle + last 2
-    let letters = '';
-    if (namePart.length >= 6) {
-      letters = namePart.substring(0, 2) + 
-               namePart.substring(2, Math.floor(namePart.length / 2)) + 
-               namePart.substring(namePart.length - 2);
-    } else {
-      letters = namePart.substring(0, Math.min(namePart.length, 5));
-    }
+    const prefix = 'MAX';
     
     // Use seeded random for consistency
-    const randomSuffix = getSeededRandom(email);
+    const randomSuffix = getSeededRandom4Digits(email);
     
-    const code = prefix + letters.toUpperCase().substring(0, 5) + randomSuffix;
+    // Ensure 4 digits with leading zeros
+    const paddedNumber = randomSuffix.toString().padStart(4, '0');
+    
+    const code = prefix + paddedNumber;
     return code;
   };
 
@@ -76,14 +66,51 @@ export function useReferralCode() {
         return;
       }
 
-      // Priority 3: Generate new code (consistent)
-      const newCode = generateCodeFromEmail(user.email);
-      setReferralCode(newCode);
-      saveCodeToDatabase(newCode);
+      // Priority 3: Generate unique code and save
+      const uniqueCode = await generateUniqueCode(user.email);
+      setReferralCode(uniqueCode);
+      saveCodeToDatabase(uniqueCode);
     };
 
     initializeReferralCode();
   }, [user?.email, profile]);
+
+  // Check if code already exists in database
+  const checkCodeUniqueness = async (code: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('referral_codes')
+        .select('id')
+        .eq('code', code)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+        console.error('Error checking code uniqueness:', error);
+        return false;
+      }
+
+      return !data; // Return true if code doesn't exist (unique)
+    } catch (error) {
+      console.error('Error checking code uniqueness:', error);
+      return false;
+    }
+  };
+
+  // Generate unique code with retry logic
+  const generateUniqueCode = async (email: string, maxRetries = 10) => {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const code = generateCodeFromEmail(email + attempt); // Add attempt to change seed
+      
+      const isUnique = await checkCodeUniqueness(code);
+      if (isUnique) {
+        return code;
+      }
+    }
+    
+    // Fallback: use timestamp
+    const timestamp = Date.now().toString().slice(-4);
+    return 'MAX' + timestamp;
+  };
 
   // Load existing referral code from database
   const loadExistingCode = async (userId: string) => {
