@@ -57,6 +57,12 @@ export function useReferralCode() {
 
     const initializeReferralCode = async () => {
       console.log('🔍 Initializing referral code for user:', user.email);
+      console.log('👤 User ID:', user.id);
+      console.log('📋 Profile data:', { 
+        profileId: profile.id, 
+        is_ugc: profile.is_ugc,
+        referral_code: (profile as any).referral_code 
+      });
       
       // Priority 1: Check database FIRST (most reliable)
       console.log('📋 Checking database for existing code...');
@@ -83,7 +89,8 @@ export function useReferralCode() {
       console.log('✅ Generated unique code:', uniqueCode);
       setReferralCode(uniqueCode);
       console.log('💾 Saving code to database...');
-      saveCodeToDatabase(uniqueCode);
+      await saveCodeToDatabase(uniqueCode);
+      console.log('🔄 Code generation and save process completed');
     };
 
     initializeReferralCode();
@@ -121,18 +128,20 @@ export function useReferralCode() {
       return baseCode;
     }
     
-    // If not unique, try variations with different suffixes
-    for (let attempt = 1; attempt < maxRetries; attempt++) {
-      const code = generateCodeFromEmail(email) + attempt; // Add simple suffix
-      const isUnique = await checkCodeUniqueness(code);
-      if (isUnique) {
-        return code;
-      }
+    // If not unique, use timestamp-based approach instead of attempt variation
+    // This ensures consistency and avoids incremental variations
+    const timestamp = Date.now().toString().slice(-4);
+    const fallbackCode = 'MAX' + timestamp;
+    
+    // Check if fallback is unique
+    const fallbackIsUnique = await checkCodeUniqueness(fallbackCode);
+    if (fallbackIsUnique) {
+      return fallbackCode;
     }
     
-    // Fallback: use timestamp
-    const timestamp = Date.now().toString().slice(-4);
-    return 'MAX' + timestamp;
+    // Last resort: add random suffix to base code
+    const randomSuffix = Math.floor(Math.random() * 1000);
+    return baseCode + randomSuffix;
   };
 
   // Load existing referral code from database
