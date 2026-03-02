@@ -230,6 +230,8 @@ export default function BattleRoom() {
         <BattleProcessingOverlay 
             userAvatar={myAvatar} 
             opponentAvatar={opponentAvatar} 
+            userName={userProfile?.display_name || userProfile?.username || "Você"}
+            opponentName={opponentProfile?.display_name || opponentProfile?.username || "Oponente"}
             isReady={readyToResolve || battle.status === 'finished'}
             onComplete={handleProcessingComplete}
             startTime={adjustedStartTime}

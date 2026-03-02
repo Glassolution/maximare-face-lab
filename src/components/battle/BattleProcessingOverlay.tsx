@@ -7,6 +7,8 @@ import { Swords } from "lucide-react";
 interface BattleProcessingOverlayProps {
   userAvatar?: string | null;
   opponentAvatar?: string | null;
+  userName?: string | null;
+  opponentName?: string | null;
   isReady?: boolean;
   onComplete?: () => void;
   startTime?: number; // Server-synced start time
@@ -20,7 +22,17 @@ const STAGES = [
   { text: "Determinando o vencedor...", duration: 999999 }, // Até terminar
 ];
 
-export function BattleProcessingOverlay({ userAvatar, opponentAvatar, isReady, onComplete, startTime }: BattleProcessingOverlayProps) {
+// Função para gerar iniciais do nome
+const getInitials = (name?: string | null): string => {
+  if (!name) return "?";
+  return name
+    .split(" ")
+    .map(word => word.charAt(0).toUpperCase())
+    .join("")
+    .substring(0, 2);
+};
+
+export function BattleProcessingOverlay({ userAvatar, opponentAvatar, userName, opponentName, isReady, onComplete, startTime }: BattleProcessingOverlayProps) {
   const [stageIndex, setStageIndex] = useState(0);
   const [progress, setProgress] = useState(0);
 
@@ -103,7 +115,9 @@ export function BattleProcessingOverlay({ userAvatar, opponentAvatar, isReady, o
                 <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full" />
                 <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-blue-500/30 shadow-[0_0_20px_rgba(59,130,246,0.4)]">
                     <AvatarImage src={userAvatar || undefined} className="object-cover" />
-                    <AvatarFallback className="bg-zinc-900 text-zinc-500">YOU</AvatarFallback>
+                    <AvatarFallback className="bg-zinc-900 text-blue-400 text-lg font-bold">
+                        {getInitials(userName || "Você")}
+                    </AvatarFallback>
                 </Avatar>
             </div>
             <span className="text-blue-500 font-bold tracking-widest text-sm uppercase">Você</span>
@@ -139,7 +153,9 @@ export function BattleProcessingOverlay({ userAvatar, opponentAvatar, isReady, o
                 <div className="absolute inset-0 bg-red-500/20 blur-xl rounded-full" />
                 <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-red-500/30 shadow-[0_0_20px_rgba(239,68,68,0.4)]">
                     <AvatarImage src={opponentAvatar || undefined} className="object-cover" />
-                    <AvatarFallback className="bg-zinc-900 text-zinc-500">VS</AvatarFallback>
+                    <AvatarFallback className="bg-zinc-900 text-red-400 text-lg font-bold">
+                        {getInitials(opponentName || "Oponente")}
+                    </AvatarFallback>
                 </Avatar>
             </div>
             <span className="text-red-500 font-bold tracking-widest text-sm uppercase">Oponente</span>
