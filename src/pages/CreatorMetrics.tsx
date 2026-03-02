@@ -1,10 +1,12 @@
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { useReferralCode } from "@/hooks/useReferralCode";
 
 export default function CreatorMetrics() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const { referralCode, referralStats, loading } = useReferralCode();
 
   if (!user) {
     return <Navigate to="/login" replace />;
@@ -13,6 +15,26 @@ export default function CreatorMetrics() {
   if (!profile?.is_ugc) {
     return <Navigate to="/analysis" replace />;
   }
+
+  // Calculate real metrics from referral stats
+  const totalUses = referralStats?.total_uses || 0;
+  const totalCommission = referralStats?.total_commission || 0;
+  const recentPurchases = referralStats?.recent_purchases || [];
+
+  // Calculate progress bar percentages based on real data
+  const usageProgress = totalUses > 0 ? Math.min((totalUses / 100) * 100, 100) : 0;
+  const commissionProgress = totalCommission > 0 ? Math.min((totalCommission / 10000) * 100, 100) : 0;
+
+  // Helper function to format time ago
+  const getTimeAgo = (iso: string) => {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `Há ${mins} minutos`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `Há ${hours} horas`;
+    const days = Math.floor(hours / 24);
+    return `Há ${days} dias`;
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-[#0f171e] text-white">
@@ -38,9 +60,13 @@ export default function CreatorMetrics() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-between gap-6 mt-4">
               <h2 className="font-black tracking-widest text-white drop-shadow-sm text-4xl sm:text-5xl">
-                MAXMARIA10
+                {referralCode || 'CARREGANDO...'}
               </h2>
-              <button className="bg-sky-500 hover:bg-sky-400 text-white font-bold py-2 px-4 rounded-xl flex items-center gap-2 transition-colors">
+              <button 
+                onClick={() => navigator.clipboard.writeText(referralCode || '')}
+                disabled={!referralCode || loading}
+                className="bg-sky-500 hover:bg-sky-400 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-xl flex items-center gap-2 transition-colors"
+              >
                 <svg
                   className="h-4 w-4"
                   fill="currentColor"
@@ -50,7 +76,7 @@ export default function CreatorMetrics() {
                   <path d="M7 9a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9z" />
                   <path d="M5 3a2 2 0 00-2 2v6a2 2 0 002 2V5h8a2 2 0 00-2-2H5z" />
                 </svg>
-                <span>Copiar Código</span>
+                <span>{loading ? 'Gerando...' : 'Copiar Código'}</span>
               </button>
             </div>
           </div>
@@ -91,9 +117,9 @@ export default function CreatorMetrics() {
               </svg>
             </div>
             <p className="text-slate-400 text-sm font-medium mb-4">Usos Totais</p>
-            <div className="text-4xl font-bold mb-6">0</div>
+            <div className="text-4xl font-bold mb-6">{totalUses}</div>
             <div className="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
-              <div className="bg-sky-500 h-full w-[0%] rounded-full shadow-[0_0_10px_rgba(14,165,233,0.5)]" />
+              <div className="bg-sky-500 h-full rounded-full shadow-[0_0_10px_rgba(14,165,233,0.5)]" style={{ width: `${usageProgress}%` }} />
             </div>
           </div>
 
@@ -110,9 +136,9 @@ export default function CreatorMetrics() {
               </svg>
             </div>
             <p className="text-slate-400 text-sm font-medium mb-4">Comissão Gerada</p>
-            <div className="text-4xl font-bold mb-6">R$ 0,00</div>
+            <div className="text-4xl font-bold mb-6">R$ {(totalCommission / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
             <div className="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
-              <div className="bg-sky-500 h-full w-[0%] rounded-full shadow-[0_0_10px_rgba(14,165,233,0.5)]" />
+              <div className="bg-sky-500 h-full rounded-full shadow-[0_0_10px_rgba(14,165,233,0.5)]" style={{ width: `${commissionProgress}%` }} />
             </div>
           </div>
         </section>
@@ -121,9 +147,39 @@ export default function CreatorMetrics() {
         <section className="space-y-4 pb-4">
           <h3 className="text-xl font-bold">Atividades Recentes</h3>
           <div className="space-y-3">
-            <div className="bg-[#17212b] p-8 rounded-xl border border-gray-800 text-center">
-              <p className="text-slate-400 text-sm font-medium">Nenhuma atividade recente</p>
-            </div>
+            {recentPurchases.length > 0 ? (
+              recentPurchases.map((purchase) => (
+                <div key={purchase.id} className="bg-[#17212b] p-4 rounded-xl border border-gray-800 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="bg-gray-800 p-2.5 rounded-lg text-sky-500">
+                      <svg
+                        className="h-5 w-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-100">Nova Assinatura via Código</p>
+                      <p className="text-sm text-slate-400">{purchase.plan_type} • Há {getTimeAgo(purchase.created_at)}</p>
+                    </div>
+                  </div>
+                  <div className="text-emerald-400 font-bold">+ R$ {(purchase.amount_cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                </div>
+              ))
+            ) : (
+              <div className="bg-[#17212b] p-8 rounded-xl border border-gray-800 text-center">
+                <p className="text-slate-400 text-sm font-medium">Nenhuma atividade recente</p>
+              </div>
+            )}
           </div>
         </section>
       </main>
@@ -139,7 +195,7 @@ export default function CreatorMetrics() {
             xmlns="http://www.w3.org/2000/svg"
           >
             <path
-              d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+              d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001 1v4a1 1 0 001 1h2a1 1 0 001 1v-4a1 1 0 00-1-1h-2a1 1 0 00-1 1z"
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"

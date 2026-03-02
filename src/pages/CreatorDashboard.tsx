@@ -1,10 +1,12 @@
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { useReferralCode } from "@/hooks/useReferralCode";
 
 export default function CreatorDashboard() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const { referralStats } = useReferralCode();
 
   if (!user) {
     return <Navigate to="/login" replace />;
@@ -13,6 +15,16 @@ export default function CreatorDashboard() {
   if (!profile?.is_ugc) {
     return <Navigate to="/analysis" replace />;
   }
+
+  // Calculate real metrics from referral stats
+  const totalCommission = referralStats?.total_commission || 0;
+  const totalUses = referralStats?.total_uses || 0;
+
+  // Calculate distribution percentages
+  const total = totalCommission + (totalUses * 100); // Simple calculation for demo
+  const profitPercentage = total > 0 ? (totalCommission / total) * 100 : 0;
+  const churnPercentage = 0; // No churn data in referral system yet
+  const revenuePercentage = total > 0 ? ((totalUses * 100) / total) * 100 : 0;
 
   return (
     <div className="min-h-screen bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100">
@@ -36,7 +48,7 @@ export default function CreatorDashboard() {
               className="text-3xl font-bold leading-tight"
               style={{ color: "#00FF88" }}
             >
-              R$ 0,00
+              R$ {(totalCommission / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
           </div>
         </div>
@@ -47,7 +59,7 @@ export default function CreatorDashboard() {
             <p className="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">
               Taxa de Churn
             </p>
-            <p className="text-red-500 text-3xl font-bold leading-tight">0%</p>
+            <p className="text-red-500 text-3xl font-bold leading-tight">{churnPercentage.toFixed(1)}%</p>
           </div>
         </div>
 
@@ -58,7 +70,7 @@ export default function CreatorDashboard() {
               Faturamento Bruto
             </p>
             <p className="text-slate-900 dark:text-white text-3xl font-bold leading-tight">
-              R$ 0,00
+              R$ {((totalUses * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
           </div>
         </div>
@@ -90,7 +102,7 @@ export default function CreatorDashboard() {
                   fill="transparent"
                   stroke="#0f172a"
                   strokeWidth="4"
-                  strokeDasharray="0 100"
+                  strokeDasharray={`${profitPercentage} ${100 - profitPercentage}`}
                   strokeDashoffset={0}
                 />
               </svg>
@@ -111,14 +123,14 @@ export default function CreatorDashboard() {
                 />
                 <div className="flex flex-col">
                   <span className="text-xs text-slate-500">Lucro</span>
-                  <span className="text-sm font-semibold">R$ 0,00</span>
+                  <span className="text-sm font-semibold">R$ {(totalCommission / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <div className="h-3 w-3 rounded-full bg-red-500" />
                 <div className="flex flex-col">
                   <span className="text-xs text-slate-500">Taxa de Churn</span>
-                  <span className="text-sm font-semibold">0%</span>
+                  <span className="text-sm font-semibold">{churnPercentage.toFixed(1)}%</span>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -128,7 +140,7 @@ export default function CreatorDashboard() {
                     Faturamento Bruto
                   </span>
                   <span className="text-sm font-semibold">
-                    R$ 0,00
+                    R$ {((totalUses * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>

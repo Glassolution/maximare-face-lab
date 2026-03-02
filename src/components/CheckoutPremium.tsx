@@ -122,6 +122,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
 
 
   const [initialEmail, setInitialEmail] = useState('');
+  const [referralCode, setReferralCode] = useState('');
 
   // Use a stable reference for initialization to prevent re-renders
   // We ignore changes to email/price after mount to avoid resetting the form
@@ -610,6 +611,16 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
         <div className="space-y-4 mb-8">
             <p className="text-[12px] uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 font-semibold px-1">Seus Dados</p>
             <div className="space-y-4">
+                {/* Referral Code Field */}
+                <div className="space-y-2">
+                    <Label className="text-xs text-gray-500">Código de Apoiador (Opcional)</Label>
+                    <Input 
+                        value={referralCode} 
+                        onChange={(e) => setReferralCode(e.target.value.toUpperCase())} 
+                        className="bg-gray-50 dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-800 rounded-xl h-12 text-gray-900 dark:text-white focus:ring-primary/50"
+                        placeholder="Digite o código (ex: MARIA10)"
+                    />
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <Label className="text-xs text-gray-500">Nome</Label>
