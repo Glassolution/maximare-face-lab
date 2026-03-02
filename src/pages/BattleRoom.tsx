@@ -40,9 +40,18 @@ export default function BattleRoom() {
   };
 
   const getAvatarUrl = (pathOrUrl: string | null | undefined) => {
-    if (!pathOrUrl) return null;
-    if (pathOrUrl.startsWith('http') || pathOrUrl.startsWith('data:')) return pathOrUrl;
-    return supabase.storage.from('avatars').getPublicUrl(pathOrUrl).data.publicUrl;
+    console.log('[getAvatarUrl] INPUT:', pathOrUrl);
+    if (!pathOrUrl) {
+      console.log('[getAvatarUrl] RETURN null - no pathOrUrl');
+      return null;
+    }
+    if (pathOrUrl.startsWith('http') || pathOrUrl.startsWith('data:')) {
+      console.log('[getAvatarUrl] RETURN direct URL:', pathOrUrl);
+      return pathOrUrl;
+    }
+    const publicUrl = supabase.storage.from('avatars').getPublicUrl(pathOrUrl).data.publicUrl;
+    console.log('[getAvatarUrl] RETURN public URL:', publicUrl);
+    return publicUrl;
   };
 
   const getBattlePhotoUrl = (submission: any | null | undefined) => {
@@ -288,6 +297,18 @@ export default function BattleRoom() {
        // Logic to determine labels and colors based on winner/loser
       // Assuming user logged in is viewing
       
+      console.log('[BattleRoom] === RENDERIZANDO TELA DE RESULTADO ===', {
+        'battle.status': battle.status,
+        'showResultScreen': showResultScreen,
+        'result exists': !!result,
+        'battle exists': !!battle,
+        'userProfile exists': !!userProfile,
+        'opponentProfile exists': !!opponentProfile,
+        'stableCreatorPhotoUrl': stableCreatorPhotoUrl,
+        'stableOpponentPhotoUrl': stableOpponentPhotoUrl,
+        'finalResultPhotos': finalResultPhotos
+      });
+      
       console.log('[BattleRoom] RESULT SCREEN DEBUG:', {
         result,
         battle: !!battle,
@@ -317,6 +338,19 @@ export default function BattleRoom() {
     loserId: result.loser_id,
     fallbackUsed: !finalResultPhotos.winner || !finalResultPhotos.loser
   });
+  
+  // RASTREAMENTO COMPLETO DA VARIÁVEL winnerPhotoUrl
+  console.log('[BattleRoom] RASTREAMENTO winnerPhotoUrl:', {
+    '1. finalResultPhotos.winner': finalResultPhotos.winner,
+    '2. result.winner_id === userProfile?.id': result.winner_id === userProfile?.id,
+    '3. userProfile?.id': userProfile?.id,
+    '4. myBattlePhotoUrl': myBattlePhotoUrl,
+    '5. opponentBattlePhotoUrl': opponentBattlePhotoUrl,
+    '6. getAvatarUrl()': getAvatarUrl(result.winner_id === userProfile?.id ? userProfile : opponentProfile),
+    '7. winnerPhotoUrl FINAL': winnerPhotoUrl,
+    '8. typeof winnerPhotoUrl': typeof winnerPhotoUrl,
+    '9. winnerPhotoUrl length': winnerPhotoUrl?.length
+  });
 
       return (
           <div className="container max-w-lg mx-auto py-8 px-4 space-y-8 animate-in fade-in duration-500 pb-32">
@@ -336,7 +370,11 @@ export default function BattleRoom() {
                       <div className="pt-8 pb-4 px-2 text-center bg-card">
                           <div className="h-20 w-20 mx-auto rounded-full border-4 border-amber-500 overflow-hidden mb-2 bg-muted relative">
                               <Avatar className="h-full w-full">
-                                    <AvatarImage src={winnerPhotoUrl || undefined} />
+                                    <AvatarImage 
+                                      src={winnerPhotoUrl || undefined} 
+                                      onError={(e) => console.log('[AvatarImage WINNER ERROR:', e, 'src:', winnerPhotoUrl)}
+                                      onLoad={() => console.log('[AvatarImage WINNER LOADED:', winnerPhotoUrl)}
+                                    />
                                     <AvatarFallback>WIN</AvatarFallback>
                                 </Avatar>
                           </div>
@@ -353,7 +391,11 @@ export default function BattleRoom() {
                       <div className="pt-8 pb-4 px-2 text-center bg-card">
                            <div className="h-20 w-20 mx-auto rounded-full border-2 border-muted overflow-hidden mb-2 bg-muted relative">
                                 <Avatar className="h-full w-full">
-                                    <AvatarImage src={loserPhotoUrl || undefined} />
+                                    <AvatarImage 
+                                      src={loserPhotoUrl || undefined} 
+                                      onError={(e) => console.log('[AvatarImage LOSER ERROR:', e, 'src:', loserPhotoUrl)}
+                                      onLoad={() => console.log('[AvatarImage LOSER LOADED:', loserPhotoUrl)}
+                                    />
                                     <AvatarFallback>RIP</AvatarFallback>
                                 </Avatar>
                           </div>
