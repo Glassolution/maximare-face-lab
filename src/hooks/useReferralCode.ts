@@ -50,7 +50,10 @@ export function useReferralCode() {
 
   // Load referral code with proper persistence logic
   useEffect(() => {
-    if (!user?.email) return;
+    if (!user?.email || !profile) {
+      console.log('🔍 Waiting for user and profile to load...');
+      return;
+    }
 
     const initializeReferralCode = async () => {
       console.log('🔍 Initializing referral code for user:', user.email);
@@ -84,7 +87,7 @@ export function useReferralCode() {
     };
 
     initializeReferralCode();
-  }, [user?.email]); // Remove profile from dependencies
+  }, [user?.email, profile]); // Add profile to dependencies
 
   // Check if code already exists in database
   const checkCodeUniqueness = async (code: string) => {
