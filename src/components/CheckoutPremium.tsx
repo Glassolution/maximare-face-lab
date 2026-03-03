@@ -104,6 +104,11 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'pix'>('card');
   const cardPaymentBrickController = useRef<any>(null);
   const notifiedRef = useRef(false);
+  // Guard: capture premium status at mount so profile-backup polling doesn't
+  // immediately fire for users who were already premium before opening checkout.
+  const wasAlreadyPremiumRef = useRef(false);
+  // Epoch counter: increment to invalidate all stale runPoll loops from previous renders.
+  const pollingEpochRef = useRef(0);
   
   // User data
   const [email, setEmail] = useState('');
@@ -113,7 +118,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
 
   const [remountKey, setRemountKey] = useState(0);
   const [verifying, setVerifying] = useState(false);
-  const [pollingStartTime, setPollingStartTime] = useState<number | null>(null);
+  const [pollTrigger, setPollTrigger] = useState(0);
   const [showTimeoutFallback, setShowTimeoutFallback] = useState(false);
   const [currentPaymentId, setCurrentPaymentId] = useState<string | null>(null);
 
@@ -127,22 +132,21 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
 
   // Use a stable reference for initialization to prevent re-renders
   // We ignore changes to email/price after mount to avoid resetting the form
-  const initialization = useMemo(() => ({ 
+  const initialization = useMemo(() => ({
     amount: price,
     payer: {
       email: 'customer@email.com', // Placeholder, real email is sent on submit
-      entity_type: 'individual',
     }
   }), []); // Empty dependency array = STABLE
 
   const customization = useMemo(() => ({
     paymentMethods: {
       maxInstallments: 12,
-      ticket: [],
-      bankTransfer: [],
-      atm: [],
-      creditCard: "all",
-      debitCard: "all",
+      ticket: "none" as const,
+      bankTransfer: "none" as const,
+      atm: "none" as const,
+      creditCard: "all" as const,
+      debitCard: "all" as const,
     },
     visual: {
         style: {
@@ -163,12 +167,22 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
         if (user) {
           setEmail(user.email || '');
           setInitialEmail(user.email || '');
-          
+
           if (user.user_metadata?.full_name) {
             const parts = user.user_metadata.full_name.split(' ');
             setFirstName(parts[0]);
             setLastName(parts.slice(1).join(' '));
           }
+
+          // Capture pre-existing premium status so polling backup never
+          // false-positives for users who were already premium at checkout open.
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('is_premium, subscription_status')
+            .eq('id', user.id)
+            .maybeSingle();
+          wasAlreadyPremiumRef.current =
+            !!(profile?.is_premium || profile?.subscription_status === 'active');
         }
       } catch (e) {
         console.error("Error fetching user", e);
@@ -201,26 +215,26 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                   if (!notifiedRef.current) {
                     notifiedRef.current = true;
                     toast.success("Pagamento confirmado! Acesso liberado.");
-                  }
-                  setVerifying(false);
-                  
-                  // 1. Force Refresh Session & Profile
-                  await refreshSession();
-                  
-                  // 2. Double check profile state after refresh (Optional, for logging)
-                  const { data: { user: updatedUser } } = await supabase.auth.getUser();
-                  if (updatedUser) {
-                      const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', updatedUser.id).single();
-                      logger.log("[Checkout]", "Final Profile State:", {
-                          is_premium: updatedProfile?.is_premium,
-                          status: updatedProfile?.subscription_status,
-                          plan: updatedProfile?.plan_type,
-                          expires: updatedProfile?.subscription_expires_at
-                      });
-                  }
+                    setVerifying(false);
 
-                  onSuccess(email);
-                  return true; // Stop polling
+                    // 1. Force Refresh Session & Profile (guarded — only once, prevents concurrent token rotation)
+                    await refreshSession();
+
+                    // 2. Double check profile state after refresh (Optional, for logging)
+                    const { data: { user: updatedUser } } = await supabase.auth.getUser();
+                    if (updatedUser) {
+                        const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', updatedUser.id).single();
+                        logger.log("[Checkout]", "Final Profile State:", {
+                            is_premium: updatedProfile?.is_premium,
+                            status: updatedProfile?.subscription_status,
+                            plan: updatedProfile?.plan_type,
+                            expires: updatedProfile?.subscription_expires_at
+                        });
+                    }
+
+                    onSuccess(email);
+                  }
+                  return true; // Stop polling regardless
               }
 
               if (USE_RPC_ONLY) {
@@ -248,20 +262,20 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                   if (!notifiedRef.current) {
                     notifiedRef.current = true;
                     toast.success("Pagamento confirmado! Acesso liberado.");
+                    setVerifying(false);
+                    await refreshSession();
+                    const { data: { user: updatedUser } } = await supabase.auth.getUser();
+                    if (updatedUser) {
+                        const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', updatedUser.id).single();
+                        logger.log("[Checkout]", "Final Profile State:", {
+                            is_premium: updatedProfile?.is_premium,
+                            status: updatedProfile?.subscription_status,
+                            plan: updatedProfile?.plan_type,
+                            expires: updatedProfile?.subscription_expires_at
+                        });
+                    }
+                    onSuccess(email);
                   }
-                  setVerifying(false);
-                  await refreshSession();
-                  const { data: { user: updatedUser } } = await supabase.auth.getUser();
-                  if (updatedUser) {
-                      const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', updatedUser.id).single();
-                      logger.log("[Checkout]", "Final Profile State:", {
-                          is_premium: updatedProfile?.is_premium,
-                          status: updatedProfile?.subscription_status,
-                          plan: updatedProfile?.plan_type,
-                          expires: updatedProfile?.subscription_expires_at
-                      });
-                  }
-                  onSuccess(email);
                   return true;
               } else if (efError) {
                   logger.error("[Checkout]", "Edge Function error:", efError);
@@ -280,10 +294,10 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                     if (!notifiedRef.current) {
                       notifiedRef.current = true;
                       toast.success("Pagamento confirmado! Acesso liberado.");
+                      setVerifying(false);
+                      await refreshSession();
+                      onSuccess(email);
                     }
-                    setVerifying(false);
-                    await refreshSession();
-                    onSuccess(email);
                     return true;
                   }
               }
@@ -302,142 +316,81 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
           .eq('id', user.id)
           .maybeSingle();
       
-      if (data?.subscription_status === 'active' || data?.is_premium) {
-          logger.log("[Checkout]", "Profile Polling found active status!");
+      // Only treat profile premium as confirmation if the user was NOT already
+      // premium when they opened the checkout (prevents false-positive on pre-existing plans).
+      if (!wasAlreadyPremiumRef.current && (data?.subscription_status === 'active' || data?.is_premium)) {
+          logger.log("[Checkout]", "Profile Polling found newly active status!");
           if (!notifiedRef.current) {
             notifiedRef.current = true;
             toast.success("Pagamento confirmado! Acesso liberado.");
+            setVerifying(false);
+            await refreshSession(); // Ensure global state is synced (guarded — only once)
+            onSuccess(email);
           }
-          setVerifying(false);
-          await refreshSession(); // Ensure global state is synced
-          onSuccess(email);
           return true;
       }
       return false;
   };
 
-  if (pixData?.user_id || verifying) {
-      logger.log("[Checkout]", "Starting intelligent polling...");
-      if (!pollingStartTime) setPollingStartTime(Date.now());
+  // Ref to always call the latest checkStatus — avoids stale closures inside useEffect
+  const checkStatusRef = useRef<typeof checkStatus>(checkStatus);
+  checkStatusRef.current = checkStatus;
 
-      let attempts = 0;
-      
-      const runPoll = async () => {
-          attempts++;
-          const done = await checkStatus();
-          if (done) return;
-
-          // Timeout Logic (60s)
-          const elapsed = Date.now() - (pollingStartTime || Date.now());
-          if (elapsed > 60000) {
-              setShowTimeoutFallback(true);
-              // Don't stop polling completely, just slow down significantly to 10s
-              // But UI changes to show fallback
-          }
-
-          // Backoff Strategy
-          let nextDelay = 3000; // Default 3s
-          if (attempts > 20) nextDelay = 5000; // After 1 min (20 * 3s), slow to 5s
-          
-          // Hard stop after 5 minutes of total failure
-          if (attempts > 100) { 
-              setVerifying(false);
-              return;
-          }
-
-          if (verifying || pixData?.user_id) {
-              setTimeout(runPoll, nextDelay);
-          }
-      };
-
-      runPoll();
-  }
-
-  // Effect to handle cleanup
+  // Polling via useEffect — runs exactly ONCE per poll session (not on every render).
+  // Fixes: multiple concurrent loops, stale closures, and cascading token rotation.
   useEffect(() => {
-    return () => {
-        // Cleanup if needed
-    };
-  }, [pixData, verifying, onSuccess, email, currentPaymentId]);
+    if (!pixData?.user_id && !verifying) return;
 
-  const manualCheck = async () => {
-      setShowTimeoutFallback(false); // Reset fallback UI if user retries manually
-      setPollingStartTime(Date.now()); // Reset timeout counter
-      
-      const payId = currentPaymentId || pixData?.payment_id;
-      
-      if (payId) {
-          try {
-            // Try RPC first
-            const { data: rpcData, error: rpcError } = await supabase.rpc('check_payment_status', { payment_id_input: payId });
-            const rpcApproved = !!rpcData && (rpcData.success === true || rpcData.status === 'approved');
-            logger.log("[Checkout]", "Manual RPC response:", { rpcApproved, rpcData, rpcError: rpcError?.message });
-            if (!rpcError && rpcApproved) {
-                logger.log("[Checkout]", "Manual Check Approved via RPC.");
-                if (!notifiedRef.current) {
-                  notifiedRef.current = true;
-                  toast.success("Pagamento confirmado! Acesso liberado.");
-                }
-                setVerifying(false);
-                await refreshSession();
-                onSuccess(email);
-                return;
-            }
-            // Fallback EF
-            const USE_RPC_ONLY = ((import.meta as any).env?.VITE_CHECKOUT_RPC_ONLY || '').toString() === 'true';
-            if (USE_RPC_ONLY) {
-              logger.log("[Checkout]", "RPC_ONLY flag active; skipping EF in manualCheck.");
-              return;
-            }
-            const token = await getValidAccessToken();
-            if (!token) {
-              toast.error("Faça login novamente");
-              return;
-            }
-            const { data: efData, error: efError } = await supabase.functions.invoke('check-payment-status', {
-              headers: {
-                apikey: (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "",
-                "sb-access-token": token,
-                "x-supabase-auth": token
-              },
-              body: { payment_id: payId }
-            });
-            logger.log("[Checkout]", "Manual EF response:", { efData, efError: efError?.message });
-            if (!efError && efData?.status === 'approved') {
-                logger.log("[Checkout]", "Manual Check Approved via Edge Function.");
-                if (!notifiedRef.current) {
-                  notifiedRef.current = true;
-                  toast.success("Pagamento confirmado! Acesso liberado.");
-                }
-                setVerifying(false);
-                await refreshSession();
-                onSuccess(email);
-                return;
-            } else {
-                 if (efError) logger.error("[Checkout]", "Manual Check EF error:", efError);
-                 return;
-            }
-          } catch (err) {
-              logger.error("[Checkout]", "Manual Check Error:", err);
-          }
+    const myEpoch = pollingEpochRef.current;
+    const startTime = Date.now(); // Timeout baseline for THIS session
+    let attempts = 0;
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    const runPoll = async () => {
+      if (pollingEpochRef.current !== myEpoch) return;
+
+      attempts++;
+      const done = await checkStatusRef.current();
+      if (done || pollingEpochRef.current !== myEpoch) return;
+
+      // Show timeout fallback after 60s
+      if (Date.now() - startTime > 60000) {
+        setShowTimeoutFallback(true);
       }
-      
-      // Fallback Profile Check
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-          const { data } = await supabase.from('profiles').select('subscription_status, is_premium').eq('id', user.id).maybeSingle();
-          if (data?.subscription_status === 'active' || data?.is_premium) {
-              logger.log("[Checkout]", "Manual Profile Check Approved.");
-              if (!notifiedRef.current) {
-                notifiedRef.current = true;
-                toast.success("Pagamento confirmado! Acesso liberado.");
-              }
-              setVerifying(false);
-              await refreshSession();
-              onSuccess(email);
-          } else {
-          }
+
+      // Hard stop after 100 attempts (~5 minutes)
+      if (attempts > 100) {
+        setVerifying(false);
+        return;
       }
+
+      // Faster start: 1.5s → 3s → 5s backoff
+      const nextDelay = attempts <= 10 ? 1500 : attempts <= 20 ? 3000 : 5000;
+      timeoutId = setTimeout(runPoll, nextDelay);
+    };
+
+    runPoll();
+
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pixData?.user_id, verifying, pollTrigger]);
+
+  // Reset all PIX state so user can generate a new QR code / change payment method
+  const resetToPay = () => {
+      pollingEpochRef.current += 1; // Invalidate all running poll loops
+      setPixData(null);
+      setCurrentPaymentId(null);
+      setShowTimeoutFallback(false);
+      setVerifying(false);
+      notifiedRef.current = false;
+  };
+
+  // manualCheck: stop current loops, hide timeout screen, restart poll immediately via pollTrigger.
+  // The useEffect will fire right away with the new epoch, calling checkStatus instantly.
+  const manualCheck = () => {
+      pollingEpochRef.current += 1; // Invalidate stale loops
+      setShowTimeoutFallback(false);
+      setPollTrigger(t => t + 1); // Restarts polling useEffect → immediate checkStatus call
   };
 
   const handleCardSubmit = async (formData: any) => {
@@ -475,7 +428,6 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
         // Track Payment ID for polling
         if (data?.payment_id) {
             setCurrentPaymentId(data.payment_id.toString());
-            setPollingStartTime(Date.now());
         }
 
         // PostHog: track payment outcome
@@ -561,11 +513,10 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
         if (data.error) throw new Error(data.error);
 
         setPixData(data);
-        
+
         // Track Payment ID for polling
         if (data?.payment_id) {
             setCurrentPaymentId(data.payment_id.toString());
-            setPollingStartTime(Date.now());
         }
 
     } catch (e: any) {
@@ -633,7 +584,10 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                             
                             <div className="space-y-2 pt-2">
                                 <Button onClick={manualCheck} className="w-full bg-primary hover:bg-blue-700 text-white h-10 text-sm">
-                                    <RefreshCw className="mr-2 h-3 w-3" /> Tentar Novamente
+                                    <RefreshCw className="mr-2 h-3 w-3" /> Já paguei, verificar
+                                </Button>
+                                <Button onClick={resetToPay} variant="outline" className="w-full h-10 text-sm border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300">
+                                    <ChevronLeft className="mr-2 h-3 w-3" /> Gerar novo código / Trocar método
                                 </Button>
                                 <Button variant="outline" className="w-full h-10 text-sm border-gray-200 dark:border-gray-700" asChild>
                                     <a href="mailto:suporte@maximare.com.br" target="_blank" rel="noopener noreferrer">

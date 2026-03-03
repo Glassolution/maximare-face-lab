@@ -27,7 +27,6 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    try { console.log(JSON.stringify({ tag: "subcancel_entry", ts: new Date().toISOString() })); } catch {}
     if (!SUPABASE_URL) {
       return new Response(JSON.stringify({ error: "server_config_error", detail: "MISSING_URL" }), {
         status: 500,
@@ -36,14 +35,14 @@ serve(async (req) => {
     }
 
     const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
-    const hdrInfo = {
-      hasAuth: !!authHeader,
-      authLen: authHeader ? authHeader.length : 0,
-      hasAnon: !!(req.headers.get("apikey") || req.headers.get("x-api-key") || ENV_ANON_KEY),
-      hasSbToken: !!(req.headers.get("sb-access-token") || req.headers.get("x-supabase-auth"))
-    };
     try {
-      console.log(JSON.stringify({ tag: "subcancel_req_headers", ...hdrInfo }));
+      const info = {
+        hasAuth: !!authHeader,
+        authLen: authHeader ? authHeader.length : 0,
+        hasAnon: !!(req.headers.get("apikey") || req.headers.get("x-api-key") || ENV_ANON_KEY),
+        hasSbToken: !!(req.headers.get("sb-access-token") || req.headers.get("x-supabase-auth"))
+      };
+      console.log(JSON.stringify({ tag: "subcancel_req_headers", ...info }));
     } catch {}
     if (!authHeader && !ENV_ANON_KEY && !req.headers.get("apikey") && !req.headers.get("x-api-key")) {
       return new Response(JSON.stringify({ error: "unauthorized", reason: "missing_auth_header" }), {
@@ -65,34 +64,36 @@ serve(async (req) => {
     const client = createClient(SUPABASE_URL, ANON_KEY, {
       global: { headers: { Authorization: `Bearer ${sbToken}` } },
     });
-    // Sempre que houver SERVICE_ROLE_KEY, use admin (evita heurísticas frágeis)
-    const admin = SERVICE_ROLE_KEY ? createClient(SUPABASE_URL, SERVICE_ROLE_KEY) : null;
+    const isServiceJwt = SERVICE_ROLE_KEY && SERVICE_ROLE_KEY.includes(".");
+    const admin = isServiceJwt ? createClient(SUPABASE_URL, SERVICE_ROLE_KEY) : null;
+    if (!admin) {
+      console.error('[cancel] SERVICE_ROLE_KEY ausente ou inválida');
+      return new Response(
+        JSON.stringify({ error: 'Configuração interna inválida' }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const token = sbToken || (authHeader ? authHeader.replace(/^Bearer\s+/i, "") : "");
-    // Robust user extraction: prefer local decode; fall back to getUser
-    let userId: string | null = null;
-    let userErrMsg: string | null = null;
-    if (token) {
+    const { data: userRes, error: userErr } = await client.auth.getUser(token);
+    let userId = userRes?.user?.id || null;
+    if (!userId) {
+      // Fallback: decode JWT locally just to extract "sub" (no signature verification).
+      // PostgREST will still verify the token when using it for DB operations.
       try {
         const payloadB64 = token.split(".")[1];
         const normalized = payloadB64.replace(/-/g, "+").replace(/_/g, "/");
         const json = atob(normalized);
         const payload = JSON.parse(json) as { sub?: string; iss?: string; aud?: string };
-        // Accept token as long as it has a sub; optional project check for extra safety
-        if (payload?.sub) {
-          userId = payload.sub;
+        if (payload?.iss?.includes("xbtendfjajspaidpktsw")) {
+          userId = payload?.sub || null;
         }
       } catch (_e) {
-        // ignore and try network-based resolution
+        // ignore
       }
     }
-    if (!userId) {
-      const { data: userRes, error: userErr } = await client.auth.getUser(token);
-      userId = userRes?.user?.id || null;
-      userErrMsg = userErr?.message || null;
-    }
     try {
-      console.log(JSON.stringify({ tag: "subcancel_user", userId, getUserError: userErrMsg }));
+      console.log(JSON.stringify({ tag: "subcancel_user", userId, getUserError: userErr?.message || null }));
     } catch {}
     if (!userId) {
       return new Response(JSON.stringify({ error: "unauthorized", reason: "invalid_user_or_parse" }), {
@@ -114,94 +115,36 @@ serve(async (req) => {
     let { data: profile } = await db
       .from("profiles")
       .select(
-        "id, user_id, subscription_status, subscription_expires_at, premium_since, plan_type, payment_provider, payment_id, provider_payment_id, provider_subscription_id, first_payment_at, subscription_started_at, last_payment_at"
+        "id, user_id, subscription_status, subscription_expires_at, premium_since, plan_type, payment_provider, payment_id, provider_payment_id, provider_subscription_id, first_payment_at, subscription_started_at"
       )
       .or(`id.eq.${userId},user_id.eq.${userId}`)
       .maybeSingle();
 
     if (!profile) {
       if (admin) {
-        // Derive a safe username/display name to satisfy potential NOT NULL/UNIQUE constraints
-        let base = "user";
-        try {
-          const { data: u } = await admin.auth.admin.getUserById(userId);
-          const emailBase =
-            (u?.user?.email || "")
-              .split("@")[0]
-              .toLowerCase()
-              .replace(/[^a-z0-9_]/g, "")
-              .slice(0, 16) || "user";
-          base = (u?.user?.user_metadata?.username as string) || emailBase;
-        } catch {}
-        const suffix = (userId || "").replace(/-/g, "").slice(0, 8) || crypto.randomUUID().slice(0, 8);
-        const username = `${base}_${suffix}`.toLowerCase();
-        const display_name = base;
-
-        // Try upsert by id; if schema uses user_id or has constraints, try alternatives
+        // Try upsert by id; if schema uses user_id, fall back to user_id upsert
         const tryById = await admin
           .from("profiles")
-          .upsert({ id: userId, username, display_name }, { onConflict: "id", ignoreDuplicates: true });
+          .upsert({ id: userId }, { onConflict: "id", ignoreDuplicates: true });
         if (tryById.error) {
-          // Try by user_id
-          const tryByUserId = await admin
+          await admin
             .from("profiles")
-            .upsert({ user_id: userId, username, display_name }, { onConflict: "user_id", ignoreDuplicates: true });
-          if (tryByUserId.error) {
-            // Last resort: attempt insert with minimal column that likely exists
-            await admin.from("profiles").insert([{ user_id: userId, username, display_name }]).catch(() => {});
-            await admin.from("profiles").insert([{ id: userId, username, display_name }]).catch(() => {});
-          }
+            .upsert({ user_id: userId }, { onConflict: "user_id", ignoreDuplicates: true });
         }
         const re = await (admin ?? client)
           .from("profiles")
           .select(
-            "id, user_id, subscription_status, subscription_expires_at, premium_since, plan_type, payment_provider, payment_id, provider_payment_id, provider_subscription_id, first_payment_at, subscription_started_at, last_payment_at"
+            "id, user_id, subscription_status, subscription_expires_at, premium_since, plan_type, payment_provider, payment_id, provider_payment_id, provider_subscription_id, first_payment_at, subscription_started_at"
           )
           .or(`id.eq.${userId},user_id.eq.${userId}`)
           .maybeSingle();
         profile = re.data || null;
       }
       if (!profile) {
-        const now = new Date();
-        let base = "user";
-        try {
-          const { data: u } = await (admin ?? client).auth.getUser();
-          const emailBase =
-            (u?.user?.email || "")
-              .split("@")[0]
-              .toLowerCase()
-              .replace(/[^a-z0-9_]/g, "")
-              .slice(0, 16) || "user";
-          base = (u?.user?.user_metadata as any)?.username || emailBase;
-        } catch {}
-        const suffix = (userId || "").replace(/-/g, "").slice(0, 8) || crypto.randomUUID().slice(0, 8);
-        const username = `${base}_${suffix}`.toLowerCase();
-        const display_name = base;
-        try {
-          await (admin ?? client)
-            .from("profiles")
-            .upsert(
-              {
-                id: userId,
-                user_id: userId,
-                username,
-                display_name,
-                updated_at: now.toISOString(),
-              },
-              { onConflict: "id", ignoreDuplicates: false }
-            );
-        } catch {}
-        profile = {
-          id: userId,
-          user_id: userId,
-          plan_type: null,
-          provider_payment_id: null,
-          payment_id: null,
-          provider_subscription_id: null,
-          first_payment_at: null,
-          subscription_started_at: null,
-          premium_since: null,
-        } as any;
+        return new Response(JSON.stringify({ error: "Profile not found" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
     }
 
@@ -210,74 +153,25 @@ serve(async (req) => {
     else if (profile.subscription_started_at) startDate = new Date(profile.subscription_started_at as string);
     else if (profile.premium_since) startDate = new Date(profile.premium_since as string);
 
-    // Capture earliest and latest approved payment to determine refund window and target payment
-    let earliestPaymentId: string | null = null;
-    let earliestPaymentDate: Date | null = null;
-    let latestPaymentId: string | null = null;
-    let latestPaymentDate: Date | null = null;
     if (!startDate || isNaN(startDate.getTime())) {
       if (admin) {
         const { data: firstPay } = await admin
           .from("payments")
-          .select("created_at, payment_id")
+          .select("created_at")
           .eq("user_id", userId)
           .eq("status", "approved")
           .order("created_at", { ascending: true })
           .limit(1)
           .maybeSingle();
-        if (firstPay?.created_at) {
-          startDate = new Date(firstPay.created_at as string);
-          earliestPaymentDate = new Date(firstPay.created_at as string);
-        }
-        if (firstPay?.payment_id) earliestPaymentId = String(firstPay.payment_id);
+        if (firstPay?.created_at) startDate = new Date(firstPay.created_at as string);
       }
     }
 
-    // Always fetch latest approved payment to assess refund eligibility based on the last charge
-    if (admin) {
-      const { data: lastPay } = await admin
-        .from("payments")
-        .select("payment_id, created_at")
-        .eq("user_id", userId)
-        .eq("status", "approved")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (lastPay?.payment_id) latestPaymentId = String(lastPay.payment_id);
-      if (lastPay?.created_at) latestPaymentDate = new Date(lastPay.created_at as string);
-    }
-
     const now = new Date();
-    let windowDate: Date | null = latestPaymentDate || null;
-    if (!windowDate) {
-      const lp = (profile as any)?.last_payment_at as string | undefined;
-      windowDate = lp ? new Date(lp) : (startDate || null);
-    }
-    if (!windowDate || isNaN(windowDate.getTime())) {
-      return new Response(
-        JSON.stringify({
-          error: "refund_required",
-          reason: "unable_to_determine_payment_window",
-          debug: {
-            latest_payment_id: latestPaymentId || null,
-            earliest_payment_id: earliestPaymentId || null,
-            project: SUPABASE_URL,
-          },
-        }),
-        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    const isWithin7Days = now.getTime() - windowDate.getTime() <= 7 * 24 * 60 * 60 * 1000;
+    const isWithin7Days = startDate ? now.getTime() - startDate.getTime() <= 7 * 24 * 60 * 60 * 1000 : false;
 
-    let providerPaymentId: string | null = (profile.provider_payment_id as string) || (profile.payment_id as string) || null;
+    const providerPaymentId = profile.provider_payment_id || profile.payment_id || null;
     const providerSubscriptionId = profile.provider_subscription_id || null;
-
-    // If within 7 days and we have the latest payment id, use it for refund (refund last charge)
-    if (!providerPaymentId && isWithin7Days && latestPaymentId) {
-      providerPaymentId = latestPaymentId;
-    }
-    // Otherwise, fallback order: profile ids -> latest -> earliest (legacy)
-    if (!providerPaymentId) providerPaymentId = latestPaymentId || earliestPaymentId || null;
 
     if (providerPaymentId) {
       const { data: existing } = await db
@@ -299,113 +193,10 @@ serve(async (req) => {
       }
     }
 
-    let cancelPayload: unknown = null;
-    let refundPayload: unknown = null;
-    let refundStatus: string = "not_applicable";
-
-    // Note: We will cancel provider preapproval later, conditioned on refund policy (see below)
-
-    if (isWithin7Days) {
-      if (!providerPaymentId) {
-        return new Response(
-          JSON.stringify({
-            error: "refund_required",
-            reason: "payment_id_missing_or_not_approved",
-            debug: {
-              latest_payment_id: latestPaymentId || null,
-              earliest_payment_id: earliestPaymentId || null,
-              window_date_iso: (latestPaymentDate || startDate)?.toISOString?.() || null,
-              project: SUPABASE_URL,
-            },
-          }),
-          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      if (providerPaymentId && MP_ACCESS_TOKEN) {
-        const res = await fetch(`https://api.mercadopago.com/v1/payments/${providerPaymentId}/refunds`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
-            "Content-Type": "application/json",
-            "X-Idempotency-Key": crypto.randomUUID(),
-          },
-          body: JSON.stringify({}),
-        });
-        const resJson = await res.json().catch(() => null);
-        refundPayload = resJson;
-        if (!res.ok) {
-          const msg = (resJson && (resJson.message || resJson.error || resJson.status)) || "";
-          const already = typeof msg === "string" && /already\s*refunded|reembolsad[oa]/i.test(msg);
-          if (already) {
-            refundStatus = "approved";
-          } else {
-            refundStatus = "failed";
-          }
-        } else {
-          refundStatus = "approved";
-        }
-        if (!res.ok) {
-          let priceFail: number | null = null;
-          const pFail = await admin
-            ?.from("payments")
-            .select("amount")
-            .eq("payment_id", providerPaymentId.toString())
-            .maybeSingle();
-          if (pFail?.data?.amount != null) priceFail = Number(pFail.data.amount);
-          await db.from("subscription_cancellation_feedback").insert({
-            user_id: userId,
-            provider: "mercadopago",
-            provider_subscription_id: providerSubscriptionId,
-            provider_payment_id: providerPaymentId,
-            plan_type: profile.plan_type || null,
-            price: priceFail,
-            is_within_7_days: isWithin7Days,
-            reason_primary: body.reason_primary,
-            reason_details: body.reason_details || null,
-            nps: body.nps ?? null,
-            had_issues: body.had_issues ?? null,
-            issue_details: body.issue_details || null,
-            retention_offer_shown: body.retention_offer_shown || null,
-            retention_offer_accepted: body.retention_offer_accepted ?? null,
-            final_action: already ? "cancel_refund" : "cancel_refund_failed",
-            refund_status: already ? "approved" : "failed",
-            provider_payload: { cancel: cancelPayload, refund: refundPayload, debug: { headers: hdrInfo, user_id: userId, mp_status: res.status } },
-          });
-          if (!already) {
-            return new Response(
-              JSON.stringify({
-                error: "refund_required",
-                reason: "provider_refund_failed",
-                refund_status: "failed",
-                debug: {
-                  selected_payment_id: providerPaymentId,
-                  window_date_iso: (latestPaymentDate || startDate)?.toISOString?.() || null,
-                  project: SUPABASE_URL,
-                },
-              }),
-              { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-          }
-        }
-        // After successful refund within 7 days, cancel provider preapproval if present
-        if (providerSubscriptionId && MP_ACCESS_TOKEN) {
-          const resCancel = await fetch(`https://api.mercadopago.com/preapproval/${providerSubscriptionId}`, {
-            method: "PUT",
-            headers: {
-              Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
-              "Content-Type": "application/json",
-              "X-Idempotency-Key": crypto.randomUUID(),
-            },
-            body: JSON.stringify({ status: "cancelled" }),
-          });
-          cancelPayload = await resCancel.json().catch(() => null);
-        }
-      }
-    }
-
+    // Fetch payment data BEFORE calling MP (needed for amount + idempotency)
     let price: number | null = null;
     if (providerPaymentId) {
-      const { data: p } = await admin
+      const { data: p } = await db
         .from("payments")
         .select("amount")
         .eq("payment_id", providerPaymentId.toString())
@@ -413,9 +204,12 @@ serve(async (req) => {
       if (p?.amount != null) price = Number(p.amount);
     }
 
-    // If outside the 7-day window, cancel provider preapproval (no refund expected)
-    if (!isWithin7Days && providerSubscriptionId && MP_ACCESS_TOKEN) {
-      const resCancel = await fetch(`https://api.mercadopago.com/preapproval/${providerSubscriptionId}`, {
+    let cancelPayload: unknown = null;
+    let refundPayload: unknown = null;
+    let refundStatus: string = "not_applicable";
+
+    if (providerSubscriptionId && MP_ACCESS_TOKEN) {
+      const res = await fetch(`https://api.mercadopago.com/preapproval/${providerSubscriptionId}`, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
@@ -424,10 +218,30 @@ serve(async (req) => {
         },
         body: JSON.stringify({ status: "cancelled" }),
       });
-      cancelPayload = await resCancel.json().catch(() => null);
+      cancelPayload = await res.json().catch(() => null);
     }
 
-    const finalAction = isWithin7Days ? "cancel_refund" : "cancel";
+    if (isWithin7Days && providerPaymentId && MP_ACCESS_TOKEN) {
+      const refundBody: Record<string, unknown> = {};
+      if (price != null) refundBody.amount = price;
+      const res = await fetch(`https://api.mercadopago.com/v1/payments/${providerPaymentId}/refunds`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
+          "Content-Type": "application/json",
+          "X-Idempotency-Key": `refund_${providerPaymentId}_${userId}`,
+        },
+        body: JSON.stringify(refundBody),
+      });
+      refundPayload = await res.json().catch(() => null);
+      refundStatus = res.ok ? "approved" : "failed";
+      console.log(`[cancel] MP refund response for payment ${providerPaymentId}:`, JSON.stringify(refundPayload));
+      if (!res.ok) {
+        console.error(`[cancel] Refund failed. Status: ${res.status}. Body:`, JSON.stringify(refundPayload));
+      }
+    }
+
+    const finalAction = isWithin7Days && providerPaymentId ? (refundStatus === "approved" ? "cancel_refund" : "cancel_refund_failed") : "cancel";
 
     await db.from("subscription_cancellation_feedback").insert({
       user_id: userId,
@@ -445,17 +259,13 @@ serve(async (req) => {
       retention_offer_shown: body.retention_offer_shown || null,
       retention_offer_accepted: body.retention_offer_accepted ?? null,
       final_action: finalAction,
-      refund_status: isWithin7Days ? "approved" : refundStatus,
-      provider_payload: { cancel: cancelPayload, refund: refundPayload, debug: { headers: hdrInfo, user_id: userId } },
+      refund_status: refundStatus,
+      provider_payload: { cancel: cancelPayload, refund: refundPayload },
     });
 
     const updates: Record<string, unknown> = {
       subscription_status: "canceled",
       is_premium: false,
-      plan_type: "free",
-      premium_plan_id: null,
-      subscription_expires_at: null,
-      premium_until: null,
       cancelled_at: now.toISOString(),
       cancel_reason: body.reason_primary,
       updated_at: now.toISOString(),
@@ -469,14 +279,7 @@ serve(async (req) => {
       JSON.stringify({
         ok: true,
         is_within_7_days: isWithin7Days,
-        refund_status: isWithin7Days ? "approved" : refundStatus,
-        debug: {
-          selected_payment_id: providerPaymentId || null,
-          latest_payment_id: latestPaymentId || null,
-          earliest_payment_id: earliestPaymentId || null,
-          window_date_iso: (latestPaymentDate || startDate)?.toISOString?.() || null,
-          project: SUPABASE_URL,
-        },
+        refund_status: refundStatus,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

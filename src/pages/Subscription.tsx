@@ -57,19 +57,11 @@ export default function Subscription() {
     setShowSuccess(true);
   };
 
-  const handleFinalRedirect = async () => {
-    // Check if user is logged in
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (session) {
-        navigate('/profile', { state: { premiumActivated: true } }); 
-    } else {
-        // Guest User
-        if (successEmail) {
-            toast.success("Verifique seu e-mail para acessar sua conta!");
-        }
-        navigate('/login');
-    }
+  const handleFinalRedirect = () => {
+    // Payment was confirmed — always navigate to profile.
+    // Never redirect to /login here: the user was authenticated to make the payment,
+    // and a stale session check could cause false redirects after token rotation.
+    navigate('/profile', { state: { premiumActivated: true } });
   };
 
   if (showSuccess) {
