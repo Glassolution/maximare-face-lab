@@ -70,7 +70,7 @@ export function CancelSubscriptionWizard({ open, onOpenChange }: Props) {
       );
       const { data, error } = await supabase.functions.invoke("subscription-cancel", {
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: payload
       });

@@ -107,6 +107,8 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
   // Guard: capture premium status at mount so profile-backup polling doesn't
   // immediately fire for users who were already premium before opening checkout.
   const wasAlreadyPremiumRef = useRef(false);
+  // Epoch counter: increment to invalidate all stale runPoll loops from previous renders.
+  const pollingEpochRef = useRef(0);
   
   // User data
   const [email, setEmail] = useState('');
@@ -334,32 +336,36 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
       logger.log("[Checkout]", "Starting intelligent polling...");
       if (!pollingStartTime) setPollingStartTime(Date.now());
 
+      // Capture the current epoch — if pollingEpochRef changes (user reset),
+      // this loop will self-terminate instead of re-triggering the timeout screen.
+      const myEpoch = pollingEpochRef.current;
       let attempts = 0;
-      
+
       const runPoll = async () => {
+          // Stop if a newer polling session was started (epoch changed)
+          if (pollingEpochRef.current !== myEpoch) return;
+
           attempts++;
           const done = await checkStatus();
-          if (done) return;
+          if (done || pollingEpochRef.current !== myEpoch) return;
 
-          // Timeout Logic (60s)
+          // Timeout Logic (60s) — only fire for THIS epoch
           const elapsed = Date.now() - (pollingStartTime || Date.now());
-          if (elapsed > 60000) {
+          if (elapsed > 60000 && pollingEpochRef.current === myEpoch) {
               setShowTimeoutFallback(true);
-              // Don't stop polling completely, just slow down significantly to 10s
-              // But UI changes to show fallback
           }
 
           // Backoff Strategy
           let nextDelay = 3000; // Default 3s
           if (attempts > 20) nextDelay = 5000; // After 1 min (20 * 3s), slow to 5s
-          
+
           // Hard stop after 5 minutes of total failure
-          if (attempts > 100) { 
+          if (attempts > 100) {
               setVerifying(false);
               return;
           }
 
-          if (verifying || pixData?.user_id) {
+          if ((verifying || pixData?.user_id) && pollingEpochRef.current === myEpoch) {
               setTimeout(runPoll, nextDelay);
           }
       };
@@ -374,7 +380,19 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
     };
   }, [pixData, verifying, onSuccess, email, currentPaymentId]);
 
+  // Reset all PIX state so user can generate a new QR code / change payment method
+  const resetToPay = () => {
+      pollingEpochRef.current += 1; // Invalidate all running poll loops
+      setPixData(null);
+      setCurrentPaymentId(null);
+      setShowTimeoutFallback(false);
+      setVerifying(false);
+      setPollingStartTime(null);
+      notifiedRef.current = false;
+  };
+
   const manualCheck = async () => {
+      pollingEpochRef.current += 1; // Invalidate stale loops before resetting timer
       setShowTimeoutFallback(false); // Reset fallback UI if user retries manually
       setPollingStartTime(Date.now()); // Reset timeout counter
       
@@ -647,7 +665,10 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                             
                             <div className="space-y-2 pt-2">
                                 <Button onClick={manualCheck} className="w-full bg-primary hover:bg-blue-700 text-white h-10 text-sm">
-                                    <RefreshCw className="mr-2 h-3 w-3" /> Tentar Novamente
+                                    <RefreshCw className="mr-2 h-3 w-3" /> Já paguei, verificar
+                                </Button>
+                                <Button onClick={resetToPay} variant="outline" className="w-full h-10 text-sm border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300">
+                                    <ChevronLeft className="mr-2 h-3 w-3" /> Gerar novo código / Trocar método
                                 </Button>
                                 <Button variant="outline" className="w-full h-10 text-sm border-gray-200 dark:border-gray-700" asChild>
                                     <a href="mailto:suporte@maximare.com.br" target="_blank" rel="noopener noreferrer">
