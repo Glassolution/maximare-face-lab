@@ -118,7 +118,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
 
   const [remountKey, setRemountKey] = useState(0);
   const [verifying, setVerifying] = useState(false);
-  const [pollingStartTime, setPollingStartTime] = useState<number | null>(null);
+  const [pollTrigger, setPollTrigger] = useState(0);
   const [showTimeoutFallback, setShowTimeoutFallback] = useState(false);
   const [currentPaymentId, setCurrentPaymentId] = useState<string | null>(null);
 
@@ -215,26 +215,26 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                   if (!notifiedRef.current) {
                     notifiedRef.current = true;
                     toast.success("Pagamento confirmado! Acesso liberado.");
-                  }
-                  setVerifying(false);
-                  
-                  // 1. Force Refresh Session & Profile
-                  await refreshSession();
-                  
-                  // 2. Double check profile state after refresh (Optional, for logging)
-                  const { data: { user: updatedUser } } = await supabase.auth.getUser();
-                  if (updatedUser) {
-                      const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', updatedUser.id).single();
-                      logger.log("[Checkout]", "Final Profile State:", {
-                          is_premium: updatedProfile?.is_premium,
-                          status: updatedProfile?.subscription_status,
-                          plan: updatedProfile?.plan_type,
-                          expires: updatedProfile?.subscription_expires_at
-                      });
-                  }
+                    setVerifying(false);
 
-                  onSuccess(email);
-                  return true; // Stop polling
+                    // 1. Force Refresh Session & Profile (guarded — only once, prevents concurrent token rotation)
+                    await refreshSession();
+
+                    // 2. Double check profile state after refresh (Optional, for logging)
+                    const { data: { user: updatedUser } } = await supabase.auth.getUser();
+                    if (updatedUser) {
+                        const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', updatedUser.id).single();
+                        logger.log("[Checkout]", "Final Profile State:", {
+                            is_premium: updatedProfile?.is_premium,
+                            status: updatedProfile?.subscription_status,
+                            plan: updatedProfile?.plan_type,
+                            expires: updatedProfile?.subscription_expires_at
+                        });
+                    }
+
+                    onSuccess(email);
+                  }
+                  return true; // Stop polling regardless
               }
 
               if (USE_RPC_ONLY) {
@@ -262,20 +262,20 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                   if (!notifiedRef.current) {
                     notifiedRef.current = true;
                     toast.success("Pagamento confirmado! Acesso liberado.");
+                    setVerifying(false);
+                    await refreshSession();
+                    const { data: { user: updatedUser } } = await supabase.auth.getUser();
+                    if (updatedUser) {
+                        const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', updatedUser.id).single();
+                        logger.log("[Checkout]", "Final Profile State:", {
+                            is_premium: updatedProfile?.is_premium,
+                            status: updatedProfile?.subscription_status,
+                            plan: updatedProfile?.plan_type,
+                            expires: updatedProfile?.subscription_expires_at
+                        });
+                    }
+                    onSuccess(email);
                   }
-                  setVerifying(false);
-                  await refreshSession();
-                  const { data: { user: updatedUser } } = await supabase.auth.getUser();
-                  if (updatedUser) {
-                      const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', updatedUser.id).single();
-                      logger.log("[Checkout]", "Final Profile State:", {
-                          is_premium: updatedProfile?.is_premium,
-                          status: updatedProfile?.subscription_status,
-                          plan: updatedProfile?.plan_type,
-                          expires: updatedProfile?.subscription_expires_at
-                      });
-                  }
-                  onSuccess(email);
                   return true;
               } else if (efError) {
                   logger.error("[Checkout]", "Edge Function error:", efError);
@@ -294,10 +294,10 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                     if (!notifiedRef.current) {
                       notifiedRef.current = true;
                       toast.success("Pagamento confirmado! Acesso liberado.");
+                      setVerifying(false);
+                      await refreshSession();
+                      onSuccess(email);
                     }
-                    setVerifying(false);
-                    await refreshSession();
-                    onSuccess(email);
                     return true;
                   }
               }
@@ -323,62 +323,57 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
           if (!notifiedRef.current) {
             notifiedRef.current = true;
             toast.success("Pagamento confirmado! Acesso liberado.");
+            setVerifying(false);
+            await refreshSession(); // Ensure global state is synced (guarded — only once)
+            onSuccess(email);
           }
-          setVerifying(false);
-          await refreshSession(); // Ensure global state is synced
-          onSuccess(email);
           return true;
       }
       return false;
   };
 
-  if (pixData?.user_id || verifying) {
-      logger.log("[Checkout]", "Starting intelligent polling...");
-      if (!pollingStartTime) setPollingStartTime(Date.now());
+  // Ref to always call the latest checkStatus — avoids stale closures inside useEffect
+  const checkStatusRef = useRef<typeof checkStatus>(checkStatus);
+  checkStatusRef.current = checkStatus;
 
-      // Capture the current epoch — if pollingEpochRef changes (user reset),
-      // this loop will self-terminate instead of re-triggering the timeout screen.
-      const myEpoch = pollingEpochRef.current;
-      let attempts = 0;
-
-      const runPoll = async () => {
-          // Stop if a newer polling session was started (epoch changed)
-          if (pollingEpochRef.current !== myEpoch) return;
-
-          attempts++;
-          const done = await checkStatus();
-          if (done || pollingEpochRef.current !== myEpoch) return;
-
-          // Timeout Logic (60s) — only fire for THIS epoch
-          const elapsed = Date.now() - (pollingStartTime || Date.now());
-          if (elapsed > 60000 && pollingEpochRef.current === myEpoch) {
-              setShowTimeoutFallback(true);
-          }
-
-          // Backoff Strategy
-          let nextDelay = 3000; // Default 3s
-          if (attempts > 20) nextDelay = 5000; // After 1 min (20 * 3s), slow to 5s
-
-          // Hard stop after 5 minutes of total failure
-          if (attempts > 100) {
-              setVerifying(false);
-              return;
-          }
-
-          if ((verifying || pixData?.user_id) && pollingEpochRef.current === myEpoch) {
-              setTimeout(runPoll, nextDelay);
-          }
-      };
-
-      runPoll();
-  }
-
-  // Effect to handle cleanup
+  // Polling via useEffect — runs exactly ONCE per poll session (not on every render).
+  // Fixes: multiple concurrent loops, stale closures, and cascading token rotation.
   useEffect(() => {
-    return () => {
-        // Cleanup if needed
+    if (!pixData?.user_id && !verifying) return;
+
+    const myEpoch = pollingEpochRef.current;
+    const startTime = Date.now(); // Timeout baseline for THIS session
+    let attempts = 0;
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    const runPoll = async () => {
+      if (pollingEpochRef.current !== myEpoch) return;
+
+      attempts++;
+      const done = await checkStatusRef.current();
+      if (done || pollingEpochRef.current !== myEpoch) return;
+
+      // Show timeout fallback after 60s
+      if (Date.now() - startTime > 60000) {
+        setShowTimeoutFallback(true);
+      }
+
+      // Hard stop after 100 attempts (~5 minutes)
+      if (attempts > 100) {
+        setVerifying(false);
+        return;
+      }
+
+      // Faster start: 1.5s → 3s → 5s backoff
+      const nextDelay = attempts <= 10 ? 1500 : attempts <= 20 ? 3000 : 5000;
+      timeoutId = setTimeout(runPoll, nextDelay);
     };
-  }, [pixData, verifying, onSuccess, email, currentPaymentId]);
+
+    runPoll();
+
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pixData?.user_id, verifying, pollTrigger]);
 
   // Reset all PIX state so user can generate a new QR code / change payment method
   const resetToPay = () => {
@@ -387,89 +382,15 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
       setCurrentPaymentId(null);
       setShowTimeoutFallback(false);
       setVerifying(false);
-      setPollingStartTime(null);
       notifiedRef.current = false;
   };
 
-  const manualCheck = async () => {
-      pollingEpochRef.current += 1; // Invalidate stale loops before resetting timer
-      setShowTimeoutFallback(false); // Reset fallback UI if user retries manually
-      setPollingStartTime(Date.now()); // Reset timeout counter
-      
-      const payId = currentPaymentId || pixData?.payment_id;
-      
-      if (payId) {
-          try {
-            // Try RPC first
-            const { data: rpcData, error: rpcError } = await supabase.rpc('check_payment_status', { payment_id_input: payId });
-            const rpcApproved = !!rpcData && (rpcData.success === true || rpcData.status === 'approved');
-            logger.log("[Checkout]", "Manual RPC response:", { rpcApproved, rpcData, rpcError: rpcError?.message });
-            if (!rpcError && rpcApproved) {
-                logger.log("[Checkout]", "Manual Check Approved via RPC.");
-                if (!notifiedRef.current) {
-                  notifiedRef.current = true;
-                  toast.success("Pagamento confirmado! Acesso liberado.");
-                }
-                setVerifying(false);
-                await refreshSession();
-                onSuccess(email);
-                return;
-            }
-            // Fallback EF
-            const USE_RPC_ONLY = ((import.meta as any).env?.VITE_CHECKOUT_RPC_ONLY || '').toString() === 'true';
-            if (USE_RPC_ONLY) {
-              logger.log("[Checkout]", "RPC_ONLY flag active; skipping EF in manualCheck.");
-              return;
-            }
-            const token = await getValidAccessToken();
-            if (!token) {
-              toast.error("Faça login novamente");
-              return;
-            }
-            const { data: efData, error: efError } = await supabase.functions.invoke('check-payment-status', {
-              headers: {
-                apikey: (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "",
-                "sb-access-token": token,
-                "x-supabase-auth": token
-              },
-              body: { payment_id: payId }
-            });
-            logger.log("[Checkout]", "Manual EF response:", { efData, efError: efError?.message });
-            if (!efError && efData?.status === 'approved') {
-                logger.log("[Checkout]", "Manual Check Approved via Edge Function.");
-                if (!notifiedRef.current) {
-                  notifiedRef.current = true;
-                  toast.success("Pagamento confirmado! Acesso liberado.");
-                }
-                setVerifying(false);
-                await refreshSession();
-                onSuccess(email);
-                return;
-            } else {
-                 if (efError) logger.error("[Checkout]", "Manual Check EF error:", efError);
-                 return;
-            }
-          } catch (err) {
-              logger.error("[Checkout]", "Manual Check Error:", err);
-          }
-      }
-      
-      // Fallback Profile Check
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-          const { data } = await supabase.from('profiles').select('subscription_status, is_premium').eq('id', user.id).maybeSingle();
-          if (data?.subscription_status === 'active' || data?.is_premium) {
-              logger.log("[Checkout]", "Manual Profile Check Approved.");
-              if (!notifiedRef.current) {
-                notifiedRef.current = true;
-                toast.success("Pagamento confirmado! Acesso liberado.");
-              }
-              setVerifying(false);
-              await refreshSession();
-              onSuccess(email);
-          } else {
-          }
-      }
+  // manualCheck: stop current loops, hide timeout screen, restart poll immediately via pollTrigger.
+  // The useEffect will fire right away with the new epoch, calling checkStatus instantly.
+  const manualCheck = () => {
+      pollingEpochRef.current += 1; // Invalidate stale loops
+      setShowTimeoutFallback(false);
+      setPollTrigger(t => t + 1); // Restarts polling useEffect → immediate checkStatus call
   };
 
   const handleCardSubmit = async (formData: any) => {
@@ -507,7 +428,6 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
         // Track Payment ID for polling
         if (data?.payment_id) {
             setCurrentPaymentId(data.payment_id.toString());
-            setPollingStartTime(Date.now());
         }
 
         // PostHog: track payment outcome
@@ -593,11 +513,10 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
         if (data.error) throw new Error(data.error);
 
         setPixData(data);
-        
+
         // Track Payment ID for polling
         if (data?.payment_id) {
             setCurrentPaymentId(data.payment_id.toString());
-            setPollingStartTime(Date.now());
         }
 
     } catch (e: any) {
