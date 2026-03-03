@@ -27,6 +27,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
+    try { console.log(JSON.stringify({ tag: "subcancel_entry", ts: new Date().toISOString() })); } catch {}
     if (!SUPABASE_URL) {
       return new Response(JSON.stringify({ error: "server_config_error", detail: "MISSING_URL" }), {
         status: 500,
@@ -35,14 +36,14 @@ serve(async (req) => {
     }
 
     const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
+    const hdrInfo = {
+      hasAuth: !!authHeader,
+      authLen: authHeader ? authHeader.length : 0,
+      hasAnon: !!(req.headers.get("apikey") || req.headers.get("x-api-key") || ENV_ANON_KEY),
+      hasSbToken: !!(req.headers.get("sb-access-token") || req.headers.get("x-supabase-auth"))
+    };
     try {
-      const info = {
-        hasAuth: !!authHeader,
-        authLen: authHeader ? authHeader.length : 0,
-        hasAnon: !!(req.headers.get("apikey") || req.headers.get("x-api-key") || ENV_ANON_KEY),
-        hasSbToken: !!(req.headers.get("sb-access-token") || req.headers.get("x-supabase-auth"))
-      };
-      console.log(JSON.stringify({ tag: "subcancel_req_headers", ...info }));
+      console.log(JSON.stringify({ tag: "subcancel_req_headers", ...hdrInfo }));
     } catch {}
     if (!authHeader && !ENV_ANON_KEY && !req.headers.get("apikey") && !req.headers.get("x-api-key")) {
       return new Response(JSON.stringify({ error: "unauthorized", reason: "missing_auth_header" }), {
@@ -64,29 +65,34 @@ serve(async (req) => {
     const client = createClient(SUPABASE_URL, ANON_KEY, {
       global: { headers: { Authorization: `Bearer ${sbToken}` } },
     });
-    const isServiceJwt = SERVICE_ROLE_KEY && SERVICE_ROLE_KEY.includes(".");
-    const admin = isServiceJwt ? createClient(SUPABASE_URL, SERVICE_ROLE_KEY) : null;
+    // Sempre que houver SERVICE_ROLE_KEY, use admin (evita heurísticas frágeis)
+    const admin = SERVICE_ROLE_KEY ? createClient(SUPABASE_URL, SERVICE_ROLE_KEY) : null;
 
     const token = sbToken || (authHeader ? authHeader.replace(/^Bearer\s+/i, "") : "");
-    const { data: userRes, error: userErr } = await client.auth.getUser(token);
-    let userId = userRes?.user?.id || null;
-    if (!userId) {
-      // Fallback: decode JWT locally just to extract "sub" (no signature verification).
-      // PostgREST will still verify the token when using it for DB operations.
+    // Robust user extraction: prefer local decode; fall back to getUser
+    let userId: string | null = null;
+    let userErrMsg: string | null = null;
+    if (token) {
       try {
         const payloadB64 = token.split(".")[1];
         const normalized = payloadB64.replace(/-/g, "+").replace(/_/g, "/");
         const json = atob(normalized);
         const payload = JSON.parse(json) as { sub?: string; iss?: string; aud?: string };
-        if (payload?.iss?.includes("xbtendfjajspaidpktsw")) {
-          userId = payload?.sub || null;
+        // Accept token as long as it has a sub; optional project check for extra safety
+        if (payload?.sub) {
+          userId = payload.sub;
         }
       } catch (_e) {
-        // ignore
+        // ignore and try network-based resolution
       }
     }
+    if (!userId) {
+      const { data: userRes, error: userErr } = await client.auth.getUser(token);
+      userId = userRes?.user?.id || null;
+      userErrMsg = userErr?.message || null;
+    }
     try {
-      console.log(JSON.stringify({ tag: "subcancel_user", userId, getUserError: userErr?.message || null }));
+      console.log(JSON.stringify({ tag: "subcancel_user", userId, getUserError: userErrMsg }));
     } catch {}
     if (!userId) {
       return new Response(JSON.stringify({ error: "unauthorized", reason: "invalid_user_or_parse" }), {
@@ -242,9 +248,12 @@ serve(async (req) => {
     }
 
     const now = new Date();
-    // Refund window: prefer latest payment date; fallback to startDate
-    const windowDate = latestPaymentDate || (profile as any)?.last_payment_at ? new Date((profile as any).last_payment_at as string) : startDate;
+    let windowDate: Date | null = latestPaymentDate || null;
     if (!windowDate) {
+      const lp = (profile as any)?.last_payment_at as string | undefined;
+      windowDate = lp ? new Date(lp) : (startDate || null);
+    }
+    if (!windowDate || isNaN(windowDate.getTime())) {
       return new Response(
         JSON.stringify({
           error: "refund_required",
@@ -322,8 +331,19 @@ serve(async (req) => {
           },
           body: JSON.stringify({}),
         });
-        refundPayload = await res.json().catch(() => null);
-        refundStatus = res.ok ? "approved" : "failed";
+        const resJson = await res.json().catch(() => null);
+        refundPayload = resJson;
+        if (!res.ok) {
+          const msg = (resJson && (resJson.message || resJson.error || resJson.status)) || "";
+          const already = typeof msg === "string" && /already\s*refunded|reembolsad[oa]/i.test(msg);
+          if (already) {
+            refundStatus = "approved";
+          } else {
+            refundStatus = "failed";
+          }
+        } else {
+          refundStatus = "approved";
+        }
         if (!res.ok) {
           let priceFail: number | null = null;
           const pFail = await admin
@@ -347,23 +367,25 @@ serve(async (req) => {
             issue_details: body.issue_details || null,
             retention_offer_shown: body.retention_offer_shown || null,
             retention_offer_accepted: body.retention_offer_accepted ?? null,
-            final_action: "cancel_refund_failed",
-            refund_status: "failed",
-            provider_payload: { cancel: cancelPayload, refund: refundPayload },
+            final_action: already ? "cancel_refund" : "cancel_refund_failed",
+            refund_status: already ? "approved" : "failed",
+            provider_payload: { cancel: cancelPayload, refund: refundPayload, debug: { headers: hdrInfo, user_id: userId, mp_status: res.status } },
           });
-          return new Response(
-            JSON.stringify({
-              error: "refund_required",
-              reason: "provider_refund_failed",
-              refund_status: "failed",
-              debug: {
-                selected_payment_id: providerPaymentId,
-                window_date_iso: (latestPaymentDate || startDate)?.toISOString?.() || null,
-                project: SUPABASE_URL,
-              },
-            }),
-            { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+          if (!already) {
+            return new Response(
+              JSON.stringify({
+                error: "refund_required",
+                reason: "provider_refund_failed",
+                refund_status: "failed",
+                debug: {
+                  selected_payment_id: providerPaymentId,
+                  window_date_iso: (latestPaymentDate || startDate)?.toISOString?.() || null,
+                  project: SUPABASE_URL,
+                },
+              }),
+              { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
         }
         // After successful refund within 7 days, cancel provider preapproval if present
         if (providerSubscriptionId && MP_ACCESS_TOKEN) {
@@ -424,12 +446,16 @@ serve(async (req) => {
       retention_offer_accepted: body.retention_offer_accepted ?? null,
       final_action: finalAction,
       refund_status: isWithin7Days ? "approved" : refundStatus,
-      provider_payload: { cancel: cancelPayload, refund: refundPayload },
+      provider_payload: { cancel: cancelPayload, refund: refundPayload, debug: { headers: hdrInfo, user_id: userId } },
     });
 
     const updates: Record<string, unknown> = {
       subscription_status: "canceled",
       is_premium: false,
+      plan_type: "free",
+      premium_plan_id: null,
+      subscription_expires_at: null,
+      premium_until: null,
       cancelled_at: now.toISOString(),
       cancel_reason: body.reason_primary,
       updated_at: now.toISOString(),

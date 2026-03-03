@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { getValidAccessToken } from "@/lib/session";
 
 type Props = {
   open: boolean;
@@ -45,15 +46,11 @@ export function CancelSubscriptionWizard({ open, onOpenChange }: Props) {
   const submit = async () => {
     try {
       setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      const token = await getValidAccessToken();
+      if (!token) {
         toast.error("Faça login novamente");
         setLoading(false);
         return;
-      }
-      const nowSec = Math.floor(Date.now() / 1000);
-      if (session.expires_at && session.expires_at - nowSec < 60) {
-        await supabase.auth.refreshSession();
       }
       const payload: any = {
         reason_primary: reason,
@@ -62,16 +59,28 @@ export function CancelSubscriptionWizard({ open, onOpenChange }: Props) {
         had_issues: hadIssues === "" ? null : hadIssues === "yes",
         issue_details: issueDetails || null
       };
+      const anonEnv = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "";
+      // Minimal, masked debug to verify env and token presence on localhost
+      console.log(
+        "[CancelSubscription] apikey present:", !!anonEnv,
+        "len:", anonEnv.length,
+        "prefix:", anonEnv.slice(0, 6),
+        "| sb-token present:", !!token,
+        "token len:", token.length
+      );
       const { data, error } = await supabase.functions.invoke("subscription-cancel", {
-        headers: { 
+        headers: {
+          // Ensure gateway auth and function-side ANON_KEY availability
           Authorization: `Bearer ${(import.meta as any).env?.VITE_SUPABASE_ANON_KEY || ""}`,
           apikey: (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "",
-          "sb-access-token": (await supabase.auth.getSession()).data.session?.access_token || ""
+          "sb-access-token": token,
+          "x-supabase-auth": token
         },
         body: payload
       });
       if (error) {
-        const msg = typeof error === "object" && error !== null && "message" in error ? (error as any).message : "Erro ao cancelar assinatura";
+        const errMsg = (typeof error === "object" && error !== null && "message" in error) ? (error as any).message : String(error);
+        const msg = errMsg?.toLowerCase()?.includes("unauthorized") ? "Sessão expirada. Faça login novamente." : (errMsg || "Erro ao cancelar assinatura");
         toast.error(String(msg));
         return;
       }

@@ -78,6 +78,34 @@ serve(async (req) => {
         expiresAt.setDate(expiresAt.getDate() + days);
 
         if (userId) {
+            const base = 'user';
+            const username = `${base}_${String(userId).replace(/-/g, '').slice(0, 8)}`.toLowerCase();
+            const display_name = base;
+            try {
+                await supabaseAdmin
+                  .from('profiles')
+                  .upsert({ 
+                    id: userId, 
+                    user_id: userId, 
+                    username, 
+                    display_name,
+                    subscription_status: 'free',
+                    plan_type: 'free',
+                  }, { onConflict: 'id', ignoreDuplicates: true });
+            } catch {
+                try {
+                    await supabaseAdmin
+                      .from('profiles')
+                      .upsert({ 
+                        id: userId, 
+                        user_id: userId, 
+                        username, 
+                        display_name,
+                        subscription_status: 'free',
+                        plan_type: 'free',
+                      }, { onConflict: 'user_id', ignoreDuplicates: true });
+                } catch {}
+            }
             // Update Profiles
             const { error: profileError } = await supabaseAdmin.from('profiles').update({
                 subscription_status: 'active',
@@ -90,7 +118,7 @@ serve(async (req) => {
                 payment_id: payment.id.toString(),
                 payment_status: 'approved',
                 updated_at: new Date().toISOString()
-            }).eq('id', userId);
+            }).or(`id.eq.${userId},user_id.eq.${userId}`);
 
             if (profileError) {
                 console.error("[Finalize-Payment] Profile Update Error:", profileError);

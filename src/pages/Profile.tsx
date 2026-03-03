@@ -8,6 +8,7 @@ import { getTier, getNextTier, ExtendedAnalysisResult } from "@/lib/rankingSyste
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { getValidAccessToken } from "@/lib/session";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/theme/ThemeProvider";
@@ -127,14 +128,16 @@ export default function Profile() {
                 setEarnedBadges(currentBadges.map(b => b.badge_id));
             }
 
-            // 2. Run evaluation in background to check for new ones
-            // We use a small delay or check less frequently if needed, but for now on mount is fine
-            const { data: { session } } = await supabase.auth.getSession();
-            
-            if (session) {
+            // 2. Run evaluation in background to check for new ones (with fresh token)
+            const token = await getValidAccessToken();
+            if (token) {
+                const anon = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "";
                 const { data, error } = await supabase.functions.invoke('check-achievements', {
                     headers: {
-                        Authorization: `Bearer ${session.access_token}`
+                        Authorization: `Bearer ${token}`,
+                        apikey: anon,
+                        "sb-access-token": token,
+                        "x-supabase-auth": token
                     }
                 });
                 

@@ -25,13 +25,19 @@ export function usePremiumStatus() {
     if (!user) {
       setIsPremium(false);
       setSubscriptionStatus('free');
+      setExpiresAt(null);
+      setPlanType('free');
       setLoading(false);
       return;
     }
 
     if (!profile) {
-      // Profile loading or not found
-      return; 
+      setIsPremium(false);
+      setSubscriptionStatus('free');
+      setExpiresAt(null);
+      setPlanType('free');
+      setLoading(false);
+      return;
     }
 
     // Parse status from global profile

@@ -12,6 +12,7 @@ import { logger } from "@/lib/logger";
 import { PLAN_CONFIG } from "@/config/plans";
 import { trackEvent, captureException } from "@/lib/posthog";
 import { motion } from "framer-motion";
+import { getValidAccessToken } from "@/lib/session";
 
 initMercadoPago(import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY || 'TEST-539d056c-2673-4566-a401-4475f82245c7', {
   locale: 'pt-BR'
@@ -181,17 +182,21 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
 
   // Intelligent Polling with Backoff
   const checkStatus = async () => {
-      // 1. Check RPC (if payment ID exists)
+      // 1. Prefer RPC (compat mode), fallback to Edge Function
       if (currentPaymentId || pixData?.payment_id) {
            const payId = currentPaymentId || pixData?.payment_id;
-           logger.log("[Checkout]", "Checking payment status via RPC:", payId);
+           logger.log("[Checkout]", "Checking payment status via RPC first:", payId);
+           const USE_RPC_ONLY = ((import.meta as any).env?.VITE_CHECKOUT_RPC_ONLY || '').toString() === 'true';
            
            try {
+              // RPC path
               const { data: rpcData, error: rpcError } = await supabase.rpc('check_payment_status', { 
                   payment_id_input: payId 
               });
 
-              if (rpcData && rpcData.success) {
+              const rpcApproved = !!rpcData && (rpcData.success === true || rpcData.status === 'approved');
+              logger.log("[Checkout]", "RPC response:", { rpcApproved, rpcData, rpcError: rpcError?.message });
+              if (!rpcError && rpcApproved) {
                   logger.log("[Checkout]", "RPC Approved. Forcing session refresh...", rpcData);
                   if (!notifiedRef.current) {
                     notifiedRef.current = true;
@@ -216,8 +221,71 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
 
                   onSuccess(email);
                   return true; // Stop polling
-              } else if (rpcData?.error && rpcData?.error.includes("Rate limit")) {
-                  logger.log("[Checkout]", "Rate limit hit, skipping cycle");
+              }
+
+              if (USE_RPC_ONLY) {
+                logger.log("[Checkout]", "RPC_ONLY flag active; skipping EF fallback.");
+                return false;
+              }
+              // Fallback EF (specified id)
+              logger.log("[Checkout]", "RPC did not confirm. Falling back to Edge Function...");
+              const token = await getValidAccessToken();
+              if (!token) {
+                logger.error("[Checkout]", "No valid token for check-payment-status fallback");
+                return false;
+              }
+              const { data: efData, error: efError } = await supabase.functions.invoke('check-payment-status', {
+                headers: {
+                  apikey: (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "",
+                  "sb-access-token": token,
+                  "x-supabase-auth": token
+                },
+                body: { payment_id: payId }
+              });
+              logger.log("[Checkout]", "EF response:", { efData, efError: efError?.message });
+              if (!efError && efData?.status === 'approved') {
+                  logger.log("[Checkout]", "Edge Function Approved. Forcing session refresh...", efData);
+                  if (!notifiedRef.current) {
+                    notifiedRef.current = true;
+                    toast.success("Pagamento confirmado! Acesso liberado.");
+                  }
+                  setVerifying(false);
+                  await refreshSession();
+                  const { data: { user: updatedUser } } = await supabase.auth.getUser();
+                  if (updatedUser) {
+                      const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', updatedUser.id).single();
+                      logger.log("[Checkout]", "Final Profile State:", {
+                          is_premium: updatedProfile?.is_premium,
+                          status: updatedProfile?.subscription_status,
+                          plan: updatedProfile?.plan_type,
+                          expires: updatedProfile?.subscription_expires_at
+                      });
+                  }
+                  onSuccess(email);
+                  return true;
+              } else if (efError) {
+                  logger.error("[Checkout]", "Edge Function error:", efError);
+              } else {
+                  // Final fallback: ask server to look up latest approved for this user
+                  const { data: latestData, error: latestErr } = await supabase.functions.invoke('check-payment-latest', {
+                    headers: {
+                      apikey: (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "",
+                      "sb-access-token": token,
+                      "x-supabase-auth": token
+                    },
+                    body: {}
+                  });
+                  logger.log("[Checkout]", "EF latest response:", { latestData, latestErr: latestErr?.message });
+                  if (!latestErr && latestData?.ok && latestData?.status === 'approved') {
+                    if (!notifiedRef.current) {
+                      notifiedRef.current = true;
+                      toast.success("Pagamento confirmado! Acesso liberado.");
+                    }
+                    setVerifying(false);
+                    await refreshSession();
+                    onSuccess(email);
+                    return true;
+                  }
               }
            } catch (err) {
                logger.error("[Checkout]", "Polling Error:", err);
@@ -300,11 +368,43 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
       
       if (payId) {
           try {
-            // Use RPC because Edge Function deploy failed
-            const { data: rpcData } = await supabase.rpc('check_payment_status', { payment_id_input: payId });
-            
-            if (rpcData && rpcData.success) {
-                logger.log("[Checkout]", "Manual Check Approved.");
+            // Try RPC first
+            const { data: rpcData, error: rpcError } = await supabase.rpc('check_payment_status', { payment_id_input: payId });
+            const rpcApproved = !!rpcData && (rpcData.success === true || rpcData.status === 'approved');
+            logger.log("[Checkout]", "Manual RPC response:", { rpcApproved, rpcData, rpcError: rpcError?.message });
+            if (!rpcError && rpcApproved) {
+                logger.log("[Checkout]", "Manual Check Approved via RPC.");
+                if (!notifiedRef.current) {
+                  notifiedRef.current = true;
+                  toast.success("Pagamento confirmado! Acesso liberado.");
+                }
+                setVerifying(false);
+                await refreshSession();
+                onSuccess(email);
+                return;
+            }
+            // Fallback EF
+            const USE_RPC_ONLY = ((import.meta as any).env?.VITE_CHECKOUT_RPC_ONLY || '').toString() === 'true';
+            if (USE_RPC_ONLY) {
+              logger.log("[Checkout]", "RPC_ONLY flag active; skipping EF in manualCheck.");
+              return;
+            }
+            const token = await getValidAccessToken();
+            if (!token) {
+              toast.error("Faça login novamente");
+              return;
+            }
+            const { data: efData, error: efError } = await supabase.functions.invoke('check-payment-status', {
+              headers: {
+                apikey: (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "",
+                "sb-access-token": token,
+                "x-supabase-auth": token
+              },
+              body: { payment_id: payId }
+            });
+            logger.log("[Checkout]", "Manual EF response:", { efData, efError: efError?.message });
+            if (!efError && efData?.status === 'approved') {
+                logger.log("[Checkout]", "Manual Check Approved via Edge Function.");
                 if (!notifiedRef.current) {
                   notifiedRef.current = true;
                   toast.success("Pagamento confirmado! Acesso liberado.");
@@ -314,6 +414,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                 onSuccess(email);
                 return;
             } else {
+                 if (efError) logger.error("[Checkout]", "Manual Check EF error:", efError);
                  return;
             }
           } catch (err) {
@@ -344,12 +445,17 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
     // We just need to send the data to our backend
     setLoading(true);
     try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const token = await getValidAccessToken();
+        if (!token) {
+            toast.error("Faça login novamente");
+            setLoading(false);
+            return;
+        }
         const { data, error } = await supabase.functions.invoke('create-payment', {
             headers: { 
                 Authorization: `Bearer ${(import.meta as any).env?.VITE_SUPABASE_ANON_KEY || ""}`,
                 apikey: (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "",
-                "sb-access-token": session?.access_token || ""
+                "sb-access-token": token
             },
             body: {
                 payment_method_id: formData.payment_method_id, // e.g. 'master'
@@ -411,7 +517,12 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
   const handlePix = async () => {
     setLoading(true);
     try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const token = await getValidAccessToken();
+        if (!token) {
+            toast.error("Faça login novamente");
+            setLoading(false);
+            return;
+        }
         // Validate inputs with detailed messages
         const missingFields = [];
         if (!firstName) missingFields.push("Nome");
@@ -429,7 +540,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
             headers: { 
                 Authorization: `Bearer ${(import.meta as any).env?.VITE_SUPABASE_ANON_KEY || ""}`,
                 apikey: (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "",
-                "sb-access-token": session?.access_token || ""
+                "sb-access-token": token
             },
             body: {
                 payment_method_id: 'pix',

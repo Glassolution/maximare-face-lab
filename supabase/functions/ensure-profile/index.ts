@@ -70,12 +70,26 @@ serve(async (req) => {
     // Try by id then by user_id; include both columns to satisfy either schema
     const byId = await admin
       .from("profiles")
-      .upsert({ id: userId, user_id: userId, username, display_name }, { onConflict: "id", ignoreDuplicates: true });
+      .upsert({ 
+        id: userId, 
+        user_id: userId, 
+        username, 
+        display_name,
+        subscription_status: 'free',
+        plan_type: 'free',
+      }, { onConflict: "id", ignoreDuplicates: true });
     if (byId.error) {
       try {
         await admin
           .from("profiles")
-          .upsert({ id: userId, user_id: userId, username, display_name }, { onConflict: "user_id", ignoreDuplicates: true });
+          .upsert({ 
+            id: userId, 
+            user_id: userId, 
+            username, 
+            display_name,
+            subscription_status: 'free',
+            plan_type: 'free',
+          }, { onConflict: "user_id", ignoreDuplicates: true });
       } catch {}
     }
     // Fallback: insert with unique username only, then update id/user_id
@@ -87,7 +101,12 @@ serve(async (req) => {
     if (!afterTry.data) {
       let ins: any = null;
       try {
-        ins = await admin.from("profiles").insert([{ username, display_name }]).select("id, user_id, username").maybeSingle();
+        ins = await admin.from("profiles").insert([{ 
+          username, 
+          display_name,
+          subscription_status: 'free',
+          plan_type: 'free',
+        }]).select("id, user_id, username").maybeSingle();
       } catch {}
       if (ins?.data) {
         try {

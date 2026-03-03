@@ -168,14 +168,47 @@ serve(async (req) => {
 
     console.log("Payment created:", payment.id, payment.status);
 
-    // Ensure profile exists
     try {
-      await supabaseAdmin.from('profiles').upsert({
-        id: userId,
-        user_id: userId,
-        full_name: ((payer?.first_name || '') + ' ' + (payer?.last_name || '')).trim() || null
-      }, { onConflict: 'id', ignoreDuplicates: true });
-    } catch {}
+      const base = (payer?.email ? String(payer.email).split('@')[0] : 'user')
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, '')
+        .slice(0, 16) || 'user';
+      const username = `${base}_${String(userId).replace(/-/g, '').slice(0, 8)}`.toLowerCase();
+      const display_name = base;
+      const full_name = ((payer?.first_name || '') + ' ' + (payer?.last_name || '')).trim() || null;
+      await supabaseAdmin
+        .from('profiles')
+        .upsert({
+          id: userId,
+          user_id: userId,
+          username,
+          display_name,
+          full_name,
+          subscription_status: 'free',
+          plan_type: 'free',
+        }, { onConflict: 'id', ignoreDuplicates: true });
+    } catch {
+      try {
+        const base = (payer?.email ? String(payer.email).split('@')[0] : 'user')
+          .toLowerCase()
+          .replace(/[^a-z0-9_]/g, '')
+          .slice(0, 16) || 'user';
+        const username = `${base}_${String(userId).replace(/-/g, '').slice(0, 8)}`.toLowerCase();
+        const display_name = base;
+        const full_name = ((payer?.first_name || '') + ' ' + (payer?.last_name || '')).trim() || null;
+        await supabaseAdmin
+          .from('profiles')
+          .upsert({
+            id: userId,
+            user_id: userId,
+            username,
+            display_name,
+            full_name,
+            subscription_status: 'free',
+            plan_type: 'free',
+          }, { onConflict: 'user_id', ignoreDuplicates: true });
+      } catch {}
+    }
 
     // 4. Update Profile (Immediate access if approved)
     if (payment.status === 'approved') {

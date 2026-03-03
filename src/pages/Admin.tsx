@@ -90,9 +90,9 @@ const Admin = () => {
            <Button 
             variant="ghost" 
             size="icon" 
-            onClick={() => navigate("/profile")}
+            onClick={() => signOut()}
             className="text-white/80 hover:bg-white/10 hover:text-white rounded-xl w-12 h-12 mx-auto"
-            title="Perfil"
+            title="Sair"
           >
             <LogOut className="h-6 w-6" />
           </Button>

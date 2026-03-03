@@ -26,6 +26,7 @@ serve(async (req) => {
     // Mercado Pago sends 'action' or 'type' or 'topic' depending on version
     const eventType = body.type || body.action || query.topic || 'unknown';
     const resourceId = body.data?.id || body.id || query.id;
+    const action = body.action || query.action || 'unknown';
 
     // 1. Signature Verification (HMAC SHA-256)
     // Only if secret is provided
@@ -253,13 +254,46 @@ serve(async (req) => {
             console.error("Failed to fetch payment from MP");
         }
     }
+    else if (
+      eventType === 'preapproval.updated' ||
+      (eventType === 'subscription_preapproval' && action === 'updated') ||
+      eventType === 'subscription_authorized_payment'
+    ) {
+      if (resourceId) {
+        const res = await fetch(`https://api.mercadopago.com/preapproval/${resourceId}`, {
+          headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` }
+        });
+        if (res.ok) {
+          const pre = await res.json();
+          const st = (pre?.status || '').toString().toLowerCase();
+          if (st === 'cancelled' || st === 'paused' || st === 'ended') {
+            let userId = pre?.external_reference || null;
+            const payerEmail = pre?.payer_email || pre?.payer?.email || null;
+            if ((!userId || userId === 'null') && payerEmail) {
+              const { data: foundId } = await supabaseAdmin.rpc('get_user_id_by_email', { email: payerEmail });
+              if (foundId) userId = foundId;
+            }
+            if (userId) {
+              await supabaseAdmin.from('profiles').update({
+                plan_type: 'free',
+                subscription_status: 'canceled',
+                subscription_expires_at: null,
+                is_premium: false,
+                updated_at: new Date().toISOString()
+              }).or(`id.eq.${userId},user_id.eq.${userId}`);
+              processed = true;
+            }
+          }
+        }
+      }
+    }
 
     // 4. Save Event
     await supabaseAdmin.from('webhook_events').insert({
         provider: 'mercadopago',
         event_type: eventType,
         resource_id: resourceId,
-        notification_id: notificationId, // Save unique notification ID
+        notification_id: body?.data?.id || body?.id || null,
         payload: body,
         processed_at: new Date().toISOString()
     });
