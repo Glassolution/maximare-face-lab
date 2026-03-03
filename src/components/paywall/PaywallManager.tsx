@@ -20,7 +20,7 @@ export function PaywallManager({ children }: PaywallManagerProps) {
   const [showPaywall, setShowPaywall] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'weekly' | 'monthly' | 'annual'>('annual');
   const navigate = useNavigate();
-  const { isConversionCooldownActive, setLastConversionShown } = usePaywallStore();
+  const { isMainOpen, isConversionCooldownActive, setLastConversionShown } = usePaywallStore();
 
   const isPremiumUser =
     profile?.premium === true ||
@@ -38,11 +38,17 @@ export function PaywallManager({ children }: PaywallManagerProps) {
   const triggerPaywall = () => {
     if (isPremiumUser || isPremium) return;
     if (sessionCount >= MAX_PER_SESSION) return;
-    
+
     const now = Date.now();
     if (now - lastShownAt < COOLDOWN_MS) return;
 
-    // Check global conversion cooldown
+    // Don't show if the main paywall (Screen 1) is already open or being opened
+    if (usePaywallStore.getState().isMainOpen) {
+      console.log('[PaywallManager] Skipped: Main paywall is open');
+      return;
+    }
+
+    // Check global conversion cooldown (covers the case where Main opened async)
     if (isConversionCooldownActive()) {
       console.log('[PaywallManager] Skipped: Global conversion cooldown active');
       return;
@@ -54,11 +60,12 @@ export function PaywallManager({ children }: PaywallManagerProps) {
     setLastConversionShown(now);
   };
 
+  // Close this modal immediately if the Main paywall opens after us (async race)
   useEffect(() => {
-    if (showPaywall && isPremiumUser) {
+    if (showPaywall && (isPremiumUser || isMainOpen)) {
       setShowPaywall(false);
     }
-  }, [showPaywall, isPremiumUser]);
+  }, [showPaywall, isPremiumUser, isMainOpen]);
 
   useEffect(() => {
     if (!user || isPremiumUser || isPremium) return;
