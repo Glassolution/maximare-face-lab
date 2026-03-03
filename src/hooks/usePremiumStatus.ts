@@ -13,7 +13,7 @@ interface ExtendedProfile {
 }
 
 export function usePremiumStatus() {
-  const { user, profile } = useAuth(); // Depend on global profile state
+  const { user, profile, refreshUserData } = useAuth(); // Depend on global profile state
   const [isPremium, setIsPremium] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>('free');
   const [expiresAt, setExpiresAt] = useState<Date | null>(null);
@@ -76,22 +76,18 @@ export function usePremiumStatus() {
         },
         (payload: any) => {
           logger.log("[PremiumStatus]", 'Realtime update:', payload.new);
-          // We could force a refresh here, but AuthProvider should handle it if it listens.
-          // Let's rely on AuthProvider refreshing the profile.
-          // Actually, AuthProvider doesn't listen to realtime. 
-          // So we should trigger a refresh?
-          // Ideally useAuth should expose a refreshProfile method.
-          // For now, let's just update local state if payload has data
           const newData = payload.new;
           if (newData) {
               const status = (newData.subscription_status as SubscriptionStatus) || 'free';
               const expires = newData.subscription_expires_at ? new Date(newData.subscription_expires_at) : null;
               const isValid = (status === 'active' || status === 'trialing') && (expires ? expires > new Date() : false);
-              
+
               setIsPremium(isValid);
               setSubscriptionStatus(status);
               setExpiresAt(expires);
               setPlanType(newData.plan_type || 'free');
+              // Sync global AuthContext so all consumers reflect the change immediately
+              refreshUserData();
           }
         }
       )

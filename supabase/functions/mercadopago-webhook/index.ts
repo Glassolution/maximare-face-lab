@@ -26,7 +26,6 @@ serve(async (req) => {
     // Mercado Pago sends 'action' or 'type' or 'topic' depending on version
     const eventType = body.type || body.action || query.topic || 'unknown';
     const resourceId = body.data?.id || body.id || query.id;
-    const action = body.action || query.action || 'unknown';
 
     // 1. Signature Verification (HMAC SHA-256)
     // Only if secret is provided
@@ -169,13 +168,6 @@ serve(async (req) => {
                 expiresAt.setDate(expiresAt.getDate() + days);
 
                 // Update Profile
-                try {
-                    await supabaseAdmin.from('profiles').upsert(
-                      { id: userId, user_id: userId },
-                      { onConflict: 'id', ignoreDuplicates: true }
-                    );
-                } catch {}
-                // Update Profile
                 const { error } = await supabaseAdmin.from('profiles').update({
                     subscription_status: 'active',
                     is_premium: true,
@@ -186,57 +178,14 @@ serve(async (req) => {
                     payment_provider: 'mercadopago',
                     payment_id: payment.id.toString(),
                     payment_status: 'approved',
-                    first_payment_at: new Date().toISOString(),
-                    last_payment_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
-                }).or(`id.eq.${userId},user_id.eq.${userId}`);
+                }).eq('id', userId);
 
                 if (error) {
                     console.error("Profile update failed:", error);
                 } else {
                     console.log(`Profile updated for ${userId}`);
                     processed = true;
-                }
-
-                // If there is a pending cancel_refund (no payment_id at the time), attempt refund now
-                if (payment.status === 'approved' && userId) {
-                    try {
-                        const { data: pending } = await supabaseAdmin
-                          .from('subscription_cancellation_feedback')
-                          .select('id, refund_status, created_at')
-                          .eq('user_id', userId)
-                          .eq('refund_status', 'pending')
-                          .order('created_at', { ascending: false })
-                          .limit(1)
-                          .maybeSingle();
-                        if (pending) {
-                            console.log('[Webhook] Found pending cancel_refund, attempting refund for payment', payment.id);
-                            const r = await fetch(`https://api.mercadopago.com/v1/payments/${payment.id}/refunds`, {
-                                method: 'POST',
-                                headers: {
-                                    Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
-                                    'Content-Type': 'application/json',
-                                    'X-Idempotency-Key': crypto.randomUUID(),
-                                },
-                                body: JSON.stringify({}),
-                            });
-                            const refundPayload = await r.json().catch(() => null);
-                            const refundStatus = r.ok ? 'approved' : 'failed';
-
-                            await supabaseAdmin
-                              .from('subscription_cancellation_feedback')
-                              .update({
-                                  refund_status: refundStatus,
-                                  provider_payment_id: payment.id.toString(),
-                                  provider_payload: { refund: refundPayload },
-                                  final_action: refundStatus === 'approved' ? 'cancel_refund' : 'cancel_refund_failed',
-                              })
-                              .eq('id', pending.id);
-                            console.log('[Webhook] Refund attempt result:', refundStatus);
-                        }
-                    } catch (e) {
-                        console.error('[Webhook] Pending refund follow-up failed:', e);
-                    }
                 }
             } else {
                 console.log(`Payment status: ${payment.status} or no userId`);
@@ -247,53 +196,23 @@ serve(async (req) => {
                         payment_id: payment.id.toString(),
                         payment_provider: 'mercadopago',
                         updated_at: new Date().toISOString()
-                    }).or(`id.eq.${userId},user_id.eq.${userId}`);
+                    }).eq('id', userId);
                 }
             }
         } else {
             console.error("Failed to fetch payment from MP");
         }
     }
-    else if (
-      eventType === 'preapproval.updated' ||
-      (eventType === 'subscription_preapproval' && action === 'updated') ||
-      eventType === 'subscription_authorized_payment'
-    ) {
-      if (resourceId) {
-        const res = await fetch(`https://api.mercadopago.com/preapproval/${resourceId}`, {
-          headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` }
-        });
-        if (res.ok) {
-          const pre = await res.json();
-          const st = (pre?.status || '').toString().toLowerCase();
-          if (st === 'cancelled' || st === 'paused' || st === 'ended') {
-            let userId = pre?.external_reference || null;
-            const payerEmail = pre?.payer_email || pre?.payer?.email || null;
-            if ((!userId || userId === 'null') && payerEmail) {
-              const { data: foundId } = await supabaseAdmin.rpc('get_user_id_by_email', { email: payerEmail });
-              if (foundId) userId = foundId;
-            }
-            if (userId) {
-              await supabaseAdmin.from('profiles').update({
-                plan_type: 'free',
-                subscription_status: 'canceled',
-                subscription_expires_at: null,
-                is_premium: false,
-                updated_at: new Date().toISOString()
-              }).or(`id.eq.${userId},user_id.eq.${userId}`);
-              processed = true;
-            }
-          }
-        }
-      }
-    }
 
     // 4. Save Event
+    const notificationId = body?.id?.toString()
+        ?? req.headers.get('x-request-id')
+        ?? `${eventType}_${resourceId}_${Date.now()}`;
     await supabaseAdmin.from('webhook_events').insert({
         provider: 'mercadopago',
         event_type: eventType,
         resource_id: resourceId,
-        notification_id: body?.data?.id || body?.id || null,
+        notification_id: notificationId,
         payload: body,
         processed_at: new Date().toISOString()
     });

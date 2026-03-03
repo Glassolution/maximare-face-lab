@@ -70,11 +70,7 @@ export function CancelSubscriptionWizard({ open, onOpenChange }: Props) {
       );
       const { data, error } = await supabase.functions.invoke("subscription-cancel", {
         headers: {
-          // Ensure gateway auth and function-side ANON_KEY availability
-          Authorization: `Bearer ${(import.meta as any).env?.VITE_SUPABASE_ANON_KEY || ""}`,
-          apikey: (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "",
-          "sb-access-token": token,
-          "x-supabase-auth": token
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: payload
       });
