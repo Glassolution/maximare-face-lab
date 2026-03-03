@@ -104,6 +104,9 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'pix'>('card');
   const cardPaymentBrickController = useRef<any>(null);
   const notifiedRef = useRef(false);
+  // Guard: capture premium status at mount so profile-backup polling doesn't
+  // immediately fire for users who were already premium before opening checkout.
+  const wasAlreadyPremiumRef = useRef(false);
   
   // User data
   const [email, setEmail] = useState('');
@@ -162,12 +165,22 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
         if (user) {
           setEmail(user.email || '');
           setInitialEmail(user.email || '');
-          
+
           if (user.user_metadata?.full_name) {
             const parts = user.user_metadata.full_name.split(' ');
             setFirstName(parts[0]);
             setLastName(parts.slice(1).join(' '));
           }
+
+          // Capture pre-existing premium status so polling backup never
+          // false-positives for users who were already premium at checkout open.
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('is_premium, subscription_status')
+            .eq('id', user.id)
+            .maybeSingle();
+          wasAlreadyPremiumRef.current =
+            !!(profile?.is_premium || profile?.subscription_status === 'active');
         }
       } catch (e) {
         console.error("Error fetching user", e);
@@ -301,8 +314,10 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
           .eq('id', user.id)
           .maybeSingle();
       
-      if (data?.subscription_status === 'active' || data?.is_premium) {
-          logger.log("[Checkout]", "Profile Polling found active status!");
+      // Only treat profile premium as confirmation if the user was NOT already
+      // premium when they opened the checkout (prevents false-positive on pre-existing plans).
+      if (!wasAlreadyPremiumRef.current && (data?.subscription_status === 'active' || data?.is_premium)) {
+          logger.log("[Checkout]", "Profile Polling found newly active status!");
           if (!notifiedRef.current) {
             notifiedRef.current = true;
             toast.success("Pagamento confirmado! Acesso liberado.");
