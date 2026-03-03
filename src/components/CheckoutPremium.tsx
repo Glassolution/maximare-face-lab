@@ -127,22 +127,21 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
 
   // Use a stable reference for initialization to prevent re-renders
   // We ignore changes to email/price after mount to avoid resetting the form
-  const initialization = useMemo(() => ({ 
+  const initialization = useMemo(() => ({
     amount: price,
     payer: {
       email: 'customer@email.com', // Placeholder, real email is sent on submit
-      entity_type: 'individual',
     }
   }), []); // Empty dependency array = STABLE
 
   const customization = useMemo(() => ({
     paymentMethods: {
       maxInstallments: 12,
-      ticket: [],
-      bankTransfer: [],
-      atm: [],
-      creditCard: "all",
-      debitCard: "all",
+      ticket: "none" as const,
+      bankTransfer: "none" as const,
+      atm: "none" as const,
+      creditCard: "all" as const,
+      debitCard: "all" as const,
     },
     visual: {
         style: {
