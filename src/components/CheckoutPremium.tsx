@@ -445,17 +445,17 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
     // We just need to send the data to our backend
     setLoading(true);
     try {
-        const token = await getValidAccessToken();
-        if (!token) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) {
             toast.error("Faça login novamente");
             setLoading(false);
             return;
         }
+        const token = session.access_token;
         const { data, error } = await supabase.functions.invoke('create-payment', {
             headers: { 
-                Authorization: `Bearer ${(import.meta as any).env?.VITE_SUPABASE_ANON_KEY || ""}`,
-                apikey: (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "",
-                "sb-access-token": token
+                "sb-access-token": token,
+                "x-supabase-auth": token
             },
             body: {
                 payment_method_id: formData.payment_method_id, // e.g. 'master'
@@ -517,12 +517,13 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
   const handlePix = async () => {
     setLoading(true);
     try {
-        const token = await getValidAccessToken();
-        if (!token) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) {
             toast.error("Faça login novamente");
             setLoading(false);
             return;
         }
+        const token = session.access_token;
         // Validate inputs with detailed messages
         const missingFields = [];
         if (!firstName) missingFields.push("Nome");
@@ -538,9 +539,8 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
 
         const { data, error } = await supabase.functions.invoke('create-payment', {
             headers: { 
-                Authorization: `Bearer ${(import.meta as any).env?.VITE_SUPABASE_ANON_KEY || ""}`,
-                apikey: (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "",
-                "sb-access-token": token
+                "sb-access-token": token,
+                "x-supabase-auth": token
             },
             body: {
                 payment_method_id: 'pix',
