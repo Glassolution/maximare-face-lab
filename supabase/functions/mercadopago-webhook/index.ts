@@ -107,7 +107,7 @@ serve(async (req) => {
             if ((!userId || userId === 'null') && payerEmail) {
                 console.log(`No external_reference, looking up user by email: ${payerEmail}`);
                 const { data: foundId } = await supabaseAdmin.rpc('get_user_id_by_email', { 
-                    email: payerEmail 
+                    email_input: payerEmail 
                 });
                 if (foundId) {
                     userId = foundId;
@@ -270,7 +270,7 @@ serve(async (req) => {
             let userId = pre?.external_reference || null;
             const payerEmail = pre?.payer_email || pre?.payer?.email || null;
             if ((!userId || userId === 'null') && payerEmail) {
-              const { data: foundId } = await supabaseAdmin.rpc('get_user_id_by_email', { email: payerEmail });
+              const { data: foundId } = await supabaseAdmin.rpc('get_user_id_by_email', { email_input: payerEmail });
               if (foundId) userId = foundId;
             }
             if (userId) {

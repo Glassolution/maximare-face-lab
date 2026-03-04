@@ -38,7 +38,7 @@ interface AuthContextType {
   signIn: (username: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshUserData: () => Promise<void>;
-  refreshSession: () => Promise<void>;
+  refreshSession: (forceRefresh?: boolean) => Promise<void>;
   updateUserData: (data: Partial<Pick<UserData, "last_analysis_score" | "analysis_history" | "preferences">>) => Promise<void>;
 }
 
@@ -124,12 +124,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Exposed function to force reload everything (e.g. after payment)
-  // Debounced: prevents running more than once every 5 seconds
+  // Debounced: prevents running more than once every 2 seconds (reduced from 5s)
   const [lastRefreshTime, setLastRefreshTime] = useState(0);
 
-  const refreshSession = async () => {
+  const refreshSession = async (forceRefresh = false) => {
     const now = Date.now();
-    if (now - lastRefreshTime < 5000) {
+    if (!forceRefresh && now - lastRefreshTime < 2000) {
         logger.log("[Auth]", "Refresh skipped (debounce active)");
         return;
     }

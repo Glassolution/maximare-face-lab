@@ -205,7 +205,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                   setVerifying(false);
                   
                   // 1. Force Refresh Session & Profile
-                  await refreshSession();
+                  await refreshSession(true);
                   
                   // 2. Double check profile state after refresh (Optional, for logging)
                   const { data: { user: updatedUser } } = await supabase.auth.getUser();
@@ -250,7 +250,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                     toast.success("Pagamento confirmado! Acesso liberado.");
                   }
                   setVerifying(false);
-                  await refreshSession();
+                  await refreshSession(true);
                   const { data: { user: updatedUser } } = await supabase.auth.getUser();
                   if (updatedUser) {
                       const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', updatedUser.id).single();
@@ -282,7 +282,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                       toast.success("Pagamento confirmado! Acesso liberado.");
                     }
                     setVerifying(false);
-                    await refreshSession();
+                    await refreshSession(true);
                     onSuccess(email);
                     return true;
                   }
@@ -309,7 +309,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
             toast.success("Pagamento confirmado! Acesso liberado.");
           }
           setVerifying(false);
-          await refreshSession(); // Ensure global state is synced
+          await refreshSession(true); // Ensure global state is synced
           onSuccess(email);
           return true;
       }
@@ -379,7 +379,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                   toast.success("Pagamento confirmado! Acesso liberado.");
                 }
                 setVerifying(false);
-                await refreshSession();
+                await refreshSession(true);
                 onSuccess(email);
                 return;
             }
@@ -410,7 +410,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                   toast.success("Pagamento confirmado! Acesso liberado.");
                 }
                 setVerifying(false);
-                await refreshSession();
+                await refreshSession(true);
                 onSuccess(email);
                 return;
             } else {
@@ -433,7 +433,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                 toast.success("Pagamento confirmado! Acesso liberado.");
               }
               setVerifying(false);
-              await refreshSession();
+              await refreshSession(true);
               onSuccess(email);
           } else {
           }
@@ -490,7 +490,7 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
               payment_method: 'card',
               payment_id: data?.payment_id,
             });
-            await refreshSession();
+            await refreshSession(true);
             onSuccess(email);
         } else if (data.status === 'in_process') {
             toast.info("Pagamento em processamento. Aguarde...");
