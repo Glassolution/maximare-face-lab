@@ -32,6 +32,7 @@ export function usePremiumStatus() {
     }
 
     if (!profile) {
+      console.log("[PremiumStatus] No profile loaded yet");
       setIsPremium(false);
       setSubscriptionStatus('free');
       setExpiresAt(null);
@@ -39,6 +40,9 @@ export function usePremiumStatus() {
       setLoading(false);
       return;
     }
+
+    // Debug: Log full profile data
+    console.log("[PremiumStatus] Full profile data:", JSON.stringify(profile, null, 2));
 
     // Parse status from global profile
     const status = (profile.subscription_status as SubscriptionStatus) || 'free';
@@ -50,7 +54,7 @@ export function usePremiumStatus() {
     // STRICT CHECK: Only active/trialing AND future expiration date are valid.
     const isValid = (status === 'active' || status === 'trialing') && (expires ? expires > now : false);
     
-    logger.log("[PremiumStatus]", `User: ${user.id} | Status: ${status} | Valid: ${isValid}`);
+    console.log("[PremiumStatus]", `User: ${user.id} | Status: ${status} | Expires: ${expires} | Now: ${now} | Valid: ${isValid}`);
     
     setIsPremium(isValid);
     setSubscriptionStatus(status);
