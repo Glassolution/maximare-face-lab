@@ -59,12 +59,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchProfile = async (userId: string) => {
     try {
       console.log("[Auth]", "Fetching profile for:", userId);
-      // Try to find profile by id OR user_id (some profiles may have different id/user_id)
+      // Fetch profile by id (which should match auth user id)
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
-        .or(`id.eq.${userId},user_id.eq.${userId}`)
-        .limit(1)
+        .eq("id", userId)
         .maybeSingle();
       
       console.log("[Auth]", "Profile query result:", { data, error });
@@ -77,7 +76,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data) {
         console.log("[Auth]", "Profile loaded:", {
             id: data.id,
-            user_id: data.user_id,
             status: data.subscription_status,
             premium: data.is_premium,
             plan: data.plan_type,
@@ -89,7 +87,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log("[Auth]", "Profile missing, attempting to create...");
         const { error: insertError } = await supabase.from('profiles').insert({
             id: userId,
-            user_id: userId,
             username: `user_${userId.substring(0, 8)}`,
         });
 
@@ -100,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
              const { data: newData } = await supabase
                 .from("profiles")
                 .select("*")
-                .or(`id.eq.${userId},user_id.eq.${userId}`)
+                .eq("id", userId)
                 .maybeSingle();
              if (newData) setProfile(newData as Profile);
         }
