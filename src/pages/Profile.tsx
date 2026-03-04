@@ -25,7 +25,7 @@ type MenuItem = {
 };
 
 export default function Profile() {
-  const { user, profile } = useAuth();
+  const { user, profile, refreshSession } = useAuth();
   const { isPremium, subscriptionStatus, expiresAt, planType } = usePremiumStatus();
   const navigate = useNavigate();
   const location = useLocation();
@@ -43,6 +43,13 @@ export default function Profile() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // Force refresh profile on mount to ensure fresh data
+  useEffect(() => {
+    if (user) {
+      refreshSession(true);
+    }
+  }, []);
+
   // Sync state with profile from context
   useEffect(() => {
     if (profile) {
