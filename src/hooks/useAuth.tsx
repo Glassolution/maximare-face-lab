@@ -58,51 +58,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchProfile = async (userId: string) => {
     try {
-      logger.log("[Auth]", "Fetching profile for:", userId);
-      // Use limit(1).maybeSingle() to handle 0 or >1 rows gracefully
+      console.log("[Auth]", "Fetching profile for:", userId);
+      // Try to find profile by id OR user_id (some profiles may have different id/user_id)
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", userId)
+        .or(`id.eq.${userId},user_id.eq.${userId}`)
         .limit(1)
         .maybeSingle();
       
+      console.log("[Auth]", "Profile query result:", { data, error });
+      
       if (error) {
-        logger.error("[Auth]", "Profile fetch error:", error);
+        console.error("[Auth]", "Profile fetch error:", error);
         return;
       }
       
       if (data) {
-        logger.log("[Auth]", "Profile loaded:", {
+        console.log("[Auth]", "Profile loaded:", {
+            id: data.id,
+            user_id: data.user_id,
             status: data.subscription_status,
             premium: data.is_premium,
-            plan: data.plan_type
+            plan: data.plan_type,
+            expires: data.subscription_expires_at
         });
         setProfile(data as Profile);
       } else {
         // Profile missing (0 rows) - Try to create it automatically
-        logger.log("[Auth]", "Profile missing, attempting to create...");
+        console.log("[Auth]", "Profile missing, attempting to create...");
         const { error: insertError } = await supabase.from('profiles').insert({
             id: userId,
-            // defaults will handle the rest, or trigger will fill
-            // but we need username usually if not nullable
+            user_id: userId,
             username: `user_${userId.substring(0, 8)}`,
         });
 
         if (insertError) {
-             logger.error("[Auth]", "Failed to auto-create profile:", insertError);
+             console.error("[Auth]", "Failed to auto-create profile:", insertError);
         } else {
              // Retry fetch
              const { data: newData } = await supabase
                 .from("profiles")
                 .select("*")
-                .eq("id", userId)
+                .or(`id.eq.${userId},user_id.eq.${userId}`)
                 .maybeSingle();
              if (newData) setProfile(newData as Profile);
         }
       }
     } catch (e) {
-      logger.error("[Auth]", "Unexpected profile error:", e);
+      console.error("[Auth]", "Unexpected profile error:", e);
     }
   };
 
