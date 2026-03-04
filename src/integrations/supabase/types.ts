@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      payments: {
+        Row: {
+          amount: number | null
+          created_at: string
+          currency: string | null
+          id: string
+          metadata: Json | null
+          payment_id: string
+          plan_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          currency?: string | null
+          id?: string
+          metadata?: Json | null
+          payment_id: string
+          plan_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          currency?: string | null
+          id?: string
+          metadata?: Json | null
+          payment_id?: string
+          plan_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       paywall_events: {
         Row: {
           context: Json | null
@@ -38,17 +85,62 @@ export type Database = {
         }
         Relationships: []
       }
+      plans: {
+        Row: {
+          active: boolean
+          created_at: string
+          currency: string
+          id: string
+          interval: string
+          name: string
+          price_cents: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          currency?: string
+          id: string
+          interval?: string
+          name: string
+          price_cents: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          currency?: string
+          id?: string
+          interval?: string
+          name?: string
+          price_cents?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
+          cancel_reason: string | null
+          cancelled_at: string | null
           created_at: string
           display_name: string | null
+          first_payment_at: string | null
           id: string
+          is_premium: boolean | null
+          last_payment_at: string | null
           last_paywall_dismissed_at: string | null
           last_paywall_shown_at: string | null
+          payment_id: string | null
+          payment_provider: string | null
+          payment_status: string | null
           paywall_dismiss_count_7d: number
           paywall_show_count_7d: number
           plan_type: string
+          premium_plan_id: string | null
+          premium_since: string | null
+          provider_payment_id: string | null
+          provider_subscription_id: string | null
           subscription_expires_at: string | null
           subscription_status: string
           updated_at: string | null
@@ -57,14 +149,26 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
           created_at?: string
           display_name?: string | null
+          first_payment_at?: string | null
           id?: string
+          is_premium?: boolean | null
+          last_payment_at?: string | null
           last_paywall_dismissed_at?: string | null
           last_paywall_shown_at?: string | null
+          payment_id?: string | null
+          payment_provider?: string | null
+          payment_status?: string | null
           paywall_dismiss_count_7d?: number
           paywall_show_count_7d?: number
           plan_type?: string
+          premium_plan_id?: string | null
+          premium_since?: string | null
+          provider_payment_id?: string | null
+          provider_subscription_id?: string | null
           subscription_expires_at?: string | null
           subscription_status?: string
           updated_at?: string | null
@@ -73,14 +177,26 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
           created_at?: string
           display_name?: string | null
+          first_payment_at?: string | null
           id?: string
+          is_premium?: boolean | null
+          last_payment_at?: string | null
           last_paywall_dismissed_at?: string | null
           last_paywall_shown_at?: string | null
+          payment_id?: string | null
+          payment_provider?: string | null
+          payment_status?: string | null
           paywall_dismiss_count_7d?: number
           paywall_show_count_7d?: number
           plan_type?: string
+          premium_plan_id?: string | null
+          premium_since?: string | null
+          provider_payment_id?: string | null
+          provider_subscription_id?: string | null
           subscription_expires_at?: string | null
           subscription_status?: string
           updated_at?: string | null
@@ -127,6 +243,72 @@ export type Database = {
           provider?: string
           status?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      subscription_cancellation_feedback: {
+        Row: {
+          created_at: string
+          final_action: string | null
+          had_issues: boolean | null
+          id: string
+          is_within_7_days: boolean | null
+          issue_details: string | null
+          nps: number | null
+          plan_type: string | null
+          price: number | null
+          provider: string | null
+          provider_payload: Json | null
+          provider_payment_id: string | null
+          provider_subscription_id: string | null
+          reason_details: string | null
+          reason_primary: string
+          refund_status: string | null
+          retention_offer_accepted: boolean | null
+          retention_offer_shown: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          final_action?: string | null
+          had_issues?: boolean | null
+          id?: string
+          is_within_7_days?: boolean | null
+          issue_details?: string | null
+          nps?: number | null
+          plan_type?: string | null
+          price?: number | null
+          provider?: string | null
+          provider_payload?: Json | null
+          provider_payment_id?: string | null
+          provider_subscription_id?: string | null
+          reason_details?: string | null
+          reason_primary: string
+          refund_status?: string | null
+          retention_offer_accepted?: boolean | null
+          retention_offer_shown?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          final_action?: string | null
+          had_issues?: boolean | null
+          id?: string
+          is_within_7_days?: boolean | null
+          issue_details?: string | null
+          nps?: number | null
+          plan_type?: string | null
+          price?: number | null
+          provider?: string | null
+          provider_payload?: Json | null
+          provider_payment_id?: string | null
+          provider_subscription_id?: string | null
+          reason_details?: string | null
+          reason_primary?: string
+          refund_status?: string | null
+          retention_offer_accepted?: boolean | null
+          retention_offer_shown?: string | null
           user_id?: string
         }
         Relationships: []
@@ -208,6 +390,9 @@ export type Database = {
           created_at: string
           event_type: string
           id: string
+          notification_id: string | null
+          payload: Json | null
+          processed_at: string | null
           provider: string
           request_id: string | null
           resource_id: string
@@ -216,6 +401,9 @@ export type Database = {
           created_at?: string
           event_type: string
           id?: string
+          notification_id?: string | null
+          payload?: Json | null
+          processed_at?: string | null
           provider: string
           request_id?: string | null
           resource_id: string
@@ -224,6 +412,9 @@ export type Database = {
           created_at?: string
           event_type?: string
           id?: string
+          notification_id?: string | null
+          payload?: Json | null
+          processed_at?: string | null
           provider?: string
           request_id?: string | null
           resource_id?: string
