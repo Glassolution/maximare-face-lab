@@ -21,65 +21,50 @@ serve(async (req) => {
     const url = new URL(req.url);
     const query = Object.fromEntries(url.searchParams.entries());
     const bodyText = await req.text();
-    const body = bodyText ? JSON.parse(bodyText) : {};
-    
-    // Mercado Pago sends 'action' or 'type' or 'topic' depending on version
-    const eventType = body.type || body.action || query.topic || 'unknown';
-    const resourceId = body.data?.id || body.id || query.id;
-    const action = body.action || query.action || 'unknown';
+    const eventTypePre = query.topic || 'unknown';
+    const resourceIdPre = query.id;
+    const actionPre = query.action || 'unknown';
 
-    // 1. Signature Verification (HMAC SHA-256)
-    // Only if secret is provided
-    if (MP_WEBHOOK_SECRET) {
-        const xSignature = req.headers.get("x-signature");
-        const xRequestId = req.headers.get("x-request-id");
-        
-        if (xSignature && xRequestId) {
-             const parts = xSignature.split(',');
-             let ts = '';
-             let v1 = '';
-             parts.forEach(p => {
-                 const [k, v] = p.split('=');
-                 if (k === 'ts') ts = v;
-                 if (k === 'v1') v1 = v;
-             });
-
-             // Manifest format: id:[data.id];request-timestamp:[ts];requestId:[x-request-id];signed_payload:[json_payload]
-             const manifest = `id:${resourceId};request-timestamp:${ts};requestId:${xRequestId};signed_payload:${bodyText}`;
-             
-             const key = await crypto.subtle.importKey(
-                 "raw",
-                 new TextEncoder().encode(MP_WEBHOOK_SECRET),
-                 { name: "HMAC", hash: "SHA-256" },
-                 false,
-                 ["sign"]
-             );
-             
-             const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(manifest));
-             const hex = Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
-             
-             if (hex !== v1) {
-                 console.warn("Invalid Signature");
-                 // We return 200 to avoid retries, but log error
-                 // return new Response(JSON.stringify({ error: "Invalid Signature" }), { status: 200 });
-                 // Note: For now, we just WARN because if we get the format wrong, we don't want to break prod.
-                 // Once verified, uncomment the return.
-             }
-        }
+    if (!MP_WEBHOOK_SECRET) {
+      console.warn("[SECURITY WARNING] MP_WEBHOOK_SECRET not set — webhook running without signature enforcement");
+    } else {
+      const xSignature = req.headers.get("x-signature");
+      const xRequestId = req.headers.get("x-request-id");
+      if (!xSignature || !xRequestId) {
+        return new Response(JSON.stringify({ error: "missing_signature_headers" }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      const parts = xSignature.split(',');
+      let ts = '';
+      let v1 = '';
+      parts.forEach(p => {
+        const [k, v] = p.split('=');
+        if (k === 'ts') ts = v;
+        if (k === 'v1') v1 = v;
+      });
+      if (!ts || !v1) {
+        return new Response(JSON.stringify({ error: "invalid_signature_format" }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      const manifest = `id:${resourceId};request-timestamp:${ts};requestId:${xRequestId};signed_payload:${bodyText}`;
+      const key = await crypto.subtle.importKey(
+        "raw",
+        new TextEncoder().encode(MP_WEBHOOK_SECRET),
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["sign"]
+      );
+      const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(manifest));
+      const hex = Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
+      if (hex !== v1) {
+        console.warn("[SECURITY] Invalid MercadoPago webhook signature");
+        return new Response(JSON.stringify({ error: "invalid_signature" }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
     }
 
-    console.log(`Webhook received: ${eventType} ID: ${resourceId}`);
-
-    if (!resourceId) {
-        return new Response(JSON.stringify({ message: "No resource ID" }), { status: 200 });
-    }
-
-    // 2. Idempotency Check
     const { data: existing } = await supabaseAdmin.from('webhook_events')
         .select('id')
         .eq('provider', 'mercadopago')
-        .eq('event_type', eventType)
-        .eq('resource_id', resourceId)
+        .eq('event_type', eventTypePre)
+        .eq('resource_id', resourceIdPre)
         .maybeSingle();
 
     if (existing) {
@@ -87,7 +72,17 @@ serve(async (req) => {
         return new Response(JSON.stringify({ message: "Already processed" }), { status: 200 });
     }
 
-    // 3. Process Payment
+    const body = bodyText ? JSON.parse(bodyText) : {};
+    const eventType = body.type || body.action || query.topic || 'unknown';
+    const resourceId = body.data?.id || body.id || query.id;
+    const action = body.action || query.action || 'unknown';
+
+    console.log(`Webhook received: ${eventType} ID: ${resourceId}`);
+
+    if (!resourceId) {
+        return new Response(JSON.stringify({ message: "No resource ID" }), { status: 200 });
+    }
+
     let processed = false;
     
     if (eventType === 'payment' || eventType === 'payment.created' || eventType === 'payment.updated') {
@@ -165,41 +160,27 @@ serve(async (req) => {
                     }
                 }
 
-                const expiresAt = new Date();
-                expiresAt.setDate(expiresAt.getDate() + days);
-
-                // Update Profile
-                try {
-                    await supabaseAdmin.from('profiles').upsert(
-                      { id: userId, user_id: userId },
-                      { onConflict: 'id', ignoreDuplicates: true }
-                    );
-                } catch {}
-                // Update Profile
-                const { error } = await supabaseAdmin.from('profiles').update({
-                    subscription_status: 'active',
-                    is_premium: true,
-                    premium_since: new Date().toISOString(),
-                    subscription_expires_at: expiresAt.toISOString(),
-                    plan_type: planType,
-                    premium_plan_id: planId || null,
-                    payment_provider: 'mercadopago',
-                    payment_id: payment.id.toString(),
-                    payment_status: 'approved',
-                    first_payment_at: new Date().toISOString(),
-                    last_payment_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                }).or(`id.eq.${userId},user_id.eq.${userId}`);
-
-                if (error) {
-                    console.error("[webhook] Falha ao atualizar perfil:", error);
-                    return new Response(
-                        JSON.stringify({ error: 'Falha ao atualizar perfil' }),
-                        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-                    );
+                // Activation via centralized RPC
+                const { data: activation, error: actError } = await supabaseAdmin.rpc('activate_user_subscription', {
+                  p_user_id: userId,
+                  p_plan_type: planType,
+                  p_payment_id: payment.id.toString(),
+                  p_days: days,
+                  p_provider: 'mercadopago',
+                  p_plan_id: planId,
+                  p_amount: payment.transaction_amount,
+                  p_currency: payment.currency_id,
+                  p_metadata: payment.metadata
+                });
+                if (actError) {
+                  console.error("[webhook] Falha ao ativar assinatura via RPC:", actError);
+                  return new Response(
+                    JSON.stringify({ error: 'Falha ao ativar via RPC' }),
+                    { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                  );
                 } else {
-                    console.log(`Profile updated for ${userId}`);
-                    processed = true;
+                  console.log(`Subscription activated for ${userId}`, activation);
+                  processed = true;
                 }
 
                 // If there is a pending cancel_refund (no payment_id at the time), attempt refund now

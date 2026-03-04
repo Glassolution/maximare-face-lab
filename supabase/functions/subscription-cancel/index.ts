@@ -27,7 +27,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    try { console.log(JSON.stringify({ tag: "subcancel_entry", ts: new Date().toISOString() })); } catch {}
+    try { console.log(JSON.stringify({ tag: "subcancel_entry", ts: new Date().toISOString() })); } catch (_e) { void _e; }
     if (!SUPABASE_URL) {
       return new Response(JSON.stringify({ error: "server_config_error", detail: "MISSING_URL" }), {
         status: 500,
@@ -44,7 +44,7 @@ serve(async (req) => {
     };
     try {
       console.log(JSON.stringify({ tag: "subcancel_req_headers", ...hdrInfo }));
-    } catch {}
+    } catch (_e) { void _e; }
     if (!authHeader && !ENV_ANON_KEY && !req.headers.get("apikey") && !req.headers.get("x-api-key")) {
       return new Response(JSON.stringify({ error: "unauthorized", reason: "missing_auth_header" }), {
         status: 401,
@@ -99,7 +99,7 @@ serve(async (req) => {
     }
     try {
       console.log(JSON.stringify({ tag: "subcancel_user", userId, getUserError: userErrMsg }));
-    } catch {}
+    } catch (_e) { void _e; }
     if (!userId) {
       return new Response(JSON.stringify({ error: "unauthorized", reason: "invalid_user_or_parse" }), {
         status: 401,
@@ -138,7 +138,7 @@ serve(async (req) => {
               .replace(/[^a-z0-9_]/g, "")
               .slice(0, 16) || "user";
           base = (u?.user?.user_metadata?.username as string) || emailBase;
-        } catch {}
+        } catch (_e) { void _e; }
         const suffix = (userId || "").replace(/-/g, "").slice(0, 8) || crypto.randomUUID().slice(0, 8);
         const username = `${base}_${suffix}`.toLowerCase();
         const display_name = base;
@@ -179,7 +179,7 @@ serve(async (req) => {
               .replace(/[^a-z0-9_]/g, "")
               .slice(0, 16) || "user";
           base = (u?.user?.user_metadata as any)?.username || emailBase;
-        } catch {}
+        } catch (_e) { void _e; }
         const suffix = (userId || "").replace(/-/g, "").slice(0, 8) || crypto.randomUUID().slice(0, 8);
         const username = `${base}_${suffix}`.toLowerCase();
         const display_name = base;
@@ -196,7 +196,7 @@ serve(async (req) => {
               },
               { onConflict: "id", ignoreDuplicates: false }
             );
-        } catch {}
+        } catch (_e) { void _e; }
         profile = {
           id: userId,
           user_id: userId,
@@ -452,25 +452,30 @@ serve(async (req) => {
       retention_offer_shown: body.retention_offer_shown || null,
       retention_offer_accepted: body.retention_offer_accepted ?? null,
       final_action: finalAction,
-      refund_status: isWithin7Days ? "approved" : refundStatus,
+      refund_status: refundStatus,
       provider_payload: { cancel: cancelPayload, refund: refundPayload, debug: { headers: hdrInfo, user_id: userId } },
     });
 
-    const updates: Record<string, unknown> = {
-      subscription_status: "canceled",
-      is_premium: false,
-      plan_type: "free",
-      premium_plan_id: null,
-      subscription_expires_at: null,
-      premium_until: null,
-      cancelled_at: now.toISOString(),
-      cancel_reason: body.reason_primary,
-      updated_at: now.toISOString(),
-    };
-    if (providerPaymentId && !profile.provider_payment_id) updates["provider_payment_id"] = providerPaymentId;
-    if (!profile.first_payment_at && startDate) updates["first_payment_at"] = startDate.toISOString();
-
-    await db.from("profiles").update(updates).or(`id.eq.${userId},user_id.eq.${userId}`);
+    // Profile update only when allowed:
+    // - Within 7 days: only after successful refund
+    // - Outside 7 days: always cancel without refund
+    const shouldDeactivate = (isWithin7Days && refundStatus === "approved") || (!isWithin7Days);
+    if (shouldDeactivate) {
+      const updates: Record<string, unknown> = {
+        subscription_status: "canceled",
+        is_premium: false,
+        plan_type: "free",
+        premium_plan_id: null,
+        subscription_expires_at: null,
+        premium_until: null,
+        cancelled_at: now.toISOString(),
+        cancel_reason: body.reason_primary,
+        updated_at: now.toISOString(),
+      };
+      if (providerPaymentId && !profile.provider_payment_id) updates["provider_payment_id"] = providerPaymentId;
+      if (!profile.first_payment_at && startDate) updates["first_payment_at"] = startDate.toISOString();
+      await db.from("profiles").update(updates).or(`id.eq.${userId},user_id.eq.${userId}`);
+    }
 
     return new Response(
       JSON.stringify({

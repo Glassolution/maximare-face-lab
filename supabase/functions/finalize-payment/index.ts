@@ -92,8 +92,8 @@ serve(async (req) => {
                     subscription_status: 'free',
                     plan_type: 'free',
                   }, { onConflict: 'id', ignoreDuplicates: true });
-            } catch {
-                try {
+            } catch (_e) { void _e; }
+            try {
                     await supabaseAdmin
                       .from('profiles')
                       .upsert({ 
@@ -104,26 +104,23 @@ serve(async (req) => {
                         subscription_status: 'free',
                         plan_type: 'free',
                       }, { onConflict: 'user_id', ignoreDuplicates: true });
-                } catch {}
-            }
-            // Update Profiles
-            const { error: profileError } = await supabaseAdmin.from('profiles').update({
-                subscription_status: 'active',
-                is_premium: true,
-                premium_since: new Date().toISOString(),
-                subscription_expires_at: expiresAt.toISOString(),
-                plan_type: planType,
-                premium_plan_id: planId || null,
-                payment_provider: 'mercadopago',
-                payment_id: payment.id.toString(),
-                payment_status: 'approved',
-                updated_at: new Date().toISOString()
-            }).or(`id.eq.${userId},user_id.eq.${userId}`);
-
-            if (profileError) {
-                console.error("[Finalize-Payment] Profile Update Error:", profileError);
+                } catch (_e) { void _e; }
+            // Centralized activation via RPC
+            const { data: activation, error: actError } = await supabaseAdmin.rpc('activate_user_subscription', {
+              p_user_id: userId,
+              p_plan_type: planType,
+              p_payment_id: payment.id.toString(),
+              p_days: days,
+              p_provider: 'mercadopago',
+              p_plan_id: planId,
+              p_amount: payment.transaction_amount,
+              p_currency: payment.currency_id,
+              p_metadata: payment.metadata
+            });
+            if (actError) {
+              console.error("[Finalize-Payment] RPC Activation Error:", actError);
             } else {
-                console.log(`[Finalize-Payment] Profile updated for user: ${userId}`);
+              console.log(`[Finalize-Payment] Subscription activated for user: ${userId}`, activation);
             }
 
             // Update Payments Table (Audit)
