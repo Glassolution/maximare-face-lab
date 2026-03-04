@@ -16,6 +16,7 @@ BEGIN
 END $$;
 
 -- Ensure the generate_referral_code function exists
+DROP FUNCTION IF EXISTS public.generate_referral_code(uuid, text);
 CREATE OR REPLACE FUNCTION public.generate_referral_code(p_creator_id uuid, p_code text)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -48,6 +49,7 @@ END;
 $$;
 
 -- Ensure the get_creator_referral_stats function exists
+DROP FUNCTION IF EXISTS public.get_creator_referral_stats(uuid);
 CREATE OR REPLACE FUNCTION public.get_creator_referral_stats(p_creator_id uuid)
 RETURNS TABLE (
   total_uses bigint,
@@ -59,21 +61,27 @@ SECURITY DEFINER
 AS $$
 BEGIN
   RETURN QUERY
-  SELECT 
+  SELECT
     COUNT(rp.id) as total_uses,
     COALESCE(SUM(rp.commission_cents), 0) as total_commission,
     COALESCE(
-      jsonb_agg(
-        jsonb_build_object(
-          'id', rp.id,
-          'purchaser_username', pp.username,
-          'plan_type', rp.plan_type,
-          'amount_cents', rp.amount_cents,
-          'commission_cents', rp.commission_cents,
-          'created_at', rp.created_at
-        )
-        ORDER BY rp.created_at DESC
-        LIMIT 10
+      (
+        SELECT jsonb_agg(row_data)
+        FROM (
+          SELECT jsonb_build_object(
+            'id', rp2.id,
+            'purchaser_username', pp2.username,
+            'plan_type', rp2.plan_type,
+            'amount_cents', rp2.amount_cents,
+            'commission_cents', rp2.commission_cents,
+            'created_at', rp2.created_at
+          ) as row_data
+          FROM public.referral_purchases rp2
+          LEFT JOIN public.profiles pp2 ON rp2.purchaser_id = pp2.id
+          WHERE rp2.creator_id = p_creator_id
+          ORDER BY rp2.created_at DESC
+          LIMIT 10
+        ) sub
       ),
       '[]'::jsonb
     ) as recent_purchases
@@ -107,4 +115,12 @@ USING (auth.uid() = creator_id);
 
 -- Enable RLS on referral tables
 ALTER TABLE public.referral_codes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.referral_purchases ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'referral_purchases'
+  ) THEN
+    ALTER TABLE public.referral_purchases ENABLE ROW LEVEL SECURITY;
+  END IF;
+END $$;

@@ -156,6 +156,7 @@ END;
 $$;
 
 -- Função para verificar se a infraestrutura está funcionando
+DROP FUNCTION IF EXISTS public.check_referral_infrastructure();
 CREATE OR REPLACE FUNCTION public.check_referral_infrastructure()
 RETURNS TABLE(
   table_exists boolean,
@@ -201,7 +202,11 @@ BEGIN
     AND schemaname = 'public'
   ) INTO pol_exists;
   
-  RETURN VALUES (tbl_exists, col_exists, func_exists, pol_exists);
+  table_exists := tbl_exists;
+  column_exists := col_exists;
+  function_exists := func_exists;
+  policies_exist := pol_exists;
+  RETURN NEXT;
 END;
 $$;
 
