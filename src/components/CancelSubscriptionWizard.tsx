@@ -46,12 +46,13 @@ export function CancelSubscriptionWizard({ open, onOpenChange }: Props) {
   const submit = async () => {
     try {
       setLoading(true);
-      const token = await getValidAccessToken();
-      if (!token) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
         toast.error("Faça login novamente");
         setLoading(false);
         return;
       }
+      const token = session.access_token;
       const payload: any = {
         reason_primary: reason,
         reason_details: details || null,
@@ -59,20 +60,8 @@ export function CancelSubscriptionWizard({ open, onOpenChange }: Props) {
         had_issues: hadIssues === "" ? null : hadIssues === "yes",
         issue_details: issueDetails || null
       };
-      const anonEnv = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "";
-      // Minimal, masked debug to verify env and token presence on localhost
-      console.log(
-        "[CancelSubscription] apikey present:", !!anonEnv,
-        "len:", anonEnv.length,
-        "prefix:", anonEnv.slice(0, 6),
-        "| sb-token present:", !!token,
-        "token len:", token.length
-      );
       const { data, error } = await supabase.functions.invoke("subscription-cancel", {
         headers: {
-          // Ensure gateway auth and function-side ANON_KEY availability
-          Authorization: `Bearer ${(import.meta as any).env?.VITE_SUPABASE_ANON_KEY || ""}`,
-          apikey: (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "",
           "sb-access-token": token,
           "x-supabase-auth": token
         },

@@ -192,7 +192,11 @@ serve(async (req) => {
                 }).or(`id.eq.${userId},user_id.eq.${userId}`);
 
                 if (error) {
-                    console.error("Profile update failed:", error);
+                    console.error("[webhook] Falha ao atualizar perfil:", error);
+                    return new Response(
+                        JSON.stringify({ error: 'Falha ao atualizar perfil' }),
+                        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                    );
                 } else {
                     console.log(`Profile updated for ${userId}`);
                     processed = true;
@@ -233,6 +237,20 @@ serve(async (req) => {
                               })
                               .eq('id', pending.id);
                             console.log('[Webhook] Refund attempt result:', refundStatus);
+
+                            // Após estorno bem-sucedido — desativa premium
+                            if (refundStatus === 'approved') {
+                              await supabaseAdmin
+                                .from('profiles')
+                                .update({
+                                  is_premium: false,
+                                  subscription_status: 'canceled',
+                                  plan_type: 'free',
+                                  updated_at: new Date().toISOString(),
+                                })
+                                .or(`id.eq.${userId},user_id.eq.${userId}`);
+                              console.log('[Webhook] Premium desativado após estorno para', userId);
+                            }
                         }
                     } catch (e) {
                         console.error('[Webhook] Pending refund follow-up failed:', e);
@@ -289,11 +307,12 @@ serve(async (req) => {
     }
 
     // 4. Save Event
+    const notificationId = body?.id?.toString() ?? req.headers.get('x-request-id') ?? `${eventType}_${resourceId}_${Date.now()}`;
     await supabaseAdmin.from('webhook_events').insert({
         provider: 'mercadopago',
         event_type: eventType,
         resource_id: resourceId,
-        notification_id: body?.data?.id || body?.id || null,
+        notification_id: notificationId,
         payload: body,
         processed_at: new Date().toISOString()
     });

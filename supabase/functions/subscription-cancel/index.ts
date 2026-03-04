@@ -67,6 +67,12 @@ serve(async (req) => {
     });
     // Sempre que houver SERVICE_ROLE_KEY, use admin (evita heurísticas frágeis)
     const admin = SERVICE_ROLE_KEY ? createClient(SUPABASE_URL, SERVICE_ROLE_KEY) : null;
+    if (!admin) {
+      return new Response(
+        JSON.stringify({ error: "Configuração interna inválida" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const token = sbToken || (authHeader ? authHeader.replace(/^Bearer\s+/i, "") : "");
     // Robust user extraction: prefer local decode; fall back to getUser
@@ -333,10 +339,11 @@ serve(async (req) => {
         });
         const resJson = await res.json().catch(() => null);
         refundPayload = resJson;
+        let alreadyRefunded = false;
         if (!res.ok) {
-          const msg = (resJson && (resJson.message || resJson.error || resJson.status)) || "";
-          const already = typeof msg === "string" && /already\s*refunded|reembolsad[oa]/i.test(msg);
-          if (already) {
+          const msg = String((resJson && (resJson.message || resJson.error || resJson.status)) || "");
+          alreadyRefunded = /already\s*refunded|reembolsad[oa]/i.test(msg);
+          if (alreadyRefunded) {
             refundStatus = "approved";
           } else {
             refundStatus = "failed";
@@ -367,11 +374,11 @@ serve(async (req) => {
             issue_details: body.issue_details || null,
             retention_offer_shown: body.retention_offer_shown || null,
             retention_offer_accepted: body.retention_offer_accepted ?? null,
-            final_action: already ? "cancel_refund" : "cancel_refund_failed",
-            refund_status: already ? "approved" : "failed",
+            final_action: alreadyRefunded ? "cancel_refund" : "cancel_refund_failed",
+            refund_status: alreadyRefunded ? "approved" : "failed",
             provider_payload: { cancel: cancelPayload, refund: refundPayload, debug: { headers: hdrInfo, user_id: userId, mp_status: res.status } },
           });
-          if (!already) {
+          if (!alreadyRefunded) {
             return new Response(
               JSON.stringify({
                 error: "refund_required",
