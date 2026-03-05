@@ -44,52 +44,10 @@ export function CancelSubscriptionWizard({ open, onOpenChange }: Props) {
   };
 
   const submit = async () => {
-    try {
-      setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        toast.error("Faça login novamente");
-        setLoading(false);
-        return;
-      }
-      const token = session.access_token;
-      const payload: any = {
-        reason_primary: reason,
-        reason_details: details || null,
-        nps: nps === "" ? null : Number(nps),
-        had_issues: hadIssues === "" ? null : hadIssues === "yes",
-        issue_details: issueDetails || null
-      };
-      const { data, error } = await supabase.functions.invoke("subscription-cancel", {
-        headers: {
-          "sb-access-token": token,
-          "x-supabase-auth": token
-        },
-        body: payload
-      });
-      if (error) {
-        const errMsg = (typeof error === "object" && error !== null && "message" in error) ? (error as any).message : String(error);
-        const msg = errMsg?.toLowerCase()?.includes("unauthorized") ? "Sessão expirada. Faça login novamente." : (errMsg || "Erro ao cancelar assinatura");
-        toast.error(String(msg));
-        return;
-      }
-      if (data?.is_within_7_days) {
-        if (data?.refund_status === "approved") {
-          toast.success("Assinatura cancelada e estorno aprovado.");
-          onClose(false);
-        } else {
-          toast.error("Estorno obrigatório falhou. Tente novamente em instantes.");
-          return;
-        }
-      } else {
-        toast.success("Assinatura cancelada. Sem estorno.");
-        onClose(false);
-      }
-    } catch {
-      toast.error("Erro ao cancelar assinatura");
-    } finally {
-      setLoading(false);
-    }
+    // REMOVIDO: subscription-cancel Edge Function deletado
+    toast.error("Sistema de cancelamento em manutenção. Entre em contato com o suporte.");
+    onClose(false);
+    return;
   };
 
   const reasons = [

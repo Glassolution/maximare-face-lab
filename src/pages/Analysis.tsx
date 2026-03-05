@@ -31,72 +31,57 @@ import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, captureException } from "@/lib/posthog";
 import { avatarService } from "@/services/avatarService";
 
-function CircularScore({ score, delta, ringColor }: { score: number; delta: number; ringColor: string }) {
+function CircularScore({ score, delta }: { score: number; delta: number }) {
   const springValue = useSpring(0, { stiffness: 40, damping: 20 });
-  
+
   useEffect(() => {
     springValue.set(score);
   }, [score, springValue]);
 
   const displayValue = useTransform(springValue, (latest) => latest.toFixed(1));
-  
-  const radius = 70;
+
+  const radius = 100;
   const circumference = 2 * Math.PI * radius;
-  
+
   const strokeDashoffset = useTransform(springValue, (latest) => {
     const progress = Math.max(0, Math.min(100, latest)) / 100;
     return circumference - (progress * circumference);
   });
 
   return (
-    <div className="relative h-44 w-44 flex items-center justify-center">
+    <div className="relative w-[240px] h-[240px] flex items-center justify-center">
       {/* Background Circle */}
-      <svg className="absolute inset-0 w-full h-full -rotate-90">
+      <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 240 240">
         <circle
-          cx="88"
-          cy="88"
+          cx="120"
+          cy="120"
           r={radius}
           stroke="currentColor"
-          strokeWidth="6"
+          strokeWidth="3"
           fill="transparent"
-          className="text-muted/30"
+          className="text-primary/15"
         />
         {/* Progress Circle */}
         <motion.circle
-          cx="88"
-          cy="88"
+          cx="120"
+          cy="120"
           r={radius}
-          stroke={ringColor}
-          strokeWidth="6"
+          stroke="#4F6EF7"
+          strokeWidth="3"
           fill="transparent"
           strokeDasharray={circumference}
           style={{ strokeDashoffset }}
           strokeLinecap="round"
         />
       </svg>
-      
+
       {/* Inner Content */}
-      <div className="flex flex-col items-center justify-center z-10 relative">
-        <p className="text-[9px] font-mono tracking-[0.2em] text-muted-foreground uppercase px-3 text-center mb-1">
-          Overall Score
-        </p>
-        <motion.p className="text-4xl font-extrabold tracking-tight text-foreground tabular-nums">
+      <div className="flex flex-col items-center justify-center z-10 relative text-center">
+        <motion.p className="text-[72px] font-bold leading-none tracking-tighter text-white">
           {displayValue}
         </motion.p>
-        <div className="mt-3 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-muted border border-border text-[10px] font-semibold text-primary">
-          <TrendingUp className="h-3 w-3" />
-          <span>
-            {delta >= 0 ? "+" : ""}
-            {delta.toFixed(1)} pts
-          </span>
-        </div>
+        <p className="text-white/60 text-sm mt-2 font-medium">Potencial de Atratividade</p>
       </div>
-      
-      {/* Glow Effect */}
-      <div 
-        className="absolute inset-0 rounded-full blur-3xl opacity-20 pointer-events-none"
-        style={{ backgroundColor: ringColor }}
-      />
     </div>
   );
 }
@@ -946,242 +931,187 @@ export default function Analysis() {
 
   // ───────── DASHBOARD ─────────
 
-  const displayName = (user && (user.user_metadata?.full_name || user.user_metadata?.name || user.email)) || "Usuário MAXIMARE";
+  const displayName = (user && (user.user_metadata?.full_name || user.user_metadata?.name || user.email)) || "Alex";
   const avatarUrl = avatarService.getAvatarPublicUrl(profile?.avatar_url);
+  const firstName = displayName.split(' ')[0];
+
+  // Calculate percentile based on GER score
+  const percentile = Math.min(99, Math.max(1, Math.round((currentGER / 99) * 100)));
+  const isTopTier = percentile >= 90;
 
   return (
     <PaywallManager trigger="app_open">
-        <div className="min-h-screen pt-6 pb-28 px-4 bg-background">
-        <div className="container max-w-lg mx-auto space-y-8">
+      <div className="min-h-screen pb-28 px-6 bg-[#0D0D14]">
+        <div className="container max-w-[430px] mx-auto relative overflow-x-hidden">
 
-            {/* Header / Top Bar */}
-            <header className="flex items-center justify-between px-6 py-4 sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-          <div className="flex items-center gap-3">
-            {avatarUrl ? (
-              <img 
-                src={avatarUrl} 
-                alt="Avatar do usuário" 
-                className="size-10 rounded-full object-cover border-2 border-white/10 shadow-lg shadow-primary/20"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                  e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                }}
-              />
-            ) : null}
-            {!avatarUrl && (
-              <div className="size-10 rounded-full bg-gradient-to-br from-primary to-blue-700 flex items-center justify-center border border-white/10 shadow-lg shadow-primary/20">
-               <User className="text-white h-5 w-5" />
+          {/* Header */}
+          <header className="flex items-center justify-between mb-10 pt-6">
+            <div className="flex items-center gap-3">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt="Avatar do usuário"
+                  className="w-[36px] h-[36px] rounded-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
+              ) : (
+                <div className="w-[36px] h-[36px] rounded-full bg-gradient-to-br from-primary to-blue-700 flex items-center justify-center">
+                  <User className="text-white h-4 w-4" />
+                </div>
+              )}
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-[22px] font-semibold tracking-tight text-white">Olá, {firstName}</h1>
+                  {isTopTier && (
+                    <span className="bg-[#4F6EF7]/15 text-[#4F6EF7] text-[10px] font-bold px-2 py-0.5 rounded tracking-wider">
+                      TOP {100 - percentile}%
+                    </span>
+                  )}
+                </div>
               </div>
-            )}
-            <div>
-              <p className="text-[10px] text-muted-foreground font-bold tracking-widest uppercase">Membro Elite</p>
-              <h2 className="text-sm font-bold text-foreground">{displayName}</h2>
             </div>
-          </div>
-          <button onClick={() => setShowSettings(true)} className="size-10 rounded-lg flex items-center justify-center bg-card border border-border text-foreground hover:bg-muted transition-colors">
-            <Settings className="h-5 w-5" />
-          </button>
-        </header>
+            <button onClick={() => setShowSettings(true)} className="text-white/40 hover:text-white/60 transition-colors">
+              <Settings className="h-6 w-6" />
+            </button>
+          </header>
 
-        {/* Main Content */}
-        <main className="flex-1 px-6 pt-4 pb-24 space-y-8">
-          {/* Hero Score Section - circular score + delta */}
-          <section className="pt-4 pb-2 flex flex-col items-center gap-6">
-            <CircularScore 
-              score={currentGER} 
-              delta={weekDelta} 
-              ringColor={ringColor} 
-            />
-          </section>
+          {/* Main Content */}
+          <main className="space-y-10">
+            {/* Hero Score Section */}
+            <section className="flex flex-col items-center justify-center py-6">
+              <CircularScore score={currentGER} delta={weekDelta} />
 
-          {/* IA Insights - Foco Atual / Trends */}
-          {primaryTrend && (
-            <section className="space-y-3">
-              <div className="flex items-center justify-between px-0.5">
-                <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-text-muted">
-                  Foco atual da IA
+              <div className="mt-6 text-center space-y-1">
+                <p className="text-[#4F6EF7] text-[13px] font-medium">
+                  Você está acima de {percentile}% dos usuários
                 </p>
+                {weekDelta !== 0 && (
+                  <p className={`text-[12px] font-semibold flex items-center justify-center gap-1 ${weekDelta >= 0 ? 'text-[#4ADE80]' : 'text-red-400'}`}>
+                    <TrendingUp className="h-3.5 w-3.5" />
+                    {weekDelta >= 0 ? '+' : ''}{weekDelta.toFixed(1)} pts esta semana
+                  </p>
+                )}
+              </div>
+            </section>
+
+            {/* Today's Analysis Card */}
+            <section>
+              <div className="bg-[#13131F] border border-white/5 rounded-3xl p-7 flex flex-col items-center text-center">
+                <div className="mb-6">
+                  <h3 className="text-xl font-semibold text-white">Sua análise de hoje</h3>
+                  <p className="text-white/40 text-[13px] mt-1">
+                    Última análise: {lastAnalysis ? formatHistoryDate(lastAnalysis.date) : 'Nenhuma análise ainda'}
+                  </p>
+                </div>
                 <button
-                  onClick={() => navigate("/trends")}
-                  className="text-[11px] font-semibold text-primary hover:text-primary/80 transition-colors"
+                  onClick={() => {
+                    if (!canAnalyze) {
+                      navigate('/profile');
+                      return;
+                    }
+                    if (!limitsDisabled && isCooldownActive) {
+                      setErrorMsg(`Aguarde ${cooldownRemaining}s para nova análise.`);
+                      return;
+                    }
+                    setShowCapture(true);
+                    setCaptureStep("intro-hero");
+                  }}
+                  disabled={(!limitsDisabled && isCooldownActive) || (!canAnalyze && !isPremium)}
+                  className="bg-[#4F6EF7] text-white px-10 py-4 rounded-[50px] font-semibold text-sm flex items-center gap-2 transition-transform active:scale-95 w-full justify-center hover:bg-[#4F6EF7]/90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Ver plano
+                  {lastAnalysis ? 'Ver análise completa' : 'Iniciar análise'}
+                  <ArrowUp className="h-[18px] w-[18px] -rotate-45" />
                 </button>
               </div>
-              <div className="rounded-2xl bg-graphite border border-slate-custom px-4 py-4 flex items-start justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
-                    <Zap className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-semibold text-primary uppercase tracking-wide">
-                      {primaryBottleneck ? primaryBottleneck.area : "Plano de Evolução"}
+            </section>
+
+            {/* Complete Analysis - Premium Card */}
+            <section>
+              <div className="bg-[#13131F] border border-[#4F6EF7]/40 rounded-3xl p-7">
+                <h4 className="text-[15px] font-semibold mb-5 text-white">Análise Completa</h4>
+                <div className="flex justify-between items-start mb-6">
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium flex items-center gap-2 text-white/90">
+                      Simetria <span className="text-white/20 text-xs">— bloqueado</span>
                     </p>
-                    <h3 className="text-sm font-bold text-white mt-1">{primaryTrend.title}</h3>
-                    <p className="text-xs text-text-muted mt-1 line-clamp-2">
-                      {primaryTrend.subtitle}
+                    <p className="text-sm font-medium flex items-center gap-2 text-white/90">
+                      Estrutura <span className="text-white/20 text-xs">— bloqueado</span>
                     </p>
-                    {weekDelta !== 0 && (
-                      <p className="mt-2 text-[10px] text-text-muted">
-                        Progresso recente:{" "}
-                        <span className={weekDelta >= 0 ? "text-green-400" : "text-red-400"}>
-                          {weekDelta >= 0 ? "+" : ""}
-                          {weekDelta.toFixed(1)} pts na Aura
-                        </span>
-                      </p>
-                    )}
+                    <p className="text-sm font-medium flex items-center gap-2 text-white/90">
+                      Harmonia <span className="text-white/20 text-xs">— bloqueado</span>
+                    </p>
                   </div>
                 </div>
-                {primaryBottleneck && (
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-white/5 text-text-muted">
-                      {primaryBottleneck.priority === "critica"
-                        ? "Crítico"
-                        : primaryBottleneck.priority === "alta"
-                        ? "Alta"
-                        : "Média"}
-                    </span>
-                    <span className="text-[11px] text-text-muted">
-                      {Math.round(primaryBottleneck.score)}/99
-                    </span>
+                <button
+                  onClick={() => navigate('/premium')}
+                  className="w-full bg-[#4F6EF7]/10 border border-[#4F6EF7]/20 text-[#4F6EF7] py-4 rounded-2xl font-bold text-sm tracking-wide transition-colors hover:bg-[#4F6EF7]/20"
+                >
+                  Desbloquear com Premium
+                </button>
+                <p className="text-center text-white/40 text-[10px] mt-3">
+                  ✓ Cancele quando quiser · R$ 19,90/mês
+                </p>
+              </div>
+            </section>
+
+            {/* Evolution Section */}
+            <section className="mb-14">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-lg font-semibold text-white">Sua evolução</h3>
+                <button onClick={() => navigate('/progress')} className="text-white/40 text-xs font-medium uppercase tracking-widest hover:text-white/60 transition-colors">
+                  Ver tudo
+                </button>
+              </div>
+              <div className="space-y-3">
+                {history.slice(0, 3).map((analysis, idx) => {
+                  const extended = analysis as unknown as ExtendedAnalysisResult;
+                  const ger = extended.ger ?? Math.round(analysis.overallScore * 10);
+                  const isBest = idx === 0 && history.length > 1;
+
+                  return (
+                    <div
+                      key={analysis.id || idx}
+                      className="bg-[#13131F] border border-white/5 rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-[#13131F]/80 transition-colors"
+                      onClick={() => navigate(`/results/${analysis.id}`)}
+                    >
+                      <div className="w-12 h-12 rounded-[10px] bg-white/5 overflow-hidden flex-shrink-0">
+                        {analysis.photoUrl ? (
+                          <img className="w-full h-full object-cover" src={analysis.photoUrl} alt="Analysis" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Scan className="h-5 w-5 text-white/20" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-white/90">Análise Facial</h4>
+                        <p className="text-[10px] text-white/40 font-medium mt-0.5 uppercase tracking-wider">
+                          {formatHistoryDate(analysis.date)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-[#4F6EF7]">{ger.toFixed(1)}</p>
+                        {isBest && (
+                          <p className="text-[#4ADE80] text-[9px] font-bold mt-0.5 whitespace-nowrap">
+                            ↑ Seu melhor resultado
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {history.length === 0 && (
+                  <div className="text-center py-8 text-white/40 text-sm bg-[#13131F] border border-white/5 rounded-2xl">
+                    Nenhuma análise recente.
                   </div>
                 )}
               </div>
             </section>
-          )}
-
-          {/* CTA Card */}
-          <section className="space-y-4">
-            <button
-              onClick={() => {
-                if (!canAnalyze) {
-                    navigate('/profile'); // Redirect to paywall/upgrade
-                    return;
-                }
-                
-                if (!limitsDisabled && isCooldownActive) {
-                  setErrorMsg(`Aguarde ${cooldownRemaining}s para nova análise.`);
-                  return;
-                }
-                setShowCapture(true);
-                setCaptureStep("intro-hero");
-              }}
-              disabled={(!limitsDisabled && isCooldownActive) || (!canAnalyze && !isPremium)}
-              className={`w-full rounded-2xl px-5 py-4 flex items-center justify-between shadow-[0_18px_40px_rgba(0,0,0,0.75)] border ${
-                (!limitsDisabled && isCooldownActive) || !canAnalyze
-                  ? "bg-zinc-900 border-zinc-800 cursor-not-allowed"
-                  : "bg-white border-white/10 hover:bg-zinc-50"
-              } transition-colors`}
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className={`h-10 w-10 rounded-2xl flex items-center justify-center ${
-                    (!limitsDisabled && isCooldownActive) || !canAnalyze ? "bg-zinc-800" : "bg-black"
-                  }`}
-                >
-                  { !canAnalyze && !isPremium ? <Clock className="h-5 w-5 text-amber-500" /> : <Scan className={`h-5 w-5 ${(!limitsDisabled && isCooldownActive) ? "text-zinc-500" : "text-white"}`} /> }
-                </div>
-                <div className="text-left">
-                  <p className={`text-xs font-semibold ${
-                    !canAnalyze && !isPremium ? "text-amber-500" : ((!limitsDisabled && isCooldownActive) ? "text-zinc-500" : "text-black")
-                  }`}>
-                    {!canAnalyze && !isPremium ? "Limite Diário Atingido" : (!limitsDisabled && isCooldownActive ? "Cooldown ativo" : "Nova Análise")}
-                  </p>
-                  <p className={`text-[11px] ${
-                    !canAnalyze && !isPremium ? "text-zinc-400" : ((!limitsDisabled && isCooldownActive) ? "text-zinc-600" : "text-black/60")
-                  }`}>
-                    {!canAnalyze && !isPremium
-                      ? "Volte amanhã ou vire Premium"
-                      : (!limitsDisabled && isCooldownActive
-                        ? `Aguarde ${cooldownRemaining}s para nova captura`
-                        : "Capturar métricas faciais de alta precisão")}
-                  </p>
-                </div>
-              </div>
-              
-              {/* Timer or Arrow */}
-              { !canAnalyze && !isPremium ? (
-                  <div className="text-amber-600 font-mono text-xs font-bold bg-amber-100 px-2 py-1 rounded">
-                      <LimitTimer nextAvailableAt={nextAvailableAt} />
-                  </div>
-              ) : (
-                  <div
-                    className={`h-7 w-7 rounded-full flex items-center justify-center border ${
-                      (!limitsDisabled && isCooldownActive)
-                        ? "border-zinc-700 text-zinc-500"
-                        : "border-black/10 text-black"
-                    }`}
-                  >
-                    <ArrowUp className="h-3 w-3 -rotate-45" />
-                  </div>
-              )}
-            </button>
-          </section>
-
-          {/* Recent Analyses List */}
-          <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold tracking-tight uppercase text-text-muted">Histórico Recente</h3>
-              <button onClick={() => navigate('/progress')} className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors">Ver tudo</button>
-            </div>
-            <div className="space-y-3">
-              {history.slice(0, 3).map((analysis, idx) => {
-                const extended = analysis as unknown as ExtendedAnalysisResult;
-                const ger = extended.ger ?? Math.round(analysis.overallScore * 10);
-                const tierInfo = getTier(ger);
-                const tierLabel = tierInfo.label || tierInfo.name;
-
-                return (
-                  <div
-                    key={analysis.id || idx}
-                    className="glass-card rounded-xl p-4 flex items-center justify-between border-l-2 border-l-primary hover:bg-white/5 transition-colors cursor-pointer"
-                    onClick={() => navigate(`/results/${analysis.id}`)}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="size-12 rounded-lg bg-slate-custom flex items-center justify-center relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent z-10"></div>
-                        {analysis.photoUrl ? (
-                          <img className="w-full h-full object-cover opacity-80" src={analysis.photoUrl} alt="Analysis" />
-                        ) : (
-                          <Scan className="h-6 w-6 text-text-muted relative z-20" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-xs text-text-muted font-medium">{formatHistoryDate(analysis.date)}</p>
-                        <h4 className="text-sm font-bold text-white">Análise Facial</h4>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <p className="text-xl font-bold text-white">
-                        {ger.toFixed(2)}
-                      </p>
-                      <span className="text-[10px] text-text-muted font-bold uppercase">
-                        {tierLabel}
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteHistory(analysis.id);
-                        }}
-                        disabled={deletingId === analysis.id}
-                        className={`mt-1 inline-flex items-center gap-1 text-[10px] ${deletingId === analysis.id ? 'text-red-400/50' : 'text-red-400 hover:text-red-300'}`}
-                      >
-                        {deletingId === analysis.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-                        {deletingId === analysis.id ? 'Excluindo...' : 'Excluir'}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-              
-              {history.length === 0 && (
-                <div className="text-center py-8 text-text-muted text-sm">
-                    Nenhuma análise recente.
-                </div>
-              )}
-            </div>
-          </section>
-        </main>
+          </main>
         {/* Quota Modal (Dashboard) */}
         {!limitsDisabled && limitInfo && (
           <Dialog open={true} onOpenChange={(v) => !v && setLimitInfo(null)}>

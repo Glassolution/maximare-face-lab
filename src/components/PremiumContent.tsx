@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, X, ShieldCheck, Zap, ScanFace, Microscope, Palette, Scissors, Ban } from "lucide-react";
+import { Check, X, ShieldCheck, Zap, ScanFace, Microscope, Palette, Scissors, Ban, Construction } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PLAN_CONFIG, PlanType } from "@/config/plans";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import faceScanHero from "@/assets/face-scan-hero.jpg";
 import { logPaywallEvent, PaywallContext } from "@/lib/paywall";
 import { trackEvent } from "@/lib/posthog";
-import { CheckoutPremium } from "./CheckoutPremium";
+// REMOVIDO: CheckoutPremium deletado
 import { PlanConfirmation } from "./PlanConfirmation";
 
 import { PaymentSuccess } from "./PaymentSuccess";
@@ -73,16 +73,18 @@ export default function PremiumContent({ onClose, context, isModal = false }: Pr
   }
 
   if (step === 'payment') {
-    const price = PLAN_CONFIG.PLANS[selectedPlan].price;
+    // REMOVIDO: CheckoutPremium deletado - sistema de pagamento em重构
     return (
-      <div className="fixed inset-0 z-50 bg-background-light dark:bg-background-dark flex flex-col items-center justify-center overflow-hidden">
-        <div className="w-full h-full max-w-md bg-background-light dark:bg-background-dark relative shadow-2xl">
-            <CheckoutPremium 
-                plan={selectedPlan} 
-                price={price} 
-                onSuccess={handleSuccess}
-                onCancel={() => setStep('confirmation')}
-            />
+      <div className="fixed inset-0 z-50 bg-background-light dark:bg-background-dark flex flex-col items-center justify-center overflow-hidden p-6">
+        <div className="w-full max-w-md bg-background-light dark:bg-background-dark relative shadow-2xl rounded-xl p-8 text-center">
+          <Construction className="w-16 h-16 mx-auto mb-4 text-yellow-500" />
+          <h2 className="text-2xl font-bold mb-2">Sistema em Manutenção</h2>
+          <p className="text-muted-foreground mb-6">
+            O sistema de pagamento está sendo atualizado. Por favor, tente novamente mais tarde.
+          </p>
+          <Button onClick={() => setStep('confirmation')} variant="outline" className="w-full">
+            Voltar
+          </Button>
         </div>
       </div>
     );

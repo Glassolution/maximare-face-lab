@@ -2,9 +2,9 @@ import { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Check, ArrowRight, ArrowLeft, Loader2, Trophy, BarChart2, Dumbbell } from "lucide-react";
+import { Check, ArrowRight, ArrowLeft, Loader2, Trophy, BarChart2, Dumbbell, Construction } from "lucide-react";
 import { toast } from "sonner";
-import { CheckoutPremium } from "@/components/CheckoutPremium";
+// REMOVIDO: CheckoutPremium deletado
 import { PLAN_CONFIG } from "@/config/plans";
 import { supabase } from "@/integrations/supabase/client";
 import { PaymentSuccess } from "@/components/PaymentSuccess";
@@ -77,15 +77,18 @@ export default function Subscription() {
   }
 
   if (showCheckout) {
+    // REMOVIDO: CheckoutPremium deletado - sistema de pagamento em重构
     return (
-      <div className="fixed inset-0 z-50 bg-[#0a0a0a] flex flex-col items-center justify-center overflow-hidden">
-        <div className="w-full h-full max-w-md bg-[#0a0a0a] relative shadow-2xl">
-            <CheckoutPremium 
-                plan={selectedPlan} 
-                price={price} 
-                onSuccess={handlePaymentSuccess}
-                onCancel={() => setShowCheckout(false)}
-            />
+      <div className="fixed inset-0 z-50 bg-[#0a0a0a] flex flex-col items-center justify-center overflow-hidden p-6">
+        <div className="w-full max-w-md bg-[#141414] relative shadow-2xl rounded-xl p-8 text-center">
+          <Construction className="w-16 h-16 mx-auto mb-4 text-yellow-500" />
+          <h2 className="text-2xl font-bold mb-2 text-white">Sistema em Manutenção</h2>
+          <p className="text-gray-400 mb-6">
+            O sistema de pagamento está sendo atualizado. Por favor, tente novamente mais tarde.
+          </p>
+          <Button onClick={() => setShowCheckout(false)} variant="outline" className="w-full">
+            Voltar
+          </Button>
         </div>
       </div>
     );
