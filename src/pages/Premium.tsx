@@ -1,11 +1,16 @@
-
-import PremiumContent from "@/components/PremiumContent";
-import { useLocation } from "react-router-dom";
-import { PaywallContext } from "@/lib/paywall";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 
 export default function Premium() {
-  const location = useLocation();
-  const context = location.state?.context as PaywallContext | undefined;
+  const navigate = useNavigate();
 
-  return <PremiumContent context={context} />;
+  return (
+    <div className="min-h-screen flex items-center justify-center px-6">
+      <div className="max-w-md text-center space-y-4">
+        <h1 className="text-2xl font-bold">Pagamentos desativados</h1>
+        <p className="text-muted-foreground">O sistema de assinatura e reembolso foi removido deste app.</p>
+        <Button onClick={() => navigate('/analysis')}>Voltar ao app</Button>
+      </div>
+    </div>
+  );
 }
