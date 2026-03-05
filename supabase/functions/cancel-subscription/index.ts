@@ -114,7 +114,7 @@ serve(async (req) => {
     }
 
     // Update profile: deactivate premium
-    await supabaseAdmin
+    const { error: updateError } = await supabaseAdmin
       .from("profiles")
       .update({
         subscription_status: "cancelled",
@@ -123,6 +123,15 @@ serve(async (req) => {
         cancel_reason: reason_primary,
       })
       .eq("user_id", userId);
+
+    if (updateError) {
+      console.error("[cancel-subscription] Failed to update profile:", updateError);
+      return new Response(JSON.stringify({ error: "Falha ao atualizar perfil: " + updateError.message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    console.log("[cancel-subscription] Profile updated successfully for user:", userId);
 
     // Update purchase record
     if (profile.provider_payment_id) {
