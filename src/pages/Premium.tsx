@@ -50,7 +50,7 @@ export default function Premium() {
     <div className="min-h-screen bg-background px-4 py-8">
       <div className="max-w-lg mx-auto space-y-6">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/analysis")}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className="text-xl font-bold text-foreground">Seja Premium</h1>
