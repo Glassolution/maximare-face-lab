@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { PLAN_CONFIG, PlanType } from "@/config/plans";
-import { supabase } from "@/integrations/supabase/client";
+
+import { getValidAccessToken } from "@/lib/session";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -26,12 +27,24 @@ export default function Premium() {
     setLoading(planId);
 
     try {
-      const { data, error } = await supabase.functions.invoke("create-subscription", {
-        body: { planId },
+      const token = await getValidAccessToken();
+      if (!token) {
+        throw new Error("Sessão inválida. Faça login novamente.");
+      }
+
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-subscription`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ planId }),
       });
 
-      if (error) {
-        throw new Error(error.message || "Erro ao criar assinatura");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || "Erro ao criar assinatura");
       }
 
       if (data?.init_point) {
