@@ -53,9 +53,20 @@ serve(async (req) => {
   }
 
   try {
+    // CORRIGIDO: Verificar autenticacao do usuario
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error("[check-payment] Missing Authorization header");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized - Missing Authorization header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Get environment variables
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || SUPABASE_SERVICE_ROLE_KEY;
     const MP_ACCESS_TOKEN = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
 
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !MP_ACCESS_TOKEN) {
@@ -65,6 +76,28 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // CORRIGIDO: Criar cliente Supabase com o token do usuario para verificar autenticacao
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY || SUPABASE_SERVICE_ROLE_KEY, {
+      global: {
+        headers: {
+          Authorization: authHeader,
+        },
+      },
+    });
+
+    // Verificar se o usuario esta autenticado
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    
+    if (authError || !user) {
+      console.error("[check-payment] Authentication failed:", authError);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized - Invalid token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("[check-payment] Authenticated user:", user.id);
 
     // Parse request
     const { payment_id } = await req.json();
@@ -78,10 +111,11 @@ serve(async (req) => {
 
     console.log("[check-payment] Checking payment:", payment_id);
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    // CORRIGIDO: Usar service role para acessar dados, mas verificar se o pagamento pertence ao usuario
+    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Get payment record
-    const { data: paymentRecord, error: dbError } = await supabase
+    const { data: paymentRecord, error: dbError } = await supabaseAdmin
       .from("payments")
       .select("*")
       .eq("id", payment_id)
@@ -92,6 +126,15 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: "Payment not found" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // CORRIGIDO: Verificar se o pagamento pertence ao usuario autenticado
+    if (paymentRecord.user_id !== user.id) {
+      console.error("[check-payment] Payment does not belong to user:", user.id);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized - Payment does not belong to user" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -137,7 +180,7 @@ serve(async (req) => {
     console.log("[check-payment] MP status:", mpData.status);
 
     // Update local record
-    await supabase
+    await supabaseAdmin
       .from("payments")
       .update({
         status: mpData.status,
@@ -149,7 +192,7 @@ serve(async (req) => {
     // If approved, activate premium
     if (mpData.status === "approved") {
       await activatePremium(
-        supabase,
+        supabaseAdmin,
         paymentRecord.user_id,
         paymentRecord.plan_id,
         paymentRecord.payment_id
