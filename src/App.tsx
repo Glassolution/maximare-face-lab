@@ -22,6 +22,7 @@ import LookAlike from "@/pages/LookAlike";
 import NotFound from "@/pages/NotFound";
 import Login from "@/pages/Login";
 import Premium from "@/pages/Premium";
+import Checkout from "@/pages/Checkout";
 import Admin from "@/pages/Admin";
 import Subscription from "@/pages/Subscription";
 import PaymentCallback from "@/pages/PaymentCallback";
@@ -35,7 +36,7 @@ const queryClient = new QueryClient();
 
 function Layout() {
   const location = useLocation();
-  const hideNav = ["/", "/onboarding", "/login", "/premium", "/landing", "/update-password", "/subscription", "/payment-callback"].includes(location.pathname) || location.pathname.startsWith("/admin");
+  const hideNav = ["/", "/onboarding", "/login", "/premium", "/checkout", "/landing", "/update-password", "/subscription", "/payment-callback"].includes(location.pathname) || location.pathname.startsWith("/admin");
 
   const { user, loading } = useAuth();
 
@@ -92,6 +93,7 @@ function Layout() {
         <Route path="/look-alike" element={<LookAlike />} />
         <Route path="/login" element={<Login />} />
         <Route path="/premium" element={<Premium />} />
+        <Route path="/checkout" element={<Checkout />} />
         <Route path="/subscription" element={<Subscription />} />
         <Route path="/payment-callback" element={<PaymentCallback />} />
         <Route path="/update-password" element={<UpdatePassword />} />
