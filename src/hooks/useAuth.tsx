@@ -39,6 +39,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   refreshUserData: () => Promise<void>;
   refreshSession: (forceRefresh?: boolean) => Promise<void>;
+  refreshProfile: () => Promise<void>;  // New: refresh profile without JWT refresh
   updateUserData: (data: Partial<Pick<UserData, "last_analysis_score" | "analysis_history" | "preferences">>) => Promise<void>;
 }
 
@@ -151,16 +152,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // New: Refresh profile only (without JWT refresh) - for realtime updates
+  const refreshProfile = async () => {
+    if (!user?.id) {
+      logger.log("[Auth]", "refreshProfile: no user id");
+      return;
+    }
+    logger.log("[Auth]", "Refreshing profile only...");
+    await fetchProfile(user.id);
+    logger.log("[Auth]", "Profile refreshed.");
+  };
+
   useEffect(() => {
+    let realtimeChannel: any = null;
+
+    const setupRealtime = (userId: string) => {
+      // Subscribe to profile changes in real-time
+      realtimeChannel = supabase
+        .channel(`profile-realtime-${userId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'profiles',
+            filter: `id=eq.${userId}`,
+          },
+          (payload) => {
+            console.log('[Auth] Realtime profile update received:', payload.new);
+            setProfile(payload.new as Profile);
+          }
+        )
+        .subscribe();
+
+      console.log('[Auth] Realtime subscription enabled for profile:', userId);
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, sess) => {
         if (event === 'SIGNED_OUT') {
             // Clear sensitive local data on sign out
             clearLocalHistory();
+            if (realtimeChannel) {
+              supabase.removeChannel(realtimeChannel);
+              realtimeChannel = null;
+            }
         }
         setSession(sess);
         setUser(sess?.user ?? null);
         if (sess?.user) {
+          // Setup realtime for the new user
+          setupRealtime(sess.user.id);
           setTimeout(() => loadUserData(sess.user.id), 0);
         } else {
           setProfile(null);
@@ -174,12 +216,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(sess);
       setUser(sess?.user ?? null);
       if (sess?.user) {
+        setupRealtime(sess.user.id);
         loadUserData(sess.user.id);
       }
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      if (realtimeChannel) {
+        supabase.removeChannel(realtimeChannel);
+      }
+    };
   }, []);
 
   const signUp = async (username: string, password: string): Promise<{ error: string | null }> => {
@@ -272,7 +320,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, userData, loading, signUp, signIn, signOut, refreshUserData, refreshSession, updateUserData }}>
+    <AuthContext.Provider value={{ user, session, profile, userData, loading, signUp, signIn, signOut, refreshUserData, refreshSession, refreshProfile, updateUserData }}>
       {children}
     </AuthContext.Provider>
   );
