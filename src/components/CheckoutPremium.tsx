@@ -341,7 +341,8 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
               customization={{
                 paymentMethods: {
                   bankTransfer: "all",
-                },
+                  mercadoPago: "all",
+                } as any,
               }}
               onSubmit={handlePixPayment}
               onError={(error) => {
