@@ -1,0 +1,1 @@
+UPDATE plans SET price_cents = 2490 WHERE id = 'monthly';
