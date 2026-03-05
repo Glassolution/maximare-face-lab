@@ -477,7 +477,7 @@ export default function Profile() {
         </motion.div>
 
         {/* Spacer for bottom nav */}
-        <div className="h-4" />
+        <div className="h-28" />
 
         {/* ─── PREFERENCES DIALOG ─── */}
         <Dialog open={showPreferences} onOpenChange={setShowPreferences}>
