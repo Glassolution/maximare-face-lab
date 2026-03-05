@@ -1,8 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { PLAN_CONFIG, PlanType } from "@/config/plans";
-import { Button } from "@/components/ui/button";
-import { Crown, Check, ArrowLeft, Sparkles, Lock } from "lucide-react";
+import { ArrowLeft, Lock, ChevronRight, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { usePremiumStatus } from "@/hooks/usePremiumStatus";
 
@@ -10,6 +9,7 @@ const COLORS = {
   bg: "#0D0D14",
   card: "#13131F",
   blue: "#4F6EF7",
+  iconBg: "#1a1a2e",
   textPrimary: "#FFFFFF",
   textSecondary: "rgba(255,255,255,0.5)",
   textTertiary: "rgba(255,255,255,0.3)",
@@ -18,7 +18,7 @@ const COLORS = {
 
 export default function Premium() {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const { isPremium, expiresAt, planType } = usePremiumStatus();
 
   const handleSubscribe = (planId: PlanType) => {
@@ -36,6 +36,9 @@ export default function Premium() {
     return new Intl.DateTimeFormat("pt-BR").format(d);
   };
 
+  const monthlyPlan = PLAN_CONFIG.PLANS.monthly;
+  const yearlyPlan = PLAN_CONFIG.PLANS.yearly;
+
   if (isPremium) {
     return (
       <div className="min-h-screen px-6 py-8" style={{ backgroundColor: COLORS.bg }}>
@@ -44,11 +47,11 @@ export default function Premium() {
             className="w-20 h-20 mx-auto rounded-full flex items-center justify-center"
             style={{ backgroundColor: `${COLORS.blue}15` }}
           >
-            <Crown className="w-10 h-10" style={{ color: COLORS.blue }} />
+            <span className="text-4xl">♛</span>
           </div>
-          <h1 className="text-2xl font-bold" style={{ color: COLORS.textPrimary }}>Você é Premium!</h1>
+          <h1 className="text-2xl font-bold text-white">Você é Premium!</h1>
           <p style={{ color: COLORS.textSecondary }}>
-            Plano: <span className="font-medium" style={{ color: COLORS.textPrimary }}>
+            Plano: <span className="font-medium text-white">
               {planType === "yearly" ? "Anual" : "Mensal"}
             </span>
           </p>
@@ -57,14 +60,14 @@ export default function Premium() {
               Válido até: {formatDate(expiresAt)}
             </p>
           )}
-          <Button
-            className="w-full"
+          <button
+            className="w-full py-3 font-semibold text-[15px] flex items-center justify-center gap-2"
             style={{ backgroundColor: COLORS.card, color: COLORS.textPrimary, borderRadius: 50, border: `1px solid ${COLORS.border}` }}
             onClick={() => navigate("/analysis")}
           >
-            <ArrowLeft className="w-4 h-4 mr-2" />
+            <ArrowLeft className="w-4 h-4" />
             Voltar ao app
-          </Button>
+          </button>
           <button
             onClick={() => navigate("/cancel-subscription")}
             className="text-[13px] font-medium transition-colors"
@@ -78,119 +81,151 @@ export default function Premium() {
   }
 
   return (
-    <div className="min-h-screen px-6 py-8" style={{ backgroundColor: COLORS.bg }}>
-      <div className="max-w-lg mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <button
-            className="h-10 w-10 rounded-xl flex items-center justify-center"
-            style={{ backgroundColor: COLORS.card }}
-            onClick={() => navigate("/analysis")}
-          >
-            <ArrowLeft className="w-5 h-5" style={{ color: COLORS.textPrimary }} />
-          </button>
-          <h1 className="text-xl font-bold" style={{ color: COLORS.textPrimary }}>Seja Premium</h1>
-        </div>
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: COLORS.bg }}>
+      {/* Header */}
+      <div className="flex items-center gap-3 px-5 pt-6 pb-2">
+        <button
+          className="h-10 w-10 rounded-xl flex items-center justify-center"
+          onClick={() => navigate(-1)}
+        >
+          <ArrowLeft className="w-5 h-5 text-white" />
+        </button>
+        <h1 className="text-lg font-bold text-white">Seja Premium</h1>
+      </div>
 
+      <div className="flex-1 px-5 pb-8">
         {/* Hero */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center space-y-3 py-4"
+          className="text-center space-y-3 pt-6 pb-8"
         >
           <div
-            className="w-16 h-16 mx-auto rounded-full flex items-center justify-center"
-            style={{ background: `linear-gradient(135deg, ${COLORS.blue}, #3B5DE7)` }}
+            className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center"
+            style={{ backgroundColor: COLORS.iconBg }}
           >
-            <Sparkles className="w-8 h-8" style={{ color: COLORS.textPrimary }} />
+            <span className="text-3xl" style={{ color: COLORS.blue }}>✦</span>
           </div>
-          <h2 className="text-2xl font-bold" style={{ color: COLORS.textPrimary }}>
+          <h2 className="text-[22px] font-extrabold text-white leading-tight">
             Desbloqueie todo o potencial
           </h2>
-          <p className="text-sm" style={{ color: COLORS.textSecondary }}>
+          <p className="text-sm leading-relaxed mx-auto max-w-[280px]" style={{ color: COLORS.textSecondary }}>
             Análises ilimitadas, resultados detalhados e suporte prioritário.
           </p>
         </motion.div>
 
-        {/* Plan Cards */}
-        <div className="space-y-4">
-          {(Object.entries(PLAN_CONFIG.PLANS) as [PlanType, typeof PLAN_CONFIG.PLANS[PlanType]][]).map(
-            ([key, plan], index) => {
-              const isPopular = plan.badge === "Mais Popular";
-              return (
-                <motion.div
-                  key={key}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                >
-                  <div
-                    className="relative p-5"
-                    style={{
-                      backgroundColor: COLORS.card,
-                      borderRadius: 20,
-                      border: isPopular ? `2px solid ${COLORS.blue}` : `1px solid ${COLORS.border}`,
-                    }}
-                  >
-                    {plan.badge && (
-                      <span
-                        className="absolute -top-3 left-4 text-xs font-semibold px-3 py-1"
-                        style={{
-                          backgroundColor: COLORS.blue,
-                          color: COLORS.textPrimary,
-                          borderRadius: 50,
-                        }}
-                      >
-                        {plan.badge}
-                      </span>
-                    )}
+        {/* Monthly Plan — Featured */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="mb-4"
+        >
+          <div
+            className="relative p-5 pb-4"
+            style={{
+              backgroundColor: COLORS.card,
+              borderRadius: 24,
+              border: `2px solid ${COLORS.blue}`,
+            }}
+          >
+            {/* Crown + Badge row */}
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-xl">♛</span>
+              <span
+                className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full"
+                style={{ backgroundColor: `${COLORS.blue}20`, color: COLORS.blue }}
+              >
+                • Mais Popular
+              </span>
+            </div>
 
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="text-lg font-bold" style={{ color: COLORS.textPrimary }}>{plan.title}</h3>
-                        <p className="text-sm" style={{ color: COLORS.textSecondary }}>{plan.description}</p>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-2xl font-bold" style={{ color: COLORS.textPrimary }}>
-                          R$ {plan.price.toFixed(2).replace(".", ",")}
-                        </span>
-                      </div>
-                    </div>
+            {/* Title */}
+            <h3 className="text-xl font-bold text-white mb-3">Mensal</h3>
 
-                    <ul className="space-y-2 mb-4">
-                      {plan.features.map((f) => (
-                        <li key={f} className="flex items-center gap-2 text-sm" style={{ color: COLORS.textSecondary }}>
-                          <Check className="w-4 h-4 flex-shrink-0" style={{ color: COLORS.blue }} />
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
+            {/* Features */}
+            <ul className="space-y-2.5 mb-5">
+              {monthlyPlan.features.map((f) => (
+                <li key={f} className="flex items-center gap-2.5 text-[14px]" style={{ color: COLORS.textSecondary }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
+                    <circle cx="12" cy="12" r="12" fill={COLORS.blue} fillOpacity="0.15" />
+                    <path d="M8 12.5L10.5 15L16 9.5" stroke={COLORS.blue} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  {f}
+                </li>
+              ))}
+            </ul>
 
-                    <button
-                      className="w-full py-3 font-semibold text-[15px] transition-all"
-                      style={{
-                        borderRadius: 50,
-                        backgroundColor: isPopular ? COLORS.blue : "transparent",
-                        color: isPopular ? COLORS.textPrimary : COLORS.blue,
-                        border: isPopular ? "none" : `1px solid ${COLORS.blue}`,
-                      }}
-                      onClick={() => handleSubscribe(key)}
-                    >
-                      Assinar agora
-                    </button>
-                  </div>
-                </motion.div>
-              );
-            }
-          )}
-        </div>
+            {/* Price + CTA row */}
+            <div className="flex items-center justify-between pt-3" style={{ borderTop: `1px solid ${COLORS.border}` }}>
+              <div>
+                <span className="text-[11px] font-medium" style={{ color: COLORS.textTertiary }}>Investimento</span>
+                <p className="text-white font-bold text-[15px]">R$ {monthlyPlan.price.toFixed(2).replace(".", ",")}/mês</p>
+              </div>
+              <button
+                className="flex items-center gap-1.5 px-5 py-2.5 font-semibold text-[14px] transition-all active:scale-95"
+                style={{
+                  borderRadius: 50,
+                  backgroundColor: COLORS.blue,
+                  color: "#FFFFFF",
+                }}
+                onClick={() => handleSubscribe("monthly")}
+              >
+                Assinar
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Other Plans Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <p className="text-[13px] font-semibold mb-3" style={{ color: COLORS.textTertiary }}>
+            Outros planos
+          </p>
+
+          {/* Yearly Plan — Compact */}
+          <button
+            className="w-full flex items-center gap-3.5 p-4 transition-all active:scale-[0.98]"
+            style={{
+              backgroundColor: COLORS.card,
+              borderRadius: 20,
+              border: `1px solid ${COLORS.border}`,
+            }}
+            onClick={() => handleSubscribe("yearly")}
+          >
+            <div
+              className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: COLORS.iconBg }}
+            >
+              <span className="text-lg">♛</span>
+            </div>
+            <div className="flex-1 text-left">
+              <h4 className="text-[15px] font-bold text-white">Anual</h4>
+              <p className="text-[12px] mt-0.5" style={{ color: COLORS.textSecondary }}>
+                R$ {yearlyPlan.price.toFixed(2).replace(".", ",")}/ano · economize 67%
+              </p>
+            </div>
+            <ChevronRight className="w-5 h-5 flex-shrink-0" style={{ color: COLORS.textTertiary }} />
+          </button>
+        </motion.div>
 
         {/* Trust footer */}
-        <div className="flex items-center justify-center gap-2 text-center pt-2">
+        <div className="flex items-center justify-center gap-2 text-center pt-8 pb-2">
           <Lock className="w-3.5 h-3.5" style={{ color: COLORS.textTertiary }} />
           <span className="text-[11px]" style={{ color: COLORS.textTertiary }}>
-            Pagamento seguro via Mercado Pago • Cancele quando quiser
+            Pagamento seguro • Cancele quando quiser
           </span>
+        </div>
+
+        {/* Legal links */}
+        <div className="flex items-center justify-center gap-4 pt-1 pb-4">
+          <a href="#" className="text-[11px] underline" style={{ color: COLORS.textTertiary }}>Termos de uso</a>
+          <a href="#" className="text-[11px] underline" style={{ color: COLORS.textTertiary }}>Privacidade</a>
         </div>
       </div>
     </div>
