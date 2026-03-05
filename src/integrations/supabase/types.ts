@@ -426,7 +426,51 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      ban_user: {
+        Args: { reason?: string; target_user_id: string }
+        Returns: Json
+      }
+      get_admin_purchases: {
+        Args: never
+        Returns: {
+          amount_cents: number
+          created_at: string
+          email: string
+          id: string
+          payment_method: string
+          plan: string
+          provider: string
+          status: string
+          user_id: string
+          username: string
+        }[]
+      }
+      get_admin_users: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          banned: boolean
+          banned_at: string
+          banned_reason: string
+          created_at: string
+          display_name: string
+          email: string
+          id: string
+          is_premium: boolean
+          is_ugc: boolean
+          plan_type: string
+          subscription_expires_at: string
+          subscription_status: string
+          username: string
+        }[]
+      }
+      grant_premium: {
+        Args: { plan?: string; target_user_id: string }
+        Returns: Json
+      }
+      grant_ugc: { Args: { target_user_id: string }; Returns: Json }
+      revoke_ugc: { Args: { target_user_id: string }; Returns: Json }
+      unban_user: { Args: { target_user_id: string }; Returns: Json }
     }
     Enums: {
       [_ in never]: never
