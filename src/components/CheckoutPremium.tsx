@@ -183,8 +183,17 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
   // Intelligent Polling with Backoff
   const checkStatus = async () => {
       // 1. Prefer RPC (compat mode), fallback to Edge Function
+      const payId = currentPaymentId || pixData?.payment_id;
+      
+      // Validate payment_id before proceeding
+      if (!payId || payId === 'null' || payId === 'undefined') {
+          logger.error("[Checkout]", "Invalid payment_id:", payId);
+          logger.log("[Checkout]", "currentPaymentId:", currentPaymentId);
+          logger.log("[Checkout]", "pixData:", pixData);
+          return false;
+      }
+      
       if (currentPaymentId || pixData?.payment_id) {
-           const payId = currentPaymentId || pixData?.payment_id;
            logger.log("[Checkout]", "Checking payment status via RPC first:", payId);
            const USE_RPC_ONLY = ((import.meta as any).env?.VITE_CHECKOUT_RPC_ONLY || '').toString() === 'true';
            
@@ -481,10 +490,15 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
 
         if (error) throw error;
         
+        logger.log("[Checkout]", "create-payment response:", data);
+        
         // Track Payment ID for polling
         if (data?.payment_id) {
+            logger.log("[Checkout]", "Setting currentPaymentId:", data.payment_id);
             setCurrentPaymentId(data.payment_id.toString());
             setPollingStartTime(Date.now());
+        } else {
+            logger.error("[Checkout]", "No payment_id in create-payment response!");
         }
 
         // PostHog: track payment outcome
