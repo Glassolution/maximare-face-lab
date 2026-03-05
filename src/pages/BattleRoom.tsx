@@ -219,10 +219,10 @@ export default function BattleRoom() {
       elapsed_ms: startMs ? (nowServerApprox - startMs) : null,
       process_called: processCalledRef.current
     });
-    supabase.rpc('mock_process_battle_result', { p_battle_id: battle.id }).then(({ data, error }) => {
+    supabase.rpc('mock_process_battle_result', { p_battle_id: battle.id }).then(({ data, error }: any) => {
       console.log('[BattleRoom][process][result]', { data, error });
       refresh();
-    }).catch((err) => {
+    }).then(undefined, (err: any) => {
       console.error('[BattleRoom][process][error]', err);
       processCalledRef.current = false;
     });

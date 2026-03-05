@@ -1,5 +1,7 @@
+// @ts-nocheck - Edge function uses Deno runtime
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// @ts-ignore - Deno std lib
 import { crypto } from "https://deno.land/std@0.177.0/crypto/mod.ts";
 
 const corsHeaders = {
@@ -404,8 +406,8 @@ serve(async (req: Request) => {
     if (!limitsDisabled && supabase && user_id) {
       const guard = await canAnalyze(supabase, user_id, plan);
       if (!guard.ok) {
-        return new Response(JSON.stringify(guard.body), {
-          status: guard.status,
+        return new Response(JSON.stringify((guard as any).body), {
+          status: (guard as any).status,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
