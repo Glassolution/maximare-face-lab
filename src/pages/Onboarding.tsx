@@ -604,7 +604,7 @@ function StepAuthority({ onNext }: { onNext: () => void }) {
 
   return (
     <div
-      className="flex flex-col min-h-screen"
+      className="flex flex-col min-h-[100dvh]"
       style={{ backgroundColor: "#0D0D14", fontFamily: "Inter, sans-serif" }}
     >
       {/* Spacer for status bar */}
@@ -685,7 +685,7 @@ function StepAuthority({ onNext }: { onNext: () => void }) {
       <div
         className="fixed bottom-0 left-0 right-0 p-6 pb-10"
         style={{
-          background: "linear-gradient(to top, #0D0D14, rgba(13, 13, 20, 0.95), transparent)",
+          backgroundColor: "#0D0D14",
         }}
       >
         <button
