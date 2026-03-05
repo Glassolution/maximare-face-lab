@@ -44,10 +44,11 @@ export function useAdminDashboard() {
         
         // 1. Fetch data in parallel
         // Usamos get_admin_users RPC para ter acesso aos emails também
+        // CORRIGIDO: Buscar de 'profiles' em vez de 'user_data' (tabela não existe)
         const [usersRes, purchasesRes, analysesRes] = await Promise.all([
           supabase.rpc('get_admin_users'),
           supabase.from('purchases').select('*'),
-          supabase.from('user_data').select('id, updated_at', { count: 'exact', head: true })
+          supabase.from('profiles').select('id, updated_at', { count: 'exact', head: true })
         ]);
 
         const profiles = usersRes.data || [];

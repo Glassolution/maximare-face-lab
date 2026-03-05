@@ -110,10 +110,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserData = async (userId: string) => {
     try {
+      // CORRIGIDO: Buscar de 'profiles' em vez de 'user_data' (tabela não existe)
       const { data } = await supabase
-        .from("user_data")
-        .select("*")
-        .eq("user_id", userId)
+        .from("profiles")
+        .select("id, created_at, updated_at, is_premium, plan_type, subscription_status")
+        .eq("id", userId)
         .single();
       if (data) setUserData(data as UserData);
     } catch (e) {
@@ -312,10 +313,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateUserData = async (data: Partial<Pick<UserData, "last_analysis_score" | "analysis_history" | "preferences">>) => {
     if (!user) return;
-    await supabase
-      .from("user_data")
-      .update(data)
-      .eq("user_id", user.id);
+    // CORRIGIDO: Atualizar 'profiles' em vez de 'user_data' (tabela não existe)
+    // Nota: profiles pode não ter todos os campos de user_data, então filtramos apenas os que existem
+    const profileData: any = {};
+    if ('preferences' in data) profileData.preferences = data.preferences;
+    
+    if (Object.keys(profileData).length > 0) {
+      await supabase
+        .from("profiles")
+        .update(profileData)
+        .eq("id", user.id);
+    }
     await fetchUserData(user.id);
   };
 

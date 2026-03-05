@@ -22,15 +22,27 @@ if (!MERCADOPAGO_PUBLIC_KEY || MERCADOPAGO_PUBLIC_KEY === 'TEST-539d056c-2673-45
   console.warn('[Checkout] ATENÇÃO: Usando chave de teste do MercadoPago. Configure VITE_MERCADOPAGO_PUBLIC_KEY no .env');
 }
 
-// CORRIGIDO: Inicializar SDK com tratamento de erro
-try {
-  initMercadoPago(MERCADOPAGO_PUBLIC_KEY, {
-    locale: 'pt-BR'
-  });
-  console.log('[Checkout] MercadoPago SDK inicializado com sucesso');
-} catch (error) {
-  console.error('[Checkout] ERRO ao inicializar MercadoPago SDK:', error);
-}
+// CORRIGIDO: Inicializar SDK apenas uma vez com lazy loading
+let sdkInitialized = false;
+const initializeMercadoPago = () => {
+  if (sdkInitialized) return true;
+  
+  try {
+    initMercadoPago(MERCADOPAGO_PUBLIC_KEY, {
+      locale: 'pt-BR',
+      advancedFraudPrevention: true,
+    });
+    sdkInitialized = true;
+    console.log('[Checkout] MercadoPago SDK inicializado com sucesso');
+    return true;
+  } catch (error) {
+    console.error('[Checkout] ERRO ao inicializar MercadoPago SDK:', error);
+    return false;
+  }
+};
+
+// CORRIGIDO: Tentar inicializar imediatamente
+initializeMercadoPago();
 
 interface CheckoutPremiumProps {
   plan: 'weekly' | 'monthly' | 'yearly';
@@ -171,8 +183,11 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
     },
   }), []);
 
-  // CORRIGIDO: Verificar carregamento do MercadoPago SDK
+  // CORRIGIDO: Verificar carregamento do MercadoPago SDK com timeout aumentado
   useEffect(() => {
+    // Tentar inicializar SDK se ainda não foi
+    initializeMercadoPago();
+    
     const checkSdkLoaded = () => {
       // Verificar se o objeto MercadoPago está disponível globalmente
       if (typeof window !== 'undefined' && (window as any).MercadoPago) {
@@ -188,13 +203,13 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
     // Iniciar verificação
     checkSdkLoaded();
     
-    // Timeout de segurança: se não carregar em 10s, mostrar erro
+    // CORRIGIDO: Timeout aumentado de 10s para 30s (conexões lentas)
     const timeout = setTimeout(() => {
       if (!sdkReady) {
-        console.error('[Checkout] Timeout: MercadoPago SDK não carregou após 10s');
-        setSdkError('Erro ao carregar o sistema de pagamento. Verifique sua conexão.');
+        console.error('[Checkout] Timeout: MercadoPago SDK não carregou após 30s');
+        setSdkError('Erro ao carregar o sistema de pagamento. Verifique sua conexão ou tente recarregar a página.');
       }
-    }, 10000);
+    }, 30000); // CORRIGIDO: 30 segundos em vez de 10
     
     return () => clearTimeout(timeout);
   }, []);
