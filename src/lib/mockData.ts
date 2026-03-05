@@ -164,7 +164,7 @@ export async function deleteAnalysis(id: string): Promise<{ ok: boolean; deleted
       }
     }
     // 2) Tentar via functions.invoke (fallback)
-    const { data, error, status } = await supabase.functions.invoke('delete-analysis', {
+    const { data, error } = await supabase.functions.invoke('delete-analysis', {
       headers: {
         'sb-access-token': session.access_token,
         'Authorization': `Bearer ${anon}`,
@@ -172,10 +172,10 @@ export async function deleteAnalysis(id: string): Promise<{ ok: boolean; deleted
       },
       body: { analysis_id: id }
     });
-    if (error) return await deleteAnalysisRlsFallback(id, session.access_token, status || 500, error.message || "invoke_failed");
+    if (error) return await deleteAnalysisRlsFallback(id, session.access_token, 500, (error as any).message || "invoke_failed");
     if (!data?.ok || (typeof data?.deleted === 'number' && data.deleted <= 0)) {
       // Fallback: tentar deletar diretamente via RLS (token do usuário)
-      return await deleteAnalysisRlsFallback(id, session.access_token, status || 200, data?.error || "not_deleted");
+      return await deleteAnalysisRlsFallback(id, session.access_token, 200, data?.error || "not_deleted");
     }
   } catch {
     return { ok: false, deleted: 0, status: 500, error: "exception" };

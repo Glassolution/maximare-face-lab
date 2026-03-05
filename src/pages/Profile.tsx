@@ -58,9 +58,9 @@ export default function Profile() {
         
         if (profile.avatar_url) {
             setAvatarUrl(avatarService.getAvatarPublicUrl(profile.avatar_url));
-        } else if (lastAnalysis?.image_url) {
+        } else if ((lastAnalysis as any)?.image_url) {
             // Fallback: Use last analysis image if no custom avatar set
-            setAvatarUrl(lastAnalysis.image_url);
+            setAvatarUrl((lastAnalysis as any).image_url);
         }
     }
   }, [profile, lastAnalysis]);

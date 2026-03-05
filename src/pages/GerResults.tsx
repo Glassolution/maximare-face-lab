@@ -246,7 +246,7 @@ export default function GerResults() {
           </>
         )}
 
-        {isPro && (
+        {isPremium && (
           <Link to="/analysis" className="block">
             <Button className="w-full rounded-2xl py-6 text-base font-semibold">
               Nova Análise

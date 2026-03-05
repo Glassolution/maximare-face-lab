@@ -116,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .select("id, created_at, updated_at, is_premium, plan_type, subscription_status")
         .eq("id", userId)
         .single();
-      if (data) setUserData(data as UserData);
+      if (data) setUserData(data as unknown as UserData);
     } catch (e) {
       logger.error("[Auth]", "UserData error:", e);
     }

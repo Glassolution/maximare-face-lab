@@ -10,10 +10,13 @@ vi.mock("@/components/battle/BattleProcessingOverlay", () => ({
   BattleProcessingOverlay: () => null,
 }));
 
-const rpcMock = vi.fn(async () => ({ data: null }));
+const rpcMock = vi.fn(async (..._args: any[]) => ({ data: null }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    rpc: (...args: unknown[]) => rpcMock(...args),
+    rpc: (...args: any[]) => {
+      const result = rpcMock(...args);
+      return { ...result, then: result.then.bind(result), catch: (fn: any) => result.catch(fn) };
+    },
   },
 }));
 
@@ -55,7 +58,7 @@ function TestProcessCaller({ battle, nowServerApprox }: { battle: any; nowServer
     if (!ready) return;
     if (processCalledRef.current) return;
     processCalledRef.current = true;
-    supabase.rpc("mock_process_battle_result", { p_battle_id: battle.id }).catch(() => {
+    (supabase.rpc as any)("mock_process_battle_result", { p_battle_id: battle.id }).catch(() => {
       processCalledRef.current = false;
     });
   }, [battle?.id, battle?.status, battle?.start_at, nowServerApprox]);
@@ -76,7 +79,7 @@ describe("processCalledRef e guards", () => {
     );
     rerender(<TestProcessCaller battle={battle} nowServerApprox={nowServerApprox} />);
     rerender(<TestProcessCaller battle={battle} nowServerApprox={nowServerApprox} />);
-    await waitFor(() => expect(rpcMock.mock.calls.filter((c) => c[0] === "mock_process_battle_result")).toHaveLength(1));
+    await waitFor(() => expect(rpcMock.mock.calls.filter((c: any[]) => c[0] === "mock_process_battle_result")).toHaveLength(1));
   });
 
   it("isCreator guard: oponente não dispara mark_battle_running_v3", async () => {
@@ -106,7 +109,7 @@ describe("processCalledRef e guards", () => {
     });
 
     // Ninguém deve ter chamado a transição para running do guard se não é o criador
-    expect(rpcMock.mock.calls.find((c) => c[0] === "mark_battle_running_v3")).toBeUndefined();
+    expect(rpcMock.mock.calls.find((c: any[]) => c[0] === "mark_battle_running_v3")).toBeUndefined();
     vi.useRealTimers();
   });
 });
