@@ -513,44 +513,82 @@ function StepGoal({ onNext, initialGoal }: { onNext: (idx: number) => void; init
 function StepGender({ onNext, initialGender }: { onNext: (id: string) => void; initialGender: string }) {
   const [selected, setSelected] = useState<string | null>(initialGender);
 
-  return (
-    <div className="flex flex-col flex-1 justify-between py-6 -mx-6 px-6 h-full">
-      <div className="flex flex-col gap-4">
-        <div className="text-left">
-          <h1 className="font-heading text-3xl font-extrabold text-foreground leading-tight">Escolha o Gênero</h1>
-          <p className="text-muted-foreground text-sm mt-2">Escolha um deles para uma experiência melhor</p>
-        </div>
+  const genderOptions = [
+    { id: "male", label: "MASCULINO", icon: "male", color: "#4F6EF7", bgColor: "rgba(79,110,247,0.15)" },
+    { id: "female", label: "FEMININO", icon: "female", color: "#F76F8E", bgColor: "rgba(247,111,142,0.15)" },
+    { id: "nonbinary", label: "NÃO BINÁRIO", icon: "auto_awesome", color: "#9B6EF7", bgColor: "rgba(155,110,247,0.15)" },
+  ];
 
-        <div className="flex flex-col gap-3 mt-3">
-          {GENDERS.map((g) => (
+  return (
+    <div className="flex flex-col flex-1 h-full">
+      <div className="mb-8">
+        <h1 className="text-[28px] leading-tight font-bold mb-2 text-white">
+          Escolha o <span className="text-[#4F6EF7]">Gênero</span>
+        </h1>
+        <p className="text-[13px] text-white/50 font-medium">
+          Personalizamos sua análise para você
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-4 flex-1">
+        {genderOptions.map((g) => {
+          const isSelected = selected === g.id;
+          return (
             <button
               key={g.id}
               onClick={() => setSelected(g.id)}
-              className={`relative rounded-2xl overflow-hidden h-[120px] border transition-all bg-[#09090b] ${
-                selected === g.id ? "border-primary ring-1 ring-primary" : "border-border/30"
+              className={`group relative w-full flex items-center justify-between px-6 py-[20px] rounded-[20px] text-left transition-all duration-200 ${
+                isSelected
+                  ? "border-2 border-[#4F6EF7] bg-[rgba(79,110,247,0.08)]"
+                  : "border border-white/5 bg-[#13131F] hover:border-[#4F6EF7]/30"
               }`}
             >
-              <img 
-                src={g.img} 
-                alt={g.label} 
-                className="absolute right-0 top-0 h-full w-auto object-cover [mask-image:linear-gradient(to_right,transparent,black_40%)]" 
-              />
-              <span className="relative z-10 font-heading font-bold text-foreground text-2xl p-6 block text-left mt-8">
-                {g.label}
-              </span>
+              <div className="flex items-center gap-4">
+                <div
+                  className="w-12 h-12 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: g.bgColor }}
+                >
+                  <span
+                    className="material-symbols-outlined text-2xl"
+                    style={{ color: g.color, fontVariationSettings: "'FILL' 1" }}
+                  >
+                    {g.icon}
+                  </span>
+                </div>
+                <span className={`text-[17px] font-semibold ${isSelected ? "text-white" : "text-white/90"}`}>
+                  {g.label}
+                </span>
+              </div>
+              {isSelected ? (
+                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-[#4F6EF7]">
+                  <span
+                    className="material-symbols-outlined text-white text-[18px] font-bold"
+                    style={{ fontVariationSettings: "'FILL' 1" }}
+                  >
+                    check
+                  </span>
+                </div>
+              ) : (
+                <div className="w-6 h-6" />
+              )}
             </button>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
-      <Button
+      <button
         onClick={() => selected && onNext(selected)}
         disabled={!selected}
-        className="w-full h-14 bg-white text-primary font-bold rounded-full shadow-lg shadow-primary/20 text-base tracking-wide hover:bg-white/90 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40 mt-4"
+        className="w-full py-5 mt-8 bg-white text-[#4F6EF7] font-bold rounded-full shadow-lg shadow-[#4F6EF7]/10 flex items-center justify-center gap-2 hover:bg-white/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <ArrowRight className="h-4 w-4" />
         Continuar
-      </Button>
+        <span
+          className="material-symbols-outlined font-bold text-[20px]"
+          style={{ fontVariationSettings: "'FILL' 1" }}
+        >
+          arrow_forward
+        </span>
+      </button>
     </div>
   );
 }
