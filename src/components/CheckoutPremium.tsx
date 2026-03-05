@@ -155,21 +155,33 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
           return;
         }
 
-        const { data, error } = await supabase.functions.invoke("check-payment-status", {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+        const response = await fetch(`${supabaseUrl}/functions/v1/check-payment-status`, {
+          method: "POST",
           headers: {
+            "Content-Type": "application/json",
+            apikey: supabaseKey,
             Authorization: `Bearer ${accessToken}`,
           },
-          body: { payment_id: internalPaymentId },
+          body: JSON.stringify({ payment_id: internalPaymentId }),
         });
 
-        if (error) {
-          console.error("[Checkout] Polling error:", error);
+        const data = await response.json().catch(() => ({} as any));
+
+        if (!response.ok) {
+          console.error("[Checkout] Polling HTTP error:", response.status, data);
+          if (response.status === 401) {
+            clearInterval(interval);
+            toast.error("Sessão expirada. Faça login novamente.");
+          }
           return;
         }
 
-        console.log('[Checkout] Payment status:', data.status);
+        console.log('[Checkout] Payment status:', data?.status);
 
-        if (data.status === "approved") {
+        if (data?.status === "approved") {
           clearInterval(interval);
           setStep("success");
           setTimeout(() => {
@@ -360,9 +372,6 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
                 paymentMethods: {
                   bankTransfer: "all",
                   mercadoPago: "all",
-                  types: {
-                    included: ["bank_transfer"],
-                  },
                 } as any,
               }}
               onSubmit={handlePixPayment}
@@ -411,9 +420,6 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
                 creditCard: "all",
                 debitCard: "all",
                 mercadoPago: "all",
-                types: {
-                  included: ["creditCard", "debitCard"],
-                },
               } as any,
             }}
             onSubmit={handleCardPayment}
