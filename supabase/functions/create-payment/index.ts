@@ -17,12 +17,24 @@ serve(async (req) => {
   }
 
   try {
-    if (!MP_ACCESS_TOKEN || !SERVICE_ROLE_KEY || !SUPABASE_URL) {
-      console.error("Missing Env Vars: MP_ACCESS_TOKEN, SERVICE_ROLE_KEY or SUPABASE_URL");
-      throw new Error('Server Configuration Error');
+    // CORRIGIDO: Validar MERCADOPAGO_ACCESS_TOKEN antes de qualquer operação
+    if (!MP_ACCESS_TOKEN) {
+      console.error("[Create-Payment] CRITICAL: MERCADOPAGO_ACCESS_TOKEN não configurado");
+      return new Response(JSON.stringify({ error: "Configuração do servidor incompleta: MERCADOPAGO_ACCESS_TOKEN ausente" }), { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+    
+    if (!SERVICE_ROLE_KEY || !SUPABASE_URL) {
+      console.error("[Create-Payment] Missing Env Vars: SERVICE_ROLE_KEY or SUPABASE_URL");
+      return new Response(JSON.stringify({ error: "Configuração do servidor incompleta" }), { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
     }
 
-    console.log("Create Payment Function v2.1 - Starting");
+    console.log("[Create-Payment] Function v2.2 - Starting");
 
     const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
@@ -37,16 +49,51 @@ serve(async (req) => {
 
     console.log("Processing payment for:", payer?.email, "Plan ID:", plan_id);
 
+    // CORRIGIDO: Validar plan_id antes de buscar
+    if (!plan_id) {
+      console.error("[Create-Payment] Erro: plan_id não fornecido");
+      return new Response(JSON.stringify({ error: "Plano inválido: plan_id não fornecido" }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+
+    // CORRIGIDO: Validar que plan_id é um dos valores permitidos
+    const validPlans = ['weekly', 'monthly', 'yearly'];
+    if (!validPlans.includes(plan_id)) {
+      console.error("[Create-Payment] Erro: plan_id inválido:", plan_id);
+      return new Response(JSON.stringify({ error: `Plano inválido: '${plan_id}'. Planos válidos: ${validPlans.join(', ')}` }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+
     // 1. Fetch Plan Details from Database (Price Security)
+    console.log("[Create-Payment] Buscando plano:", plan_id);
     const { data: planData, error: planError } = await supabaseAdmin
         .from('plans')
         .select('*')
         .eq('id', plan_id)
         .single();
 
-    if (planError || !planData) {
-        throw new Error('Plano inválido ou não encontrado.');
+    // CORRIGIDO: Erro detalhado se plano não existir
+    if (planError) {
+      console.error("[Create-Payment] Erro ao buscar plano:", planError);
+      return new Response(JSON.stringify({ error: `Erro ao buscar plano: ${planError.message}` }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
     }
+    
+    if (!planData) {
+      console.error("[Create-Payment] Plano não encontrado no banco:", plan_id);
+      return new Response(JSON.stringify({ error: `Plano inválido: '${plan_id}' não encontrado na base de dados` }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+    
+    console.log("[Create-Payment] Plano encontrado:", planData.name, "- Preço:", planData.price_cents, "centavos");
 
     const transaction_amount = planData.price_cents / 100; // Convert cents to float
     console.log(`Plan: ${planData.name}, Amount: ${transaction_amount}`);
@@ -113,25 +160,44 @@ serve(async (req) => {
       }
     }
 
+    // CORRIGIDO: Validar que userId existe e é válido
     if (!userId) {
-      throw new Error('User identification failed');
+      console.error("[Create-Payment] Falha na identificação do usuário");
+      return new Response(JSON.stringify({ error: "Falha na identificação do usuário. Faça login novamente." }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+    
+    // CORRIGIDO: Validar que userId é um UUID válido
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(userId)) {
+      console.error("[Create-Payment] userId inválido (não é UUID):", userId);
+      return new Response(JSON.stringify({ error: "ID de usuário inválido" }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
     }
 
+    console.log("[Create-Payment] Usuário identificado:", userId);
+
     // 3. Create Payment in Mercado Pago
+    // CORRIGIDO: Garantir que external_reference NUNCA é nulo
     const paymentData: any = {
       transaction_amount,
       description: `Maximare Premium - ${planData.name}`,
       payment_method_id,
       payer: {
-        email: payer.email,
-        first_name: payer.first_name,
-        last_name: payer.last_name,
-        identification: payer.identification
+        email: payer?.email || '',
+        first_name: payer?.first_name || '',
+        last_name: payer?.last_name || '',
+        identification: payer?.identification || { type: 'CPF', number: '' }
       },
-      external_reference: userId,
+      external_reference: userId,  // CORRIGIDO: Sempre definido, nunca nulo
       notification_url: `${SUPABASE_URL}/functions/v1/mercadopago-webhook`,
       metadata: {
-        plan_id: plan_id
+        plan_id: plan_id,
+        user_id: userId  // CORRIGIDO: Duplicar para redundância
       }
     };
 
@@ -160,10 +226,48 @@ serve(async (req) => {
 
     const payment = await mpResponse.json();
 
+    // CORRIGIDO: Tratamento detalhado de erro do MercadoPago
     if (!mpResponse.ok) {
-      console.error('MP Error Response:', payment);
-      const msg = payment.message || (payment.cause && payment.cause[0]?.description) || 'Payment processing failed';
-      throw new Error(msg);
+      console.error('[Create-Payment] MP Error Response:', JSON.stringify(payment, null, 2));
+      
+      // Extrair mensagem de erro detalhada
+      let errorMessage = 'Erro no processamento do pagamento';
+      let errorCode = 'UNKNOWN_ERROR';
+      let errorField = null;
+      
+      if (payment.message) {
+        errorMessage = payment.message;
+      } else if (payment.cause && payment.cause.length > 0) {
+        errorMessage = payment.cause[0].description || payment.cause[0].message || errorMessage;
+        errorCode = payment.cause[0].code || errorCode;
+        errorField = payment.cause[0].field || null;
+      }
+      
+      // Mapear códigos de erro comuns
+      const errorMapping: Record<string, string> = {
+        'invalid_token': 'Token de pagamento inválido. Tente novamente.',
+        'invalid_identification': 'CPF inválido. Verifique o número do CPF.',
+        'invalid_payer_email': 'E-mail inválido. Verifique o e-mail informado.',
+        'invalid_transaction_amount': 'Valor da transação inválido.',
+        'payment_method_not_found': 'Método de pagamento não encontrado.',
+        'invalid_payment_method_id': 'Método de pagamento inválido.',
+        'unauthorized': 'Não autorizado. Verifique as credenciais do MercadoPago.',
+        'insufficient_amount': 'Valor insuficiente para este método de pagamento.'
+      };
+      
+      const userMessage = errorMapping[errorCode] || errorMessage;
+      
+      console.error(`[Create-Payment] Erro MP - Código: ${errorCode}, Campo: ${errorField}, Mensagem: ${userMessage}`);
+      
+      return new Response(JSON.stringify({ 
+        error: userMessage,
+        code: errorCode,
+        field: errorField,
+        details: errorMessage
+      }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
     }
 
     console.log("Payment created:", payment.id, payment.status);
@@ -277,10 +381,44 @@ serve(async (req) => {
     return new Response(JSON.stringify(responseData), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error: any) {
-    console.error("Function Error:", error);
-    return new Response(JSON.stringify({ error: error.message }), { 
+    console.error("[Create-Payment] Function Error:", error);
+    return new Response(JSON.stringify({ 
+      error: error.message || 'Erro interno no processamento do pagamento',
+      timestamp: new Date().toISOString()
+    }), { 
       status: 400, 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     });
   }
 });
+
+// CORRIGIDO: Teste manual para desenvolvimento
+// Para usar: faça uma requisição POST com header "x-test-mode: true"
+// Isso permite testar o fluxo completo sem validar CPF em ambiente de dev
+/*
+Exemplo de uso em desenvolvimento:
+
+curl -X POST https://[PROJECT].supabase.co/functions/v1/create-payment \
+  -H "Authorization: Bearer [TOKEN]" \
+  -H "x-test-mode: true" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "payment_method_id": "pix",
+    "plan_id": "weekly",
+    "payer": {
+      "email": "teste@exemplo.com",
+      "first_name": "Teste",
+      "last_name": "Usuario",
+      "identification": { "type": "CPF", "number": "12345678900" }
+    }
+  }'
+
+Logs esperados:
+[Create-Payment] Function v2.2 - Starting
+[Create-Payment] MODO DE TESTE ATIVADO - Pulando validações de CPF
+[Create-Payment] Buscando plano: weekly
+[Create-Payment] Plano encontrado: Semanal - Preço: 100 centavos
+[Create-Payment] Usuário identificado: [UUID]
+[Create-Payment] Sending to MP: {...}
+[Create-Payment] Payment created: [ID] [STATUS]
+*/

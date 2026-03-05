@@ -180,8 +180,59 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
     fetchUser();
   }, []);
 
+  // CORRIGIDO: Função auxiliar para verificar e refreshar sessão
+  const ensureValidSession = async (): Promise<string | null> => {
+    try {
+      // Verificar sessão atual
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        logger.error("[Checkout]", "Erro ao obter sessão:", sessionError);
+      }
+      
+      // Se temos sessão válida, retornar token
+      if (session?.access_token) {
+        return session.access_token;
+      }
+      
+      // CORRIGIDO: Sessão expirada - tentar refresh
+      logger.log("[Checkout]", "Sessão expirada ou inválida. Tentando refresh...");
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      
+      if (refreshError) {
+        logger.error("[Checkout]", "Falha ao refreshar sessão:", refreshError);
+        toast.error("Sua sessão expirou. Faça login novamente.");
+        // Redirecionar para login
+        window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+        return null;
+      }
+      
+      if (refreshData.session?.access_token) {
+        logger.log("[Checkout]", "Sessão refreshada com sucesso");
+        return refreshData.session.access_token;
+      }
+      
+      // Se chegou aqui, não conseguiu obter token
+      toast.error("Sua sessão expirou. Faça login novamente.");
+      window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+      return null;
+    } catch (err) {
+      logger.error("[Checkout]", "Erro inesperado na verificação de sessão:", err);
+      toast.error("Erro de autenticação. Faça login novamente.");
+      window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+      return null;
+    }
+  };
+
   // Intelligent Polling with Backoff
   const checkStatus = async () => {
+      // CORRIGIDO: Verificar sessão antes de qualquer chamada
+      const validToken = await ensureValidSession();
+      if (!validToken) {
+        logger.error("[Checkout]", "Não foi possível obter sessão válida");
+        return false;
+      }
+      
       // 1. Prefer RPC (compat mode), fallback to Edge Function
       const payId = currentPaymentId || pixData?.payment_id;
       
@@ -236,9 +287,9 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                 logger.log("[Checkout]", "RPC_ONLY flag active; skipping EF fallback.");
                 return false;
               }
-              // Fallback EF (specified id) - Skip if 401 error
+              // CORRIGIDO: Usar token validado anteriormente
               logger.log("[Checkout]", "RPC did not confirm. Falling back to Edge Function...");
-              const token = await getValidAccessToken();
+              const token = validToken;  // CORRIGIDO: Usar o token já validado
               if (!token) {
                 logger.error("[Checkout]", "No valid token for check-payment-status fallback");
                 return false;
@@ -282,16 +333,33 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                 }
               } catch (invokeError) {
                 logger.error("[Checkout]", "Edge Function invoke error:", invokeError);
+                // CORRIGIDO: Se erro for 401, tentar refresh da sessão uma vez
+                if (invokeError instanceof Error && 
+                    (invokeError.message?.includes('401') || invokeError.message?.includes('Unauthorized'))) {
+                  logger.log("[Checkout]", "Erro 401 detectado, tentando refresh de sessão...");
+                  const refreshedToken = await ensureValidSession();
+                  if (refreshedToken) {
+                    logger.log("[Checkout]", "Sessão refreshada, continuando polling...");
+                    // Continua polling - webhook pode processar depois
+                  }
+                }
                 // Continue polling even if EF fails
               }
               
               // Final fallback: ask server to look up latest approved for this user
+              // CORRIGIDO: Verificar sessão novamente antes do último fallback
               try {
+                const currentToken = await ensureValidSession();
+                if (!currentToken) {
+                  logger.error("[Checkout]", "Sessão inválida no fallback final");
+                  return false;
+                }
+                
                 const { data: latestData, error: latestErr } = await supabase.functions.invoke('check-payment-latest', {
                   headers: {
                     apikey: (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "",
-                    "sb-access-token": token,
-                    "x-supabase-auth": token
+                    "sb-access-token": currentToken,
+                    "x-supabase-auth": currentToken
                   },
                   body: {}
                 });
@@ -467,13 +535,13 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
     // We just need to send the data to our backend
     setLoading(true);
     try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.access_token) {
-            toast.error("Faça login novamente");
+        // CORRIGIDO: Usar ensureValidSession para validar e refreshar se necessário
+        const token = await ensureValidSession();
+        if (!token) {
+            // ensureValidSession já redireciona para login se necessário
             setLoading(false);
             return;
         }
-        const token = session.access_token;
         const { data, error } = await supabase.functions.invoke('create-payment', {
             headers: { 
                 "sb-access-token": token,
@@ -544,13 +612,13 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
   const handlePix = async () => {
     setLoading(true);
     try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.access_token) {
-            toast.error("Faça login novamente");
+        // CORRIGIDO: Usar ensureValidSession para validar e refreshar se necessário
+        const token = await ensureValidSession();
+        if (!token) {
+            // ensureValidSession já redireciona para login se necessário
             setLoading(false);
             return;
         }
-        const token = session.access_token;
         // Validate inputs with detailed messages
         const missingFields = [];
         if (!firstName) missingFields.push("Nome");

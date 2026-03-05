@@ -33,57 +33,111 @@ serve(async (req) => {
       if (m) resourceIdPre = m[1];
     }
 
+    // CORRIGIDO: MERCADOPAGO_WEBHOOK_SECRET é obrigatório
     if (!MP_WEBHOOK_SECRET) {
-      console.warn("[SECURITY WARNING] MP_WEBHOOK_SECRET not set — webhook running without signature enforcement");
-    } else {
-      const xSignature = req.headers.get("x-signature");
-      const xRequestId = req.headers.get("x-request-id");
-      if (!xSignature || !xRequestId) {
-        return new Response(JSON.stringify({ error: "missing_signature_headers" }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
-      const parts = xSignature.split(',');
-      let ts = '';
-      let v1 = '';
-      parts.forEach(p => {
-        const [k, v] = p.split('=');
-        if (k === 'ts') ts = v;
-        if (k === 'v1') v1 = v;
-      });
-      if (!ts || !v1) {
-        return new Response(JSON.stringify({ error: "invalid_signature_format" }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
-      const manifest = `id:${resourceIdPre};request-timestamp:${ts};requestId:${xRequestId};signed_payload:${bodyText}`;
-      const key = await crypto.subtle.importKey(
-        "raw",
-        new TextEncoder().encode(MP_WEBHOOK_SECRET),
-        { name: "HMAC", hash: "SHA-256" },
-        false,
-        ["sign"]
+      console.error("[SECURITY ERROR] MP_WEBHOOK_SECRET não configurado. Webhook rejeitando todas as requisições.");
+      return new Response(
+        JSON.stringify({ error: "Configuração de segurança incompleta: MP_WEBHOOK_SECRET não configurado" }), 
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-      const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(manifest));
-      const hex = Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
-      if (hex !== v1) {
-        console.warn("[SECURITY] Invalid MercadoPago webhook signature");
-        return new Response(JSON.stringify({ error: "invalid_signature" }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
     }
+    
+    // CORRIGIDO: Validar assinatura HMAC em cada webhook
+    console.log("[Webhook] Validando assinatura HMAC...");
+    const xSignature = req.headers.get("x-signature");
+    const xRequestId = req.headers.get("x-request-id");
+    
+    // CORRIGIDO: Headers de assinatura são obrigatórios
+    if (!xSignature || !xRequestId) {
+      console.warn("[SECURITY] Tentativa de webhook sem headers de assinatura");
+      return new Response(
+        JSON.stringify({ error: "missing_signature_headers", message: "x-signature e x-request-id são obrigatórios" }), 
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Parse da assinatura
+    const parts = xSignature.split(',');
+    let ts = '';
+    let v1 = '';
+    parts.forEach(p => {
+      const [k, v] = p.split('=');
+      if (k === 'ts') ts = v;
+      if (k === 'v1') v1 = v;
+    });
+    
+    if (!ts || !v1) {
+      console.warn("[SECURITY] Formato de assinatura inválido");
+      return new Response(
+        JSON.stringify({ error: "invalid_signature_format" }), 
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Validar HMAC-SHA256
+    const manifest = `id:${resourceIdPre};request-timestamp:${ts};requestId:${xRequestId};signed_payload:${bodyText}`;
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(MP_WEBHOOK_SECRET),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(manifest));
+    const hex = Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
+    
+    if (hex !== v1) {
+      // CORRIGIDO: Logar tentativa de assinatura inválida
+      console.error("[SECURITY] Assinatura HMAC inválida!");
+      console.error("[SECURITY] Esperado:", v1);
+      console.error("[SECURITY] Calculado:", hex);
+      console.error("[SECURITY] Manifest:", manifest);
+      console.error("[SECURITY] IP:", req.headers.get('x-forwarded-for') || 'unknown');
+      
+      return new Response(
+        JSON.stringify({ error: "invalid_signature", message: "Assinatura do webhook inválida" }), 
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    console.log("[Webhook] Assinatura HMAC validada com sucesso");
 
-    const { data: existing } = await supabaseAdmin.from('webhook_events')
-        .select('id')
-        .eq('provider', 'mercadopago')
-        .eq('event_type', eventTypePre)
-        .eq('resource_id', resourceIdPre)
+    // CORRIGIDO: Usar INSERT com ON CONFLICT para garantir idempotência sem race condition
+    console.log("[Webhook] Verificando idempotência do evento...");
+    const notificationId = body?.id?.toString() ?? req.headers.get('x-request-id') ?? `${eventTypePre}_${resourceIdPre}_${Date.now()}`;
+    
+    const { data: insertResult, error: insertError } = await supabaseAdmin
+        .from('webhook_events')
+        .insert({
+            provider: 'mercadopago',
+            event_type: eventTypePre,
+            resource_id: resourceIdPre,
+            notification_id: notificationId,
+            payload: eventPayload,
+            processed_at: null  // Será atualizado após processamento
+        })
+        .select()
         .maybeSingle();
-
-    if (existing) {
-        console.log("Event already processed:", resourceIdPre);
-        return new Response(JSON.stringify({ message: "Already processed" }), { status: 200 });
+    
+    // Se erro de duplicata, evento já foi processado
+    if (insertError) {
+        if (insertError.message?.includes('duplicate') || insertError.code === '23505') {
+            console.log("[Webhook] Evento já processado anteriormente:", resourceIdPre);
+            return new Response(JSON.stringify({ message: "Already processed" }), { status: 200 });
+        }
+        // Outro erro - logar mas continuar (não bloquear por falha na auditoria)
+        console.error("[Webhook] Erro ao registrar evento (não crítico):", insertError);
+    } else {
+        console.log("[Webhook] Evento registrado para processamento:", insertResult?.id);
     }
 
     const body = bodyText ? JSON.parse(bodyText) : {};
     const eventType = body.type || body.action || query.topic || 'unknown';
     const resourceId = body.data?.id || body.id || query.id;
     const action = body.action || query.action || 'unknown';
+    
+    // CORRIGIDO: Atualizar payload no insert se body mudou após parse
+    const eventPayload = bodyText ? JSON.parse(bodyText) : {};
 
     console.log(`Webhook received: ${eventType} ID: ${resourceId}`);
 
@@ -94,33 +148,45 @@ serve(async (req) => {
     let processed = false;
     
     if (eventType === 'payment' || eventType === 'payment.created' || eventType === 'payment.updated') {
-        console.log("Fetching payment details...");
+        console.log("[Webhook] Fetching payment details...");
         const res = await fetch(`https://api.mercadopago.com/v1/payments/${resourceId}`, {
             headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` }
         });
 
             if (res.ok) {
             const payment = await res.json();
-            console.log("Payment status:", payment.status, "Ref:", payment.external_reference);
+            console.log("[Webhook] Payment status:", payment.status, "Ref:", payment.external_reference, "ID:", payment.id);
 
+            // CORRIGIDO: Garantir que external_reference é usado como user_id
             let userId = payment.external_reference;
             const payerEmail = payment.payer?.email;
+            
+            console.log("[Webhook] userId from external_reference:", userId);
 
             // Fallback: If no external_reference (userId), try to find by email
-            if ((!userId || userId === 'null') && payerEmail) {
-                console.log(`No external_reference, looking up user by email: ${payerEmail}`);
+            if ((!userId || userId === 'null' || userId === 'undefined') && payerEmail) {
+                console.log(`[Webhook] No external_reference, looking up user by email: ${payerEmail}`);
                 const { data: foundId } = await supabaseAdmin.rpc('get_user_id_by_email', { 
                     email_input: payerEmail 
                 });
                 if (foundId) {
                     userId = foundId;
-                    console.log(`Found user via email: ${userId}`);
+                    console.log(`[Webhook] Found user via email: ${userId}`);
                 }
             }
             
-            if (userId && payment.status === 'approved') {
+            // CORRIGIDO: Validar userId antes de prosseguir
+            if (!userId || userId === 'null' || userId === 'undefined') {
+                console.error("[Webhook] ERRO: Não foi possível identificar o usuário. external_reference:", payment.external_reference);
+                return new Response(JSON.stringify({ error: "User identification failed" }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
+            
+            if (payment.status === 'approved') {
+                console.log("[Webhook] Pagamento aprovado. Iniciando ativação para userId:", userId);
+                
                 // Determine duration via plan_id in metadata, or fallback to description
                 const planId = payment.metadata?.plan_id;
+                console.log("[Webhook] planId from metadata:", planId);
 
                 // Insert/Update Payments Table (Audit)
                 const { error: paymentError } = await supabaseAdmin.from('payments').upsert({
@@ -155,6 +221,9 @@ serve(async (req) => {
                         planType = planData.interval;
                         if (planType === 'weekly') days = 7;
                         if (planType === 'yearly') days = 365;
+                        console.log("[Webhook] Plano encontrado:", planData.name, "- Intervalo:", planType, "- Dias:", days);
+                    } else {
+                        console.warn("[Webhook] Plano não encontrado no banco:", planId);
                     }
                 } else {
                     // Fallback to description
@@ -166,9 +235,11 @@ serve(async (req) => {
                         days = 365;
                         planType = 'yearly';
                     }
+                    console.log("[Webhook] Plano determinado pela descrição:", planType, "- Dias:", days);
                 }
 
-                // Activation via centralized RPC
+                // CORRIGIDO: Activation via centralized RPC com logs detalhados
+                console.log("[Webhook] Ativando premium via RPC para userId:", userId);
                 const { data: activation, error: actError } = await supabaseAdmin.rpc('activate_user_subscription', {
                   p_user_id: userId,
                   p_plan_type: planType,
@@ -180,15 +251,64 @@ serve(async (req) => {
                   p_currency: payment.currency_id,
                   p_metadata: payment.metadata
                 });
+                
                 if (actError) {
-                  console.error("[webhook] Falha ao ativar assinatura via RPC:", actError);
-                  return new Response(
-                    JSON.stringify({ error: 'Falha ao ativar via RPC' }),
-                    { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-                  );
-                } else {
-                  console.log(`Subscription activated for ${userId}`, activation);
+                  console.error("[Webhook] Falha ao ativar assinatura via RPC:", actError);
+                  
+                  // CORRIGIDO: Fallback - tentar update direto na tabela profiles
+                  console.log("[Webhook] Tentando fallback: update direto na tabela profiles...");
+                  const expiresAt = new Date();
+                  expiresAt.setDate(expiresAt.getDate() + days);
+                  
+                  const { error: fallbackError } = await supabaseAdmin.from('profiles').update({
+                      subscription_status: 'active',
+                      is_premium: true,
+                      premium_since: new Date().toISOString(),
+                      subscription_expires_at: expiresAt.toISOString(),
+                      plan_type: planType,
+                      premium_plan_id: planId,
+                      payment_provider: 'mercadopago',
+                      payment_id: payment.id.toString(),
+                      payment_status: 'approved',
+                      updated_at: new Date().toISOString()
+                  }).or(`id.eq.${userId},user_id.eq.${userId}`);
+                  
+                  if (fallbackError) {
+                      console.error("[Webhook] Fallback também falhou:", fallbackError);
+                      return new Response(
+                        JSON.stringify({ error: 'Falha ao ativar assinatura via RPC e fallback' }),
+                        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                      );
+                  }
+                  
+                  console.log("[Webhook] Fallback executado com sucesso!");
                   processed = true;
+                } else {
+                  console.log(`[Webhook] Premium ativado com sucesso para ${userId}`, activation);
+                  processed = true;
+                }
+                
+                // CORRIGIDO: Verificar se is_premium foi realmente salvo
+                const { data: profileCheck, error: checkError } = await supabaseAdmin
+                    .from('profiles')
+                    .select('is_premium, subscription_status, plan_type')
+                    .or(`id.eq.${userId},user_id.eq.${userId}`)
+                    .maybeSingle();
+                
+                if (checkError) {
+                    console.error("[Webhook] Erro ao verificar profile:", checkError);
+                } else if (profileCheck) {
+                    console.log("[Webhook] Verificação do profile:", {
+                        is_premium: profileCheck.is_premium,
+                        subscription_status: profileCheck.subscription_status,
+                        plan_type: profileCheck.plan_type
+                    });
+                    
+                    if (!profileCheck.is_premium) {
+                        console.warn("[Webhook] ALERTA: is_premium está false após ativação!");
+                    }
+                } else {
+                    console.warn("[Webhook] ALERTA: Profile não encontrado após ativação!");
                 }
 
                 // If there is a pending cancel_refund (no payment_id at the time), attempt refund now
@@ -324,18 +444,22 @@ serve(async (req) => {
       }
     }
 
-    // 4. Save Event
-    const notificationId = body?.id?.toString() ?? req.headers.get('x-request-id') ?? `${eventType}_${resourceId}_${Date.now()}`;
-    await supabaseAdmin.from('webhook_events').insert({
-        provider: 'mercadopago',
-        event_type: eventType,
-        resource_id: resourceId,
-        notification_id: notificationId,
-        payload: body,
-        processed_at: new Date().toISOString()
-    });
+    // CORRIGIDO: Atualizar o evento registrado com processed_at e resultado
+    if (insertResult?.id) {
+        await supabaseAdmin
+            .from('webhook_events')
+            .update({
+                processed_at: new Date().toISOString(),
+                payload: {
+                    ...eventPayload,
+                    _processing_result: { processed, timestamp: new Date().toISOString() }
+                }
+            })
+            .eq('id', insertResult.id);
+    }
 
-    return new Response(JSON.stringify({ received: true }), { 
+    console.log("[Webhook] Processamento concluído. Processed:", processed);
+    return new Response(JSON.stringify({ received: true, processed }), { 
         status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     });
