@@ -24,7 +24,7 @@ type MenuItem = {
 };
 
 export default function Profile() {
-  const { user, profile, refreshSession } = useAuth();
+  const { user, profile, refreshSession, signOut } = useAuth();
   const { isPremium, subscriptionStatus, expiresAt, planType } = usePremiumStatus();
   const navigate = useNavigate();
   const location = useLocation();
@@ -541,8 +541,8 @@ export default function Profile() {
           <Button
             variant="ghost"
             onClick={async () => { 
-              await supabase.auth.signOut(); 
-              navigate("/login", { state: { mode: "login" } }); 
+              await signOut(); 
+              window.location.href = "/login";
             }}
             className="w-full rounded-2xl glass p-4 h-auto flex items-center gap-3 text-destructive hover:text-destructive hover:bg-destructive/10"
           >
