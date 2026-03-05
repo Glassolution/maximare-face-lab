@@ -277,6 +277,13 @@ export default function Profile() {
                   {formatDate(expiresAt)}
                 </p>
               )}
+              <button
+                onClick={() => navigate("/cancel-subscription")}
+                className="w-full mt-3 py-2 rounded-xl text-[13px] font-medium transition-colors"
+                style={{ color: "rgba(255,100,100,0.8)", backgroundColor: "rgba(255,100,100,0.08)", border: "1px solid rgba(255,100,100,0.15)" }}
+              >
+                Cancelar assinatura
+              </button>
             </div>
           ) : (
             <div
