@@ -17,6 +17,11 @@ import {
   Dumbbell,
   AlertTriangle,
   Lock,
+  ScanFace,
+  Eye,
+  FrownIcon,
+  CheckCircle2,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Area, AreaChart } from "recharts";
@@ -61,101 +66,172 @@ function StepImpact({ onNext, onBack }: { onNext: (habits: number[]) => void; on
   };
 
   const habits = [
-    { icon: "air", title: "Respiração Bucal", sub: "Queixo Fraco" },
-    { icon: "accessibility_new", title: "Má Postura", sub: "Pescoço Curvado" },
-    { icon: "face_6", title: "Inchaço", sub: "Rosto com Alto Sódio" },
+    { icon: ScanFace, title: "Assimetria\nFacial", color: "#4F6EF7" },
+    { icon: Eye, title: "Olhar\nCansado", color: "#4F6EF7" },
+    { icon: FrownIcon, title: "Pele com\nImperfeições", color: "#4F6EF7" },
   ];
 
   return (
-    <div className="dark font-display antialiased bg-background-dark text-white h-[100dvh] overflow-hidden relative flex flex-col">
-      <div className="fixed inset-0 blueprint-bg pointer-events-none"></div>
-
-      <main className="relative z-10 max-w-md mx-auto h-full flex flex-col px-5 pt-6 pb-4 w-full">
-        <header
-          className="grid grid-cols-[auto,1fr,auto] items-center mb-4"
-          style={{
-            paddingLeft: "calc(env(safe-area-inset-left))",
-            paddingRight: "calc(env(safe-area-inset-right))",
-          }}
-        >
-          <button 
-            onClick={onBack}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-200/50 dark:bg-white/5 backdrop-blur-md hover:bg-slate-200/70 dark:hover:bg-white/10 transition-colors"
-          >
-            <span className="material-symbols-outlined text-xl">arrow_back</span>
-          </button>
-          <div className="flex gap-1.5 justify-center min-w-0 overflow-hidden">
-            <div className="w-12 h-1 rounded-full bg-primary neon-glow"></div>
-            <div className="w-8 h-1 rounded-full bg-slate-200/20 dark:bg-white/10"></div>
-            <div className="w-8 h-1 rounded-full bg-slate-200/20 dark:bg-white/10"></div>
-            <div className="w-8 h-1 rounded-full bg-slate-200/20 dark:bg-white/10"></div>
-            <div className="w-8 h-1 rounded-full bg-slate-200/20 dark:bg-white/10"></div>
-          </div>
+    <div
+      className="min-h-screen flex flex-col max-w-md mx-auto relative overflow-hidden"
+      style={{
+        background: "linear-gradient(180deg, #0D0D14 0%, #0D1A3D 100%)",
+        fontFamily: "'Plus Jakarta Sans', Inter, sans-serif",
+      }}
+    >
+      {/* Header */}
+      <header className="pt-8 px-6 pb-4 flex flex-col gap-6">
+        <div className="flex items-center justify-between">
+          <span className="text-[#4F6EF7] font-extrabold text-[13px] tracking-wider flex items-center gap-1">
+            <Sparkles className="w-3.5 h-3.5" /> MAXIMARE AI
+          </span>
           <button
             onClick={() => onNext(Array.from(selected))}
-            className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors shrink-0"
+            className="text-white/50 text-[13px] font-medium hover:text-white/70 transition-colors"
           >
-            Pular
+            Salvar e sair
           </button>
-        </header>
-
-        <div className="flex items-center justify-center gap-3 mb-3">
-          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold text-xs shadow-lg shadow-primary/20">
-            M
-          </div>
-          <span className="font-bold tracking-tight text-sm uppercase">
-            Maximare <span className="text-primary">AI</span>
-          </span>
         </div>
+        <div className="w-full h-[4px] bg-white/10 rounded-full overflow-hidden">
+          <div className="w-2/3 h-full bg-[#4F6EF7] rounded-full" />
+        </div>
+      </header>
 
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-extrabold mb-2 tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white to-slate-400">
-            Você está se Segurando
+      {/* Main Content */}
+      <main className="flex-1 px-6 pt-6 flex flex-col">
+        <div className="mb-8">
+          <h1 className="text-[32px] font-bold leading-[1.2] mb-2 text-white">
+            O que está travando<br />
+            <span className="text-[#4F6EF7]">seu potencial?</span>
           </h1>
-          <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed px-4">
-            A maioria das falhas são hábitos estruturais.
-            <br />
-            Nossa IA identifica e sugere correções biométricas.
+          <p className="text-white/50 text-[13px]">
+            Selecione tudo que se aplica a você
           </p>
         </div>
 
-        <div className="flex-grow grid grid-cols-2 gap-3 mb-3 content-start">
-          {habits.map((h, i) => (
-            <button
-              key={i}
-              className={`glass-node flex flex-col items-center justify-center p-6 rounded-[2rem] group transition-all duration-300 ${
-                selected.has(i) ? "selected" : ""
-              } ${i === 2 ? "col-span-2 h-28" : "h-32"}`}
-              onClick={() => toggleSelection(i)}
-            >
-              <div
-                className={`icon-container mb-4 transition-transform group-hover:scale-110 ${
-                  selected.has(i) ? "" : "text-slate-400"
-                }`}
-              >
-                <span className="material-symbols-outlined text-4xl">{h.icon}</span>
-              </div>
-              <h3 className="text-sm font-bold mb-1">{h.title}</h3>
-              <p className="text-[10px] text-slate-500 uppercase tracking-widest font-mono">{h.sub}</p>
-            </button>
-          ))}
+        <div className="mb-8">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#4F6EF7]/10 border border-[#4F6EF7]/20 rounded-full">
+            <Sparkles className="w-3.5 h-3.5 text-[#4F6EF7]" />
+            <span className="text-[#4F6EF7] text-[12px] font-semibold">Selecione um ou mais</span>
+          </div>
         </div>
 
-        <footer className="relative z-10 px-8 pb-8 pt-4 bg-gradient-to-t from-background-dark via-background-dark to-transparent shrink-0">
-          <Button
-            onClick={() => onNext(Array.from(selected))}
-            className="w-full h-14 bg-white text-primary font-bold rounded-full shadow-lg shadow-primary/20 text-base tracking-wide hover:bg-white/90 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40"
-          >
-            <ArrowRight className="h-4 w-4" />
-            Continuar
-          </Button>
-        </footer>
+        {/* Selection Cards */}
+        <div className="grid grid-cols-2 gap-4">
+          {habits.slice(0, 2).map((h, i) => {
+            const Icon = h.icon;
+            const isSelected = selected.has(i);
+            return (
+              <button
+                key={i}
+                onClick={() => toggleSelection(i)}
+                className={`rounded-[20px] p-6 flex flex-col items-center text-center gap-4 transition-all duration-200 active:scale-95 ${
+                  isSelected
+                    ? "bg-[#4F6EF7] selected-card-shadow"
+                    : "bg-white"
+                }`}
+                style={{
+                  boxShadow: isSelected ? "0 0 25px rgba(79, 110, 247, 0.4)" : "none",
+                }}
+              >
+                <div
+                  className={`w-12 h-12 flex items-center justify-center rounded-full ${
+                    isSelected ? "bg-white/20" : "bg-[#4F6EF7]/5"
+                  }`}
+                >
+                  <Icon
+                    className={`w-7 h-7 ${isSelected ? "text-white" : "text-[#4F6EF7]"}`}
+                    strokeWidth={1.5}
+                  />
+                </div>
+                <span
+                  className={`font-bold text-sm leading-tight whitespace-pre-line ${
+                    isSelected ? "text-white" : "text-[#4F6EF7]"
+                  }`}
+                >
+                  {h.title}
+                </span>
+              </button>
+            );
+          })}
+          <div className="col-span-2 flex justify-center">
+            {(() => {
+              const Icon = habits[2].icon;
+              const isSelected = selected.has(2);
+              return (
+                <button
+                  onClick={() => toggleSelection(2)}
+                  className={`w-1/2 rounded-[20px] p-6 flex flex-col items-center text-center gap-4 transition-all duration-200 active:scale-95 ${
+                    isSelected ? "bg-[#4F6EF7]" : "bg-white"
+                  }`}
+                  style={{
+                    boxShadow: isSelected ? "0 0 25px rgba(79, 110, 247, 0.4)" : "none",
+                  }}
+                >
+                  <div
+                    className={`w-12 h-12 flex items-center justify-center rounded-full ${
+                      isSelected ? "bg-white/20" : "bg-[#4F6EF7]/5"
+                    }`}
+                  >
+                    <Icon
+                      className={`w-7 h-7 ${isSelected ? "text-white" : "text-[#4F6EF7]"}`}
+                      strokeWidth={1.5}
+                    />
+                  </div>
+                  <span
+                    className={`font-bold text-sm leading-tight whitespace-pre-line ${
+                      isSelected ? "text-white" : "text-[#4F6EF7]"
+                    }`}
+                  >
+                    {habits[2].title}
+                  </span>
+                </button>
+              );
+            })()}
+          </div>
+        </div>
       </main>
+
+      {/* Footer */}
+      <footer className="p-6 space-y-4">
+        <p className="text-[10px] text-white/30 text-center flex items-center justify-center gap-1">
+          <Lock className="w-3 h-3" /> Suas respostas são usadas apenas para personalizar seu plano
+        </p>
+        <button
+          onClick={() => onNext(Array.from(selected))}
+          className="w-full py-5 rounded-full flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+          style={{
+            backgroundColor: "#FFFFFF",
+            boxShadow: "0 4px 20px rgba(255, 255, 255, 0.15)",
+          }}
+        >
+          <span className="text-[#4F6EF7] font-bold text-lg">
+            Continuar com {selected.size} selecionado{selected.size !== 1 ? 's' : ''}
+          </span>
+          <ArrowRight className="w-5 h-5 text-[#4F6EF7]" />
+        </button>
+      </footer>
+
+      {/* Background blur effects */}
+      <div
+        className="absolute -bottom-20 -right-20 w-64 h-64 rounded-full pointer-events-none"
+        style={{
+          backgroundColor: "rgba(79, 110, 247, 0.1)",
+          filter: "blur(100px)",
+        }}
+      />
+      <div
+        className="absolute -top-20 -left-20 w-64 h-64 rounded-full pointer-events-none"
+        style={{
+          backgroundColor: "rgba(45, 79, 214, 0.1)",
+          filter: "blur(100px)",
+        }}
+      />
     </div>
   );
 }
 
-/* ─── Step 2: Age Picker (Biometric Style) ─── */
+/* ─── Step 2: Age Picker ─── */
 function StepAge({ onNext, onBack, initialAge }: { onNext: (age: number) => void; onBack: () => void; initialAge: number }) {
   const [selectedAge, setSelectedAge] = useState(initialAge);
   const ages = Array.from({ length: 83 }, (_, i) => i + 12); // Range 12-94
@@ -164,111 +240,143 @@ function StepAge({ onNext, onBack, initialAge }: { onNext: (age: number) => void
   useEffect(() => {
     if (scrollRef.current) {
       const idx = ages.indexOf(selectedAge);
-      scrollRef.current.scrollTop = idx * 120;
+      scrollRef.current.scrollTop = idx * 72; // 72px item height
     }
-  }, []); // Run once on mount
+  }, []);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const scrollTop = target.scrollTop;
+    const centerIdx = Math.round(scrollTop / 72);
+    const clamped = Math.max(0, Math.min(ages.length - 1, centerIdx));
+    if (ages[clamped] !== selectedAge) {
+      setSelectedAge(ages[clamped]);
+    }
+  };
 
   return (
-    <div className="bg-white text-slate-900 h-[100dvh] flex flex-col overflow-hidden fixed inset-0 z-50">
-      {/* Background Radial Gradient for subtle depth */}
-      <div className="fixed inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-50/50 via-white to-white pointer-events-none"></div>
+    <div
+      className="flex flex-col items-center justify-center min-h-screen"
+      style={{ backgroundColor: "#0D0D14", fontFamily: "Inter, sans-serif" }}
+    >
+      <div className="relative w-full max-w-[400px] h-screen flex flex-col overflow-hidden">
+        {/* Header */}
+        <header className="w-full px-6 pt-12 pb-4 shrink-0">
+          <div className="flex items-center justify-between mb-6">
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1 text-white/50 hover:text-white transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-[#4F6EF7]" />
+              <span className="text-[#4F6EF7] text-[11px] font-extrabold tracking-[0.2em]">MAXIMARE AI</span>
+            </div>
+            <button
+              onClick={() => onNext(selectedAge)}
+              className="text-[13px] font-medium text-white/50 hover:text-white transition-colors"
+            >
+              Salvar e sair
+            </button>
+          </div>
+          <div className="w-full h-[3px] bg-white/10 rounded-full overflow-hidden">
+            <div className="w-1/3 h-full bg-[#4F6EF7]"></div>
+          </div>
+        </header>
 
-      {/* Header */}
-      <header
-        className="relative z-10 grid grid-cols-[auto,1fr,auto] items-center px-6 pt-14 pb-4 shrink-0"
-        style={{
-          paddingLeft: "calc(1.5rem + env(safe-area-inset-left))",
-          paddingRight: "calc(1.5rem + env(safe-area-inset-right))",
-          paddingTop: "calc(3.5rem + env(safe-area-inset-top))",
-        }}
-      >
-        <button onClick={onBack} className="p-2 -ml-2 text-slate-500 hover:text-primary transition-colors">
-          <ArrowLeft className="w-6 h-6" />
-        </button>
-        
-        <div className="flex gap-2 px-4 justify-center min-w-0 overflow-hidden">
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <div
-              key={i}
-              className={`h-1 rounded-full transition-colors ${
-                i === 1 ? "w-12 bg-primary neon-glow" : "w-8 bg-slate-300"
-              }`}
-            ></div>
-          ))}
-        </div>
-
-        <button onClick={() => onNext(selectedAge)} className="text-sm font-semibold text-primary hover:text-primary/80 uppercase tracking-wider transition-colors shrink-0">
-          PULAR
-        </button>
-      </header>
-
-      <main className="flex-1 relative flex flex-col items-center justify-center shrink-0">
-        <div className="text-center z-10 mb-8 px-6 mt-[-40px]">
-          <h1 className="text-3xl font-bold text-slate-900 mb-3">Qual é sua idade?</h1>
-          <p className="text-slate-500 text-sm max-w-[280px] mx-auto leading-relaxed">
-            Selecione sua idade para calibrar o motor de análise biométrica.
+        {/* Title */}
+        <div className="w-full px-6 pt-6 text-center shrink-0">
+          <h1 className="text-[28px] font-bold leading-tight mb-2 text-white">
+            Qual é sua <span className="text-[#4F6EF7]">idade</span>?
+          </h1>
+          <p className="text-[13px] text-white/50">
+            Calibramos a análise para seu grupo etário
           </p>
         </div>
 
-        <div className="relative w-full max-w-[320px] h-[320px] flex items-center justify-center">
-          <div className="radial-lines border-slate-200"></div>
-          <div className="radial-lines w-[280px] h-[280px] opacity-30 border-slate-200"></div>
-          
-          <div className="absolute left-0 right-0 h-24 pointer-events-none flex items-center justify-between px-10 z-20">
-            <div className="w-12 h-[1px] bg-primary/40"></div>
-            <div className="w-12 h-[1px] bg-primary/40"></div>
+        {/* Age Picker */}
+        <main className="flex-1 w-full relative flex flex-col items-center justify-center overflow-hidden">
+          {/* Active lines */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-20">
+            <div
+              className="w-20 h-[2px] bg-[#4F6EF7] absolute"
+              style={{ marginBottom: "72px", left: "50%", transform: "translateX(-50%)" }}
+            />
+            <div
+              className="w-20 h-[2px] bg-[#4F6EF7] absolute"
+              style={{ marginTop: "72px", left: "50%", transform: "translateX(-50%)" }}
+            />
           </div>
 
-          <div 
+          {/* Scrollable ages */}
+          <div
             ref={scrollRef}
-            onScroll={(e) => {
-              const target = e.currentTarget;
-              const scrollTop = target.scrollTop;
-              const centerIdx = Math.round(scrollTop / 120); // 120 is ITEM_HEIGHT
-              const clamped = Math.max(0, Math.min(ages.length - 1, centerIdx));
-              if (ages[clamped] !== selectedAge) {
-                setSelectedAge(ages[clamped]);
-              }
+            onScroll={handleScroll}
+            className="overflow-y-auto w-full h-full snap-y snap-mandatory flex flex-col items-center relative z-0 no-scrollbar"
+            style={{
+              scrollbarWidth: "none",
+              msOverflowStyle: "none",
             }}
-            className="age-scroll flex flex-col items-center gap-0 overflow-y-auto snap-y snap-mandatory h-full w-full scrollbar-hide mask-gradient-y"
           >
-            <div className="shrink-0 w-full" style={{ height: 'calc(50% - 60px)' }}></div>
+            <div className="h-[40%] shrink-0"></div>
             {ages.map((age) => {
               const isSelected = age === selectedAge;
               return (
-                <div 
-                  key={age} 
-                  className={`age-item snap-center flex items-center justify-center h-[120px] min-h-[120px] w-full cursor-pointer transition-all duration-300 ${isSelected ? 'scale-110' : 'opacity-40'}`}
+                <div
+                  key={age}
+                  className="snap-center py-2 transition-all duration-200 cursor-pointer"
+                  style={{
+                    fontSize: isSelected ? "56px" : "30px",
+                    fontWeight: 700,
+                    color: isSelected ? "#ffffff" : "rgba(255, 255, 255, 0.2)",
+                    lineHeight: 1,
+                  }}
                   onClick={() => {
                     setSelectedAge(age);
-                    scrollRef.current?.scrollTo({ top: ages.indexOf(age) * 120, behavior: 'smooth' });
+                    scrollRef.current?.scrollTo({ top: ages.indexOf(age) * 72, behavior: "smooth" });
                   }}
                 >
-                  <span className={`font-bold transition-all duration-300 relative font-heading ${
-                    isSelected 
-                      ? 'text-8xl text-slate-900 selected-age' 
-                      : 'text-6xl text-slate-300'
-                  }`}>
-                    {age}
-                    {isSelected && <div className="text-[10px] font-bold tracking-[0.2em] uppercase text-primary text-center mt-2 absolute left-1/2 -translate-x-1/2 -bottom-6 whitespace-nowrap">SELECIONADO</div>}
-                  </span>
+                  {age}
                 </div>
               );
             })}
-            <div className="shrink-0 w-full" style={{ height: 'calc(50% - 60px)' }}></div>
+            <div className="h-[40%] shrink-0"></div>
           </div>
-        </div>
-      </main>
 
-      <footer className="relative z-10 px-8 pb-8 pt-4 bg-gradient-to-t from-white via-white to-transparent shrink-0">
-        <Button 
-          onClick={() => onNext(selectedAge)}
-          className="w-full h-14 bg-white text-primary font-bold rounded-full shadow-xl shadow-primary/40 glow-primary text-base tracking-wide hover:bg-white/90 hover:scale-[1.04] active:scale-[0.98] transition-all disabled:opacity-40"
-        >
-          <ArrowRight className="h-4 w-4" />
-          Continuar
-        </Button>
-      </footer>
+          {/* Gradient mask */}
+          <div
+            className="absolute inset-0 pointer-events-none z-10"
+            style={{
+              background: `linear-gradient(to bottom,
+                #0D0D14 0%,
+                rgba(13, 13, 20, 0.7) 15%,
+                rgba(13, 13, 20, 0) 40%,
+                rgba(13, 13, 20, 0) 60%,
+                rgba(13, 13, 20, 0.7) 85%,
+                #0D0D14 100%)`,
+            }}
+          />
+        </main>
+
+        {/* Footer */}
+        <footer className="w-full flex flex-col items-center justify-end pb-8 shrink-0">
+          <button
+            onClick={() => onNext(selectedAge)}
+            className="w-[85%] py-[18px] rounded-full flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+            style={{
+              backgroundColor: "#ffffff",
+              color: "#4F6EF7",
+              fontWeight: 700,
+              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
+            }}
+          >
+            <span>Continuar</span>
+            <ArrowRight className="w-5 h-5" />
+          </button>
+          <div className="w-32 h-1 bg-white/20 rounded-full mt-8"></div>
+        </footer>
+      </div>
     </div>
   );
 }
@@ -277,46 +385,126 @@ function StepAge({ onNext, onBack, initialAge }: { onNext: (age: number) => void
 function StepGoal({ onNext, initialGoal }: { onNext: (idx: number) => void; initialGoal: number }) {
   const [selected, setSelected] = useState<number | null>(initialGoal);
 
+  const goals = [
+    { icon: ScanFace, title: "Entender meu rosto", sub: "Descobrir meus pontos fortes" },
+    { icon: Sparkles, title: "Melhorar minha aparência", sub: "Protocolo facial personalizado" },
+    { icon: Dumbbell, title: "Transformação completa", sub: "Rosto, físico e presença" },
+    { icon: Zap, title: "Maximizar minha atratividade", sub: "Nível elite de presença e confiança", popular: true },
+  ];
+
   return (
-    <div className="flex flex-col items-center text-center flex-1 justify-between py-8 -mx-6 px-6">
-      <div className="flex flex-col items-center gap-6 w-full">
-        <h1 className="font-heading text-3xl font-extrabold text-foreground leading-tight">
-          Qual é sua
-          <br />
-          meta principal?
+    <div
+      className="min-h-screen flex flex-col"
+      style={{ backgroundColor: "#0D0D14", fontFamily: "Inter, sans-serif" }}
+    >
+      {/* Header */}
+      <header
+        className="px-6 pt-14 pb-4 flex flex-col gap-4 sticky top-0 z-50"
+        style={{ backgroundColor: "rgba(13, 13, 20, 0.8)", backdropFilter: "blur(12px)" }}
+      >
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => onNext(selected ?? 0)}
+            className="flex items-center gap-1 text-white/50 hover:text-white transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-[#4F6EF7]" />
+            <span className="text-[#4F6EF7] text-sm font-bold tracking-widest">MAXIMARE AI</span>
+          </div>
+          <button
+            onClick={() => onNext(selected ?? 0)}
+            className="text-white/50 text-[13px] font-medium hover:text-white transition-colors"
+          >
+            Salvar e sair
+          </button>
+        </div>
+        <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+          <div className="w-1/3 h-full bg-[#4F6EF7] rounded-full" />
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 px-6 pt-6 pb-32">
+        <h1 className="text-[28px] font-extrabold leading-tight tracking-tight mb-8 text-white">
+          Qual é sua <span className="text-[#4F6EF7]">meta principal?</span>
         </h1>
 
-        <div className="flex flex-col gap-3 w-full mt-2">
-          {GOALS.map((g, i) => (
-            <button
-              key={i}
-              onClick={() => setSelected(i)}
-              className={`flex items-center gap-4 p-5 rounded-2xl border text-left transition-all ${
-                selected === i
-                  ? "border-primary bg-primary/10"
-                  : "border-border/30 bg-secondary/40 hover:border-border/60"
-              }`}
-            >
-              <div className="h-12 w-12 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                <g.icon className={`h-5 w-5 ${selected === i ? "text-primary" : "text-muted-foreground"}`} />
-              </div>
-              <div>
-                <span className="font-heading font-bold text-foreground text-sm">{g.title}</span>
-                {g.sub && <p className="text-primary text-xs mt-0.5">{g.sub}</p>}
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
+        <div className="space-y-4">
+          {goals.map((g, i) => {
+            const Icon = g.icon;
+            const isSelected = selected === i;
 
-      <Button
-        onClick={() => selected !== null && onNext(selected)}
-        disabled={selected === null}
-        className="w-full h-14 bg-white text-primary font-bold rounded-full shadow-lg shadow-primary/20 text-base tracking-wide hover:bg-white/90 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40 mt-4"
+            return (
+              <button
+                key={i}
+                onClick={() => setSelected(i)}
+                className={`w-full flex items-center p-4 rounded-2xl transition-all active:scale-[0.98] group relative overflow-hidden ${
+                  isSelected
+                    ? "bg-[#4F6EF7]/10 border-2 border-[#4F6EF7]"
+                    : "bg-[#13131F] border border-white/5 hover:border-white/10"
+                }`}
+              >
+                {/* Popular badge */}
+                {g.popular && (
+                  <div
+                    className="absolute top-0 right-0 px-2 py-0.5 rounded-bl-lg flex items-center gap-1"
+                    style={{ backgroundColor: "rgba(79, 110, 247, 0.2)" }}
+                  >
+                    <Zap className="w-2.5 h-2.5 text-[#4F6EF7]" />
+                    <span className="text-[#4F6EF7] text-[10px] font-bold">MAIS ESCOLHIDO</span>
+                  </div>
+                )}
+
+                <div
+                  className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center mr-4 ${
+                    isSelected ? "bg-[#4F6EF7]/20" : "bg-[#4F6EF7]/10"
+                  }`}
+                >
+                  <Icon
+                    className={`w-5 h-5 ${isSelected ? "text-[#4F6EF7]" : "text-[#4F6EF7]"}`}
+                    strokeWidth={1.5}
+                  />
+                </div>
+
+                <div className="flex-1 text-left">
+                  <p className="font-bold text-[15px] text-white">{g.title}</p>
+                  <p className="text-[13px] text-white/50">{g.sub}</p>
+                </div>
+
+                {isSelected ? (
+                  <CheckCircle2 className="w-5 h-5 text-[#4F6EF7]" />
+                ) : (
+                  <ChevronRight className="w-5 h-5 text-white/10 group-hover:text-[#4F6EF7] transition-colors" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </main>
+
+      {/* Footer */}
+      <div
+        className="fixed bottom-0 left-0 right-0 p-6"
+        style={{
+          background: "linear-gradient(to top, #0D0D14, rgba(13, 13, 20, 0.9), transparent)",
+        }}
       >
-        <ArrowRight className="h-4 w-4" />
-        Continuar
-      </Button>
+        <button
+          onClick={() => selected !== null && onNext(selected)}
+          disabled={selected === null}
+          className="w-full h-[58px] rounded-full font-bold text-base flex items-center justify-center gap-2 shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 hover:opacity-90"
+          style={{
+            backgroundColor: "#ffffff",
+            color: "#4F6EF7",
+            boxShadow: "0 8px 32px rgba(79, 110, 247, 0.1)",
+          }}
+        >
+          Continuar
+          <ArrowRight className="w-5 h-5" />
+        </button>
+      </div>
     </div>
   );
 }
