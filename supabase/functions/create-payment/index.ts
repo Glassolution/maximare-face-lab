@@ -242,7 +242,7 @@ serve(async (req) => {
     console.log(`[Create-Payment] Created Payment ID: ${payment.id} for User: ${userId}`);
 
     // Insert into 'payments' table for tracking
-    const { error: insertError } = await supabaseAdmin.from('payments').insert({
+    const { error: insertError } = await supabaseAdmin.from('payments').upsert({
         payment_id: payment.id.toString(),
         user_id: userId,
         plan_id: plan_id,
@@ -250,11 +250,14 @@ serve(async (req) => {
         amount: payment.transaction_amount,
         currency: payment.currency_id,
         metadata: payment.metadata,
-        created_at: new Date().toISOString()
-    });
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+    }, { onConflict: 'payment_id' });
 
     if (insertError) {
         console.error("[Create-Payment] Failed to insert into payments table:", insertError);
+    } else {
+        console.log("[Create-Payment] Payment saved to payments table:", payment.id.toString());
     }
 
     // Return Data
