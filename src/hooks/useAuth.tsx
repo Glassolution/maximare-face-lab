@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", userId)
+        .eq("user_id", userId)
         .maybeSingle();
       
       console.log("[Auth]", "Profile query result:", { data, error });
@@ -87,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Profile missing (0 rows) - Try to create it automatically
         console.log("[Auth]", "Profile missing, attempting to create...");
         const { error: insertError } = await supabase.from('profiles').insert({
-            id: userId,
+            user_id: userId,
             username: `user_${userId.substring(0, 8)}`,
         });
 
@@ -98,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
              const { data: newData } = await supabase
                 .from("profiles")
                 .select("*")
-                .eq("id", userId)
+                .eq("user_id", userId)
                 .maybeSingle();
              if (newData) setProfile(newData as Profile);
         }
@@ -114,8 +114,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data } = await supabase
         .from("profiles")
         .select("id, created_at, updated_at, is_premium, plan_type, subscription_status")
-        .eq("id", userId)
-        .single();
+        .eq("user_id", userId)
+        .maybeSingle();
       if (data) setUserData(data as unknown as UserData);
     } catch (e) {
       logger.error("[Auth]", "UserData error:", e);
@@ -177,7 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             event: 'UPDATE',
             schema: 'public',
             table: 'profiles',
-            filter: `id=eq.${userId}`,
+            filter: `user_id=eq.${userId}`,
           },
           (payload) => {
             console.log('[Auth] Realtime profile update received:', payload.new);
@@ -322,7 +322,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await supabase
         .from("profiles")
         .update(profileData)
-        .eq("id", user.id);
+        .eq("user_id", user.id);
     }
     await fetchUserData(user.id);
   };
