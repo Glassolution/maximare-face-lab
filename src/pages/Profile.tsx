@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Crown, ChevronRight, Settings, Shield, Zap, Star, TrendingUp, Search, LogOut, Moon, Sun, CreditCard, Copy, Upload, Camera, LayoutDashboard } from "lucide-react";
+import { Crown, ChevronRight, Settings, Shield, Zap, Star, TrendingUp, Search, LogOut, Moon, Sun, Copy, Upload, Camera, LayoutDashboard } from "lucide-react";
 import { getAnalysisHistory } from "@/lib/mockData";
 import { toast } from "sonner";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -13,7 +13,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/theme/ThemeProvider";
 import { usePremiumStatus } from "@/hooks/usePremiumStatus";
-import { CancelSubscriptionWizard } from "@/components/CancelSubscriptionWizard";
 import { avatarService } from "@/services/avatarService";
 
 type MenuItem = {
@@ -33,8 +32,6 @@ export default function Profile() {
   const lastAnalysis = history.length > 0 ? (history[0] as unknown as ExtendedAnalysisResult) : null;
   const { theme, setTheme } = useTheme();
   const [showPreferences, setShowPreferences] = useState(false);
-  const [showSubscription, setShowSubscription] = useState(false);
-  const [showCancelWizard, setShowCancelWizard] = useState(false);
   const [earnedBadges, setEarnedBadges] = useState<string[]>([]);
   
   const [shortId, setShortId] = useState<string | null>(null);
@@ -215,7 +212,7 @@ export default function Profile() {
   const isCreator = !!profile?.is_ugc;
 
   const menuItems: MenuItem[] = [
-    { label: "Plano Pro", icon: Crown, desc: isPremium ? "Gerenciar assinatura" : "Desbloqueie tudo", path: isPremium ? "#" : "/premium", onClick: isPremium ? () => setShowSubscription(true) : undefined },
+    { label: "Plano", icon: Crown, desc: "Assinaturas desativadas", path: "#" },
     { label: "Progresso", icon: TrendingUp, desc: "Seu histórico", path: "/progress" },
     { label: "Configurações", icon: Settings, desc: "Preferências", path: "#", onClick: () => setShowPreferences(true) },
     { label: "Privacidade", icon: Shield, desc: "Seus dados", path: "/privacy" },
@@ -345,15 +342,15 @@ export default function Profile() {
                     <Button 
                         size="sm" 
                         variant="ghost"
-                        onClick={() => setShowSubscription(true)}
+                        onClick={() => navigate('/analysis')}
                         className="h-8 px-3 text-xs font-semibold text-amber-700 hover:bg-amber-200/50 hover:text-amber-800"
                     >
-                        Gerenciar
+                        Ok
                     </Button>
                  </div>
                  {expiresAt && (
                     <div className="mt-3 pt-3 border-t border-amber-200/50 flex items-center gap-2 text-[10px] text-amber-800/70">
-                        <CreditCard className="h-3 w-3" />
+                        <Shield className="h-3 w-3" />
                         <span>
                           {subscriptionStatus === 'canceled' 
                             ? 'Sua assinatura expirará em: ' 
@@ -376,15 +373,12 @@ export default function Profile() {
                         </div>
                     </div>
                     
-                    <Link to="/premium">
-                        <Button 
-                            size="sm" 
-                            className="h-9 text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-md glow-sm"
-                        >
-                            <Zap className="h-3 w-3 mr-1.5 fill-current" />
-                            Seja Premium
-                        </Button>
-                    </Link>
+                    <Button 
+                        size="sm" 
+                        className="h-9 text-xs font-bold bg-muted text-foreground hover:bg-muted/80 shadow-md"
+                    >
+                        Plano Free
+                    </Button>
                  </div>
               </div>
             )}
@@ -596,54 +590,6 @@ export default function Profile() {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={showSubscription} onOpenChange={setShowSubscription}>
-          <DialogContent className="max-w-sm rounded-2xl">
-            <DialogHeader>
-              <DialogTitle className="font-heading text-lg flex items-center gap-2">
-                <Crown className="h-5 w-5 text-amber-400" />
-                Sua Assinatura
-              </DialogTitle>
-            </DialogHeader>
-            <div className="mt-4 space-y-4">
-              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-foreground">Status</span>
-                  <span className="text-xs font-bold text-amber-500 bg-amber-500/10 px-2 py-1 rounded-full uppercase">Ativo</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-foreground">Plano</span>
-                  <span className="text-sm text-muted-foreground capitalize">
-                    {planType === 'premium_monthly' ? 'Mensal' : (planType === 'premium_yearly' ? 'Anual' : 'Semanal')}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-foreground">Expira em</span>
-                  <span className="text-sm text-muted-foreground">{formatDate(expiresAt)}</span>
-                </div>
-              </div>
-              
-              <div className="text-xs text-muted-foreground text-center px-4">
-                <p>Para gerenciar ou cancelar sua assinatura, utilize a plataforma do Mercado Pago ou entre em contato com o suporte.</p>
-              </div>
-
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => window.open('https://www.mercadopago.com.br/subscriptions', '_blank')}
-              >
-                Ir para Mercado Pago
-              </Button>
-              <Button 
-                variant="destructive" 
-                className="w-full"
-                onClick={() => { setShowSubscription(false); setShowCancelWizard(true); }}
-              >
-                Cancelar assinatura
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-        <CancelSubscriptionWizard open={showCancelWizard} onOpenChange={setShowCancelWizard} />
       </div>
     </div>
   );
