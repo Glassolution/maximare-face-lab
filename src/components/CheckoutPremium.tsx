@@ -15,15 +15,20 @@ const PLANS = {
   yearly: { name: "Anual", price: 99.90, price_cents: 9990, interval: "ano" },
 };
 
-// Inicializar MercadoPago com chave do .env
+// CORRIGIDO: Inicializar MercadoPago imediatamente com import direto
 const MP_PUBLIC_KEY = import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY;
+console.log('[Checkout] MP_PUBLIC_KEY available:', !!MP_PUBLIC_KEY);
 
+// Inicializar fora do componente para garantir que carregue antes
 if (MP_PUBLIC_KEY) {
   try {
     initMercadoPago(MP_PUBLIC_KEY, { locale: "pt-BR" });
+    console.log('[Checkout] MercadoPago SDK initialized successfully');
   } catch (e) {
-    console.error("[Checkout] Failed to init MercadoPago:", e);
+    console.error('[Checkout] Failed to init MercadoPago:', e);
   }
+} else {
+  console.error('[Checkout] VITE_MERCADOPAGO_PUBLIC_KEY not found in environment');
 }
 
 interface CheckoutPremiumProps {
@@ -65,22 +70,36 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
     };
   }, [pollingInterval]);
 
-  // Criar pagamento via Edge Function
+  // CORRIGIDO: Criar pagamento via Edge Function com autenticacao
   const createPayment = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.email) {
-        toast.error("Usuário não autenticado");
+      // Obter sessao para autenticacao
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast.error("Sessao expirada. Faca login novamente.");
         setLoading(false);
         return;
       }
 
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) {
+        toast.error("Usuario nao autenticado");
+        setLoading(false);
+        return;
+      }
+
+      console.log('[Checkout] Creating payment for user:', user.id, 'plan:', selectedPlan);
+
+      // CORRIGIDO: Chamar Edge Function com headers de autenticacao
       const { data, error } = await supabase.functions.invoke("create-payment", {
         body: {
           user_id: user.id,
           user_email: user.email,
           plan_id: selectedPlan,
+        },
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
         },
       });
 
@@ -90,6 +109,9 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
         setLoading(false);
         return;
       }
+
+      console.log('[Checkout] Payment created:', data);
+      console.log('[Checkout] preference_id:', data.preference_id);
 
       setPreferenceId(data.preference_id);
       setPaymentId(data.payment_id);
@@ -111,7 +133,7 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
     }
   }, [selectedPlan, paymentMethod]);
 
-  // Polling para verificar status do pagamento
+  // CORRIGIDO: Polling com autenticacao
   const startPolling = (internalPaymentId: string) => {
     let attempts = 0;
     const maxAttempts = 120; // 10 minutos (5s * 120)
@@ -126,14 +148,28 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
       }
 
       try {
+        // Obter sessao atual para autenticacao
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) {
+          console.error('[Checkout] No session token for polling');
+          return;
+        }
+
+        console.log('[Checkout] Polling check-payment-status for:', internalPaymentId);
+
         const { data, error } = await supabase.functions.invoke("check-payment-status", {
           body: { payment_id: internalPaymentId },
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
         });
 
         if (error) {
           console.error("[Checkout] Polling error:", error);
           return;
         }
+
+        console.log('[Checkout] Payment status:', data.status);
 
         if (data.status === "approved") {
           clearInterval(interval);
@@ -155,6 +191,7 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
   const handleCardPayment = async (formData: any) => {
     setLoading(true);
     try {
+      console.log('[Checkout] Card payment submitted, starting polling');
       // O Brick do MercadoPago ja processou o pagamento
       // Aguardamos o webhook atualizar o status
       // Iniciamos polling para verificar
@@ -173,6 +210,7 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
   const handlePixPayment = async (formData: any) => {
     setLoading(true);
     try {
+      console.log('[Checkout] PIX payment submitted, starting polling');
       // O Brick do MercadoPago ja processou o pagamento
       // Iniciamos polling para verificar
       if (paymentId) {
@@ -305,40 +343,45 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
     );
   }
 
-  // Renderizar PIX via Brick
+  // CORRIGIDO: Renderizar PIX via Brick com logs
   if (step === "pix") {
+    console.log('[Checkout] Rendering PIX step, preferenceId:', preferenceId, 'MP_PUBLIC_KEY:', !!MP_PUBLIC_KEY);
+
     return (
       <div className="p-6 space-y-6">
         <h2 className="text-2xl font-bold text-center">Pague com PIX</h2>
 
         {MP_PUBLIC_KEY && preferenceId ? (
-          <Payment
-            initialization={{
-              amount: selectedPlanData.price,
-              preferenceId: preferenceId,
-            }}
-            customization={{
-              paymentMethods: {
-                pix: "all",
-              },
-            }}
-            onSubmit={handlePixPayment}
-            onError={(error) => {
-              console.error("[Checkout] Brick PIX error:", error);
-              toast.error("Erro no formulario de pagamento PIX");
-            }}
-          />
+          <>
+            <Payment
+              initialization={{
+                amount: selectedPlanData.price,
+                preferenceId: preferenceId,
+              }}
+              customization={{
+                paymentMethods: {
+                  pix: "all",
+                },
+              }}
+              onSubmit={handlePixPayment}
+              onError={(error) => {
+                console.error("[Checkout] Brick PIX error:", error);
+                toast.error("Erro no formulario de pagamento PIX");
+              }}
+            />
+            <div className="flex items-center justify-center gap-2 text-sm text-zinc-400">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Aguardando pagamento...
+            </div>
+          </>
         ) : (
           <div className="text-center py-8">
             <AlertCircle className="w-12 h-12 mx-auto mb-4 text-yellow-500" />
             <p>Carregando formulario PIX...</p>
+            {!MP_PUBLIC_KEY && <p className="text-red-500 text-sm mt-2">Erro: Public Key nao configurada</p>}
+            {!preferenceId && <p className="text-red-500 text-sm mt-2">Erro: Preference ID nao gerado</p>}
           </div>
         )}
-
-        <div className="flex items-center justify-center gap-2 text-sm text-zinc-400">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          Aguardando pagamento...
-        </div>
 
         <Button onClick={onCancel} variant="ghost" className="w-full">
           Cancelar
@@ -349,6 +392,8 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
 
   // Renderizar cartao via Brick
   if (step === "card") {
+    console.log('[Checkout] Rendering Card step, preferenceId:', preferenceId);
+
     return (
       <div className="p-6 space-y-6">
         <h2 className="text-2xl font-bold text-center">Dados do cartao</h2>
@@ -375,6 +420,8 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
           <div className="text-center py-8">
             <AlertCircle className="w-12 h-12 mx-auto mb-4 text-yellow-500" />
             <p>Carregando formulario de cartao...</p>
+            {!MP_PUBLIC_KEY && <p className="text-red-500 text-sm mt-2">Erro: Public Key nao configurada</p>}
+            {!preferenceId && <p className="text-red-500 text-sm mt-2">Erro: Preference ID nao gerado</p>}
           </div>
         )}
 
