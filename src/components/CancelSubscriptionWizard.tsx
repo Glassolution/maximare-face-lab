@@ -44,10 +44,38 @@ export function CancelSubscriptionWizard({ open, onOpenChange }: Props) {
   };
 
   const submit = async () => {
-    // REMOVIDO: subscription-cancel Edge Function deletado
-    toast.error("Sistema de cancelamento em manutenção. Entre em contato com o suporte.");
-    onClose(false);
-    return;
+    try {
+      setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        toast.error("Faça login novamente");
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke("subscription-cancel", {
+        body: { user_id: session.user.id },
+      });
+
+      if (error) {
+        console.error("[Cancel] Error:", error);
+        toast.error("Erro ao cancelar assinatura");
+        setLoading(false);
+        return;
+      }
+
+      if (data.success) {
+        toast.success(data.message);
+        onClose(false);
+      } else {
+        toast.error(data.error || "Erro ao cancelar");
+      }
+    } catch (e) {
+      console.error("[Cancel] Exception:", e);
+      toast.error("Erro ao cancelar assinatura");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const reasons = [
