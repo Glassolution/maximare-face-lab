@@ -1034,8 +1034,7 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-background relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-b from-[hsl(0,0%,8%)] from-0% via-[hsl(0,0%,8%)] via-40% to-[hsl(224,76%,35%)] pointer-events-none" />
+    <div className="min-h-[100dvh] flex flex-col bg-[#0D0D14] relative overflow-hidden">
       <div className="relative z-10 flex flex-col flex-1 min-h-[100dvh] max-w-md mx-auto w-full">
         <div className="px-6 pt-6 pb-0 flex items-center justify-between">
           <button onClick={back} className="p-2 -ml-2 text-muted-foreground hover:text-foreground transition-colors">
