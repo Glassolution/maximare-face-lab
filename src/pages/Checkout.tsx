@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { PLAN_CONFIG, PlanType } from "@/config/plans";
@@ -27,7 +27,8 @@ export default function Checkout() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, refreshProfile } = useAuth();
-  const planId = (searchParams.get("plan") || "monthly") as PlanType;
+  const rawPlanId = searchParams.get("plan");
+  const planId: PlanType = rawPlanId === "yearly" ? "yearly" : "monthly";
   const plan = PLAN_CONFIG.PLANS[planId];
 
   const [step, setStep] = useState<CheckoutStep>("method");
@@ -37,7 +38,10 @@ export default function Checkout() {
   // PIX state
   const [pixCode, setPixCode] = useState("");
   const [pixQrBase64, setPixQrBase64] = useState("");
+  const [paymentId, setPaymentId] = useState("");
+  const [checkingPayment, setCheckingPayment] = useState(false);
   const [copied, setCopied] = useState(false);
+  const pixPollTimeoutRef = useRef<number | null>(null);
 
   // Card state
   const [cardNumber, setCardNumber] = useState("");
@@ -60,10 +64,6 @@ export default function Checkout() {
     };
   }, []);
 
-  if (!plan) {
-    navigate("/premium");
-    return null;
-  }
 
   const handlePixPayment = async () => {
     setLoading(true);
@@ -93,6 +93,7 @@ export default function Checkout() {
 
       setPixCode(data.pix_copy_paste || data.pix_qr_code || "");
       setPixQrBase64(data.pix_qr_code_base64 || "");
+      setPaymentId(String(data.payment_id || ""));
       setStep("pix_qr");
     } catch (err: any) {
       toast.error(err.message || "Erro ao gerar PIX");
@@ -164,6 +165,8 @@ export default function Checkout() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Erro ao processar pagamento");
 
+      setPaymentId(String(data.payment_id || ""));
+
       if (data.status === "approved") {
         setStep("success");
         setTimeout(() => refreshProfile(), 1500);
@@ -179,6 +182,72 @@ export default function Checkout() {
       setLoading(false);
     }
   };
+
+  const checkPaymentStatus = async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!paymentId) {
+      if (!silent) toast.error("Nenhum pagamento em aberto encontrado");
+      return;
+    }
+
+    if (!silent) setCheckingPayment(true);
+
+    try {
+      const token = await getValidAccessToken();
+      if (!token) throw new Error("Sessão expirada");
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-payment-status`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({ payment_id: paymentId }),
+        }
+      );
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Erro ao consultar pagamento");
+
+      if (data.status === "approved") {
+        setStep("success");
+        await refreshProfile();
+        toast.success("Pagamento confirmado! Premium ativado.");
+        return;
+      }
+
+      if (!silent && (data.status === "pending" || data.status === "in_process")) {
+        toast.info("Pagamento ainda pendente. Tente novamente em alguns segundos.");
+      }
+
+      if (!silent && data.status && !["pending", "in_process"].includes(data.status)) {
+        toast.error(`Status do pagamento: ${data.status_detail || data.status}`);
+      }
+    } catch (err: any) {
+      if (!silent) toast.error(err.message || "Erro ao verificar pagamento");
+    } finally {
+      if (!silent) setCheckingPayment(false);
+    }
+  };
+
+  useEffect(() => {
+    if (step !== "pix_qr" || !paymentId) return;
+
+    const poll = async () => {
+      await checkPaymentStatus({ silent: true });
+      pixPollTimeoutRef.current = window.setTimeout(poll, 6000);
+    };
+
+    pixPollTimeoutRef.current = window.setTimeout(poll, 6000);
+
+    return () => {
+      if (pixPollTimeoutRef.current) {
+        window.clearTimeout(pixPollTimeoutRef.current);
+      }
+    };
+  }, [step, paymentId]);
 
   const copyPix = () => {
     navigator.clipboard.writeText(pixCode);
@@ -472,9 +541,10 @@ export default function Checkout() {
               <Button
                 variant="ghost"
                 className="w-full"
-                onClick={() => navigate("/payment-callback?status=pending")}
+                disabled={!paymentId || checkingPayment}
+                onClick={() => checkPaymentStatus()}
               >
-                Já paguei
+                {checkingPayment ? "Verificando pagamento..." : "Já paguei"}
               </Button>
             </motion.div>
           )}
