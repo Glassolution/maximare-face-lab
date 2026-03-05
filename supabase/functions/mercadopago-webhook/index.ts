@@ -247,8 +247,37 @@ serve(async (req) => {
                 }
             } else {
                 console.log(`Payment status: ${payment.status} or no userId`);
+                
+                // TRATAMENTO DE REFUND/CANCELAMENTO
+                // Quando o pagamento é reembolsado ou cancelado, desativar premium
+                if (userId && (payment.status === 'refunded' || payment.status === 'cancelled' || payment.status === 'rejected')) {
+                    console.log(`[Webhook] Payment ${payment.status} - Deactivating premium for user ${userId}`);
+                    
+                    // Atualizar payments table
+                    await supabaseAdmin.from('payments').upsert({
+                        payment_id: payment.id.toString(),
+                        user_id: userId,
+                        status: payment.status,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'payment_id' });
+                    
+                    // Desativar premium no perfil
+                    await supabaseAdmin.from('profiles').update({
+                        is_premium: false,
+                        subscription_status: 'refunded',
+                        plan_type: 'free',
+                        payment_status: payment.status,
+                        subscription_expires_at: null,
+                        updated_at: new Date().toISOString()
+                    }).or(`id.eq.${userId},user_id.eq.${userId}`);
+                    
+                    console.log(`[Webhook] Premium deactivated for ${userId} due to ${payment.status}`);
+                    processed = true;
+                }
+                // Fim do tratamento de refund
+                
                 // If pending (e.g. PIX created), we might want to log it but not activate
-                if (userId && payment.status === 'pending') {
+                else if (userId && payment.status === 'pending') {
                      await supabaseAdmin.from('profiles').update({
                         payment_status: 'pending',
                         payment_id: payment.id.toString(),
