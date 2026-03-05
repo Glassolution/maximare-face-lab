@@ -18,6 +18,10 @@ interface Profile {
   plan_type?: string;
   is_admin?: boolean;
   is_ugc?: boolean;
+  last_payment_at?: string | null;
+  payment_provider?: string | null;
+  provider_payment_id?: string | null;
+  provider_subscription_id?: string | null;
 }
 
 interface UserData {

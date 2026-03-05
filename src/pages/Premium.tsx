@@ -41,6 +41,9 @@ export default function Premium() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Voltar ao app
           </Button>
+          <Button variant="ghost" className="text-destructive" onClick={() => navigate("/cancel-subscription")}>
+            Cancelar assinatura
+          </Button>
         </div>
       </div>
     );
