@@ -26,6 +26,7 @@ import Checkout from "@/pages/Checkout";
 import Admin from "@/pages/Admin";
 import Subscription from "@/pages/Subscription";
 import PaymentCallback from "@/pages/PaymentCallback";
+import CancelSubscription from "@/pages/CancelSubscription";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 import { useEffect } from "react";
@@ -36,7 +37,7 @@ const queryClient = new QueryClient();
 
 function Layout() {
   const location = useLocation();
-  const hideNav = ["/", "/onboarding", "/login", "/premium", "/checkout", "/landing", "/update-password", "/subscription", "/payment-callback"].includes(location.pathname) || location.pathname.startsWith("/admin");
+  const hideNav = ["/", "/onboarding", "/login", "/premium", "/checkout", "/landing", "/update-password", "/subscription", "/payment-callback", "/cancel-subscription"].includes(location.pathname) || location.pathname.startsWith("/admin");
 
   const { user, loading } = useAuth();
 
@@ -96,6 +97,7 @@ function Layout() {
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/subscription" element={<Subscription />} />
         <Route path="/payment-callback" element={<PaymentCallback />} />
+        <Route path="/cancel-subscription" element={<CancelSubscription />} />
         <Route path="/update-password" element={<UpdatePassword />} />
         <Route path="/admin/*" element={<Admin />} />
         <Route path="*" element={<NotFound />} />
