@@ -40,10 +40,11 @@ CREATE POLICY "Service role full access webhooks" ON webhook_events
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 -- Atualizar planos (apenas monthly e yearly)
+-- TESTE: Mensal a R$ 1,00 para testes
 UPDATE plans 
-SET price_cents = 2490, 
-    name = 'Mensal', 
-    price_display = 'R$ 24,90',
+SET price_cents = 100, 
+    name = 'Mensal (TESTE R$1)', 
+    price_display = 'R$ 1,00',
     interval = 'month',
     active = true
 WHERE id = 'monthly';

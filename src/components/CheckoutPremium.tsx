@@ -9,8 +9,9 @@ import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 
 // Planos disponiveis
+// TESTE: Mensal a R$ 1,00 para testes
 const PLANS = {
-  monthly: { name: "Mensal", price: 24.90, price_cents: 2490, interval: "mês" },
+  monthly: { name: "Mensal (TESTE R$1)", price: 1.00, price_cents: 100, interval: "mês" },
   yearly: { name: "Anual", price: 99.90, price_cents: 9990, interval: "ano" },
 };
 

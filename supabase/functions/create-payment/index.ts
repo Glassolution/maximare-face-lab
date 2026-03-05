@@ -9,8 +9,9 @@ const corsHeaders = {
 };
 
 // Planos disponiveis
+// TESTE: Mensal a R$ 1,00 (100 centavos) para testes
 const PLANS = {
-  monthly: { name: "Plano Mensal", price_cents: 2490, interval_days: 30 },
+  monthly: { name: "Plano Mensal (TESTE R$1)", price_cents: 100, interval_days: 30 },
   yearly: { name: "Plano Anual", price_cents: 9990, interval_days: 365 },
 };
 
