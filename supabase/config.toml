@@ -3,14 +3,11 @@ project_id = "xbtendfjajspaidpktsw"
 [functions.generate-tutorial-image]
 verify_jwt = false
 
-[functions.create-payment]
+[functions.create-subscription]
 verify_jwt = false
 
-[functions.mercadopago-webhook]
+[functions.mp-webhook]
 verify_jwt = false
 
 [functions.debug-admin]
-verify_jwt = false
-
-[functions.subscription-cancel]
 verify_jwt = false
