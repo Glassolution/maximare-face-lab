@@ -227,45 +227,54 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                 logger.log("[Checkout]", "RPC_ONLY flag active; skipping EF fallback.");
                 return false;
               }
-              // Fallback EF (specified id)
+              // Fallback EF (specified id) - Skip if 401 error
               logger.log("[Checkout]", "RPC did not confirm. Falling back to Edge Function...");
               const token = await getValidAccessToken();
               if (!token) {
                 logger.error("[Checkout]", "No valid token for check-payment-status fallback");
                 return false;
               }
-              const { data: efData, error: efError } = await supabase.functions.invoke('check-payment-status', {
-                headers: {
-                  apikey: (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "",
-                  "sb-access-token": token,
-                  "x-supabase-auth": token
-                },
-                body: { payment_id: payId }
-              });
-              logger.log("[Checkout]", "EF response:", { efData, efError: efError?.message });
-              if (!efError && efData?.status === 'approved') {
-                  logger.log("[Checkout]", "Edge Function Approved. Forcing session refresh...", efData);
-                  if (!notifiedRef.current) {
-                    notifiedRef.current = true;
-                    toast.success("Pagamento confirmado! Acesso liberado.");
-                  }
-                  setVerifying(false);
-                  await refreshProfile();
-                  const { data: { user: updatedUser } } = await supabase.auth.getUser();
-                  if (updatedUser) {
-                      const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', updatedUser.id).single();
-                      logger.log("[Checkout]", "Final Profile State:", {
-                          is_premium: updatedProfile?.is_premium,
-                          status: updatedProfile?.subscription_status,
-                          plan: updatedProfile?.plan_type,
-                          expires: updatedProfile?.subscription_expires_at
-                      });
-                  }
-                  onSuccess(email);
-                  return true;
-              } else if (efError) {
-                  logger.error("[Checkout]", "Edge Function error:", efError);
-              } else {
+              try {
+                const { data: efData, error: efError } = await supabase.functions.invoke('check-payment-status', {
+                  headers: {
+                    apikey: (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "",
+                    "sb-access-token": token,
+                    "x-supabase-auth": token
+                  },
+                  body: { payment_id: payId }
+                });
+                logger.log("[Checkout]", "EF response:", { efData, efError: efError?.message });
+                if (!efError && efData?.status === 'approved') {
+                    logger.log("[Checkout]", "Edge Function Approved. Forcing session refresh...", efData);
+                    if (!notifiedRef.current) {
+                      notifiedRef.current = true;
+                      toast.success("Pagamento confirmado! Acesso liberado.");
+                    }
+                    setVerifying(false);
+                    await refreshProfile();
+                    const { data: { user: updatedUser } } = await supabase.auth.getUser();
+                    if (updatedUser) {
+                        const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', updatedUser.id).single();
+                        logger.log("[Checkout]", "Final Profile State:", {
+                            is_premium: updatedProfile?.is_premium,
+                            status: updatedProfile?.subscription_status,
+                            plan: updatedProfile?.plan_type,
+                            expires: updatedProfile?.subscription_expires_at
+                        });
+                    }
+                    onSuccess(email);
+                    return true;
+                } else if (efError) {
+                    logger.error("[Checkout]", "Edge Function error:", efError);
+                    // If 401, log but don't stop polling - webhook may still process
+                    if (efError.message?.includes('401') || efError.message?.includes('Unauthorized')) {
+                      logger.log("[Checkout]", "401 error - webhook may process payment later");
+                    }
+                }
+              } catch (invokeError) {
+                logger.error("[Checkout]", "Edge Function invoke error:", invokeError);
+                // Continue polling even if EF fails
+              }
                   // Final fallback: ask server to look up latest approved for this user
                   const { data: latestData, error: latestErr } = await supabase.functions.invoke('check-payment-latest', {
                     headers: {
