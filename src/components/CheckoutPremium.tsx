@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Payment, initMercadoPago } from "@mercadopago/sdk-react";
-import { Loader2, QrCode, CreditCard, AlertCircle, Check, Copy } from "lucide-react";
+import { Loader2, QrCode, CreditCard, AlertCircle, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
@@ -11,7 +11,7 @@ import { useNavigate } from "react-router-dom";
 // Planos disponiveis
 // TESTE: Mensal a R$ 1,00 para testes
 const PLANS = {
-  monthly: { name: "Mensal (TESTE R$1)", price: 1.00, price_cents: 100, interval: "mês" },
+  monthly: { name: "Mensal", price: 1.00, price_cents: 100, interval: "mês" },
   yearly: { name: "Anual", price: 99.90, price_cents: 9990, interval: "ano" },
 };
 
@@ -52,8 +52,6 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
   const [loading, setLoading] = useState(false);
   const [preferenceId, setPreferenceId] = useState<string | null>(null);
   const [paymentId, setPaymentId] = useState<string | null>(null);
-  const [pixQrCode, setPixQrCode] = useState<string | null>(null);
-  const [pixCopyPaste, setPixCopyPaste] = useState<string | null>(null);
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
 
   const selectedPlanData = PLANS[selectedPlan];
@@ -67,7 +65,7 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
     };
   }, [pollingInterval]);
 
-  // Criar pagamento
+  // Criar pagamento via Edge Function
   const createPayment = useCallback(async () => {
     setLoading(true);
     try {
@@ -96,9 +94,11 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
       setPreferenceId(data.preference_id);
       setPaymentId(data.payment_id);
 
+      // Avancar para o step de pagamento (PIX ou Cartao)
       if (paymentMethod === "pix") {
-        // Para PIX, precisamos criar o pagamento via API
-        await createPixPayment(data.preference_id);
+        setStep("pix");
+        // Iniciar polling para PIX
+        startPolling(data.payment_id);
       } else {
         setStep("card");
       }
@@ -111,70 +111,8 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
     }
   }, [selectedPlan, paymentMethod]);
 
-  // Criar pagamento PIX
-  const createPixPayment = async (prefId: string) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Criar pagamento PIX via MercadoPago
-      const response = await fetch("https://api.mercadopago.com/v1/payments", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${import.meta.env.VITE_MERCADOPAGO_ACCESS_TOKEN || ""}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          transaction_amount: selectedPlanData.price,
-          description: `Plano ${selectedPlanData.name} - Maximare`,
-          payment_method_id: "pix",
-          payer: {
-            email: user.email,
-            identification: {
-              type: "CPF",
-              number: cpf.replace(/\D/g, ""),
-            },
-          },
-          notification_url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mercadopago-webhook`,
-          external_reference: user.id,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        console.error("[Checkout] PIX creation error:", error);
-        toast.error("Erro ao gerar QR Code PIX");
-        return;
-      }
-
-      const paymentData = await response.json();
-
-      // Atualizar payment_id na tabela
-      if (paymentId) {
-        await supabase
-          .from("payments")
-          .update({ payment_id: String(paymentData.id) })
-          .eq("id", paymentId);
-      }
-
-      // Extrair dados do PIX
-      const pointOfInteraction = paymentData.point_of_interaction;
-      if (pointOfInteraction?.transaction_data) {
-        setPixQrCode(pointOfInteraction.transaction_data.qr_code_base64);
-        setPixCopyPaste(pointOfInteraction.transaction_data.qr_code);
-        setStep("pix");
-
-        // Iniciar polling
-        startPolling(String(paymentData.id));
-      }
-    } catch (e) {
-      console.error("[Checkout] PIX error:", e);
-      toast.error("Erro ao gerar PIX");
-    }
-  };
-
   // Polling para verificar status do pagamento
-  const startPolling = (mpPaymentId: string) => {
+  const startPolling = (internalPaymentId: string) => {
     let attempts = 0;
     const maxAttempts = 120; // 10 minutos (5s * 120)
 
@@ -189,7 +127,7 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
 
       try {
         const { data, error } = await supabase.functions.invoke("check-payment-status", {
-          body: { payment_id: paymentId },
+          body: { payment_id: internalPaymentId },
         });
 
         if (error) {
@@ -213,63 +151,16 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
     setPollingInterval(interval);
   };
 
-  // Handler para pagamento com cartão
+  // Handler para pagamento com cartao via Brick
   const handleCardPayment = async (formData: any) => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error("Usuário não autenticado");
-        setLoading(false);
-        return;
+      // O Brick do MercadoPago ja processou o pagamento
+      // Aguardamos o webhook atualizar o status
+      // Iniciamos polling para verificar
+      if (paymentId) {
+        startPolling(paymentId);
       }
-
-      // Criar pagamento com cartão via MercadoPago
-      const response = await fetch("https://api.mercadopago.com/v1/payments", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${import.meta.env.VITE_MERCADOPAGO_ACCESS_TOKEN || ""}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          transaction_amount: selectedPlanData.price,
-          token: formData.token,
-          description: `Plano ${selectedPlanData.name} - Maximare`,
-          installments: formData.installments || 1,
-          payment_method_id: formData.payment_method_id,
-          payer: {
-            email: user.email,
-            identification: {
-              type: "CPF",
-              number: cpf.replace(/\D/g, ""),
-            },
-          },
-          notification_url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mercadopago-webhook`,
-          external_reference: user.id,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        console.error("[Checkout] Card payment error:", error);
-        toast.error("Erro ao processar cartão. Verifique os dados.");
-        setLoading(false);
-        return;
-      }
-
-      const paymentData = await response.json();
-
-      if (paymentData.status === "approved") {
-        setStep("success");
-        toast.success("Pagamento aprovado! 🎉");
-        setTimeout(() => {
-          onSuccess();
-          navigate("/", { state: { premiumActivated: true } });
-        }, 2000);
-      } else {
-        toast.error(`Pagamento ${paymentData.status}. Tente novamente.`);
-      }
-
       setLoading(false);
     } catch (e) {
       console.error("[Checkout] Card error:", e);
@@ -278,11 +169,20 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
     }
   };
 
-  // Copiar código PIX
-  const copyPixCode = () => {
-    if (pixCopyPaste) {
-      navigator.clipboard.writeText(pixCopyPaste);
-      toast.success("Código PIX copiado!");
+  // Handler para pagamento PIX via Brick
+  const handlePixPayment = async (formData: any) => {
+    setLoading(true);
+    try {
+      // O Brick do MercadoPago ja processou o pagamento
+      // Iniciamos polling para verificar
+      if (paymentId) {
+        startPolling(paymentId);
+      }
+      setLoading(false);
+    } catch (e) {
+      console.error("[Checkout] PIX error:", e);
+      toast.error("Erro ao processar PIX");
+      setLoading(false);
     }
   };
 
@@ -330,7 +230,7 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
     );
   }
 
-  // Renderizar seletor de método
+  // Renderizar seletor de metodo
   if (step === "method") {
     return (
       <div className="p-6 space-y-6">
@@ -348,7 +248,7 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
             <QrCode className="w-8 h-8" />
             <div className="text-left">
               <div className="font-semibold">PIX</div>
-              <div className="text-sm text-zinc-400">Pagamento instantâneo</div>
+              <div className="text-sm text-zinc-400">Pagamento instantaneo</div>
             </div>
           </button>
 
@@ -362,8 +262,8 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
           >
             <CreditCard className="w-8 h-8" />
             <div className="text-left">
-              <div className="font-semibold">Cartão de Crédito</div>
-              <div className="text-sm text-zinc-400">Até 12x sem juros</div>
+              <div className="font-semibold">Cartao de Credito</div>
+              <div className="text-sm text-zinc-400">Ate 12x sem juros</div>
             </div>
           </button>
         </div>
@@ -405,38 +305,40 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
     );
   }
 
-  // Renderizar PIX
+  // Renderizar PIX via Brick
   if (step === "pix") {
     return (
-      <div className="p-6 space-y-6 text-center">
-        <h2 className="text-2xl font-bold">Pague com PIX</h2>
+      <div className="p-6 space-y-6">
+        <h2 className="text-2xl font-bold text-center">Pague com PIX</h2>
 
-        {pixQrCode ? (
-          <>
-            <img
-              src={`data:image/png;base64,${pixQrCode}`}
-              alt="QR Code PIX"
-              className="mx-auto w-64 h-64"
-            />
-
-            <div className="space-y-2">
-              <p className="text-zinc-400">Escaneie o QR Code ou copie o código</p>
-              <Button onClick={copyPixCode} variant="outline" className="gap-2">
-                <Copy className="w-4 h-4" />
-                Copiar código PIX
-              </Button>
-            </div>
-
-            <div className="flex items-center justify-center gap-2 text-sm text-zinc-400">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Aguardando pagamento...
-            </div>
-          </>
+        {MP_PUBLIC_KEY && preferenceId ? (
+          <Payment
+            initialization={{
+              amount: selectedPlanData.price,
+              preferenceId: preferenceId,
+            }}
+            customization={{
+              paymentMethods: {
+                pix: "all",
+              },
+            }}
+            onSubmit={handlePixPayment}
+            onError={(error) => {
+              console.error("[Checkout] Brick PIX error:", error);
+              toast.error("Erro no formulario de pagamento PIX");
+            }}
+          />
         ) : (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-12 h-12 animate-spin" />
+          <div className="text-center py-8">
+            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-yellow-500" />
+            <p>Carregando formulario PIX...</p>
           </div>
         )}
+
+        <div className="flex items-center justify-center gap-2 text-sm text-zinc-400">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Aguardando pagamento...
+        </div>
 
         <Button onClick={onCancel} variant="ghost" className="w-full">
           Cancelar
@@ -445,17 +347,17 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
     );
   }
 
-  // Renderizar cartão
+  // Renderizar cartao via Brick
   if (step === "card") {
     return (
       <div className="p-6 space-y-6">
-        <h2 className="text-2xl font-bold text-center">Dados do cartão</h2>
+        <h2 className="text-2xl font-bold text-center">Dados do cartao</h2>
 
-        {MP_PUBLIC_KEY ? (
+        {MP_PUBLIC_KEY && preferenceId ? (
           <Payment
             initialization={{
               amount: selectedPlanData.price,
-              preferenceId: preferenceId || undefined,
+              preferenceId: preferenceId,
             }}
             customization={{
               paymentMethods: {
@@ -466,13 +368,13 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
             onSubmit={handleCardPayment}
             onError={(error) => {
               console.error("[Checkout] Brick error:", error);
-              toast.error("Erro no formulário de pagamento");
+              toast.error("Erro no formulario de pagamento");
             }}
           />
         ) : (
           <div className="text-center py-8">
             <AlertCircle className="w-12 h-12 mx-auto mb-4 text-yellow-500" />
-            <p>Sistema de pagamento não configurado</p>
+            <p>Carregando formulario de cartao...</p>
           </div>
         )}
 
@@ -493,11 +395,11 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
 
         <h2 className="text-2xl font-bold">Premium ativado com sucesso! 🎉</h2>
         <p className="text-zinc-400">
-          Seu acesso premium está ativo. Aproveite todos os recursos!
+          Seu acesso premium esta ativo. Aproveite todos os recursos!
         </p>
 
         <Button onClick={() => navigate("/")} className="w-full">
-          Começar a usar
+          Comecar a usar
         </Button>
       </div>
     );
