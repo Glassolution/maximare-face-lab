@@ -388,7 +388,8 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
               paymentMethods: {
                 creditCard: "all",
                 debitCard: "all",
-              },
+                mercadoPago: "all",
+              } as any,
             }}
             onSubmit={handleCardPayment}
             onError={(error) => {
