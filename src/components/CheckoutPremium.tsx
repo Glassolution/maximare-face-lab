@@ -340,7 +340,7 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
               }}
               customization={{
                 paymentMethods: {
-                  pix: "all",
+                  bankTransfer: "all",
                 },
               }}
               onSubmit={handlePixPayment}
