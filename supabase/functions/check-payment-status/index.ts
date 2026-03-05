@@ -93,6 +93,18 @@ serve(async (req) => {
 
     console.log("[check-payment] Authenticated user:", user.id);
 
+    // Parse request
+    const { payment_id } = await req.json();
+
+    if (!payment_id) {
+      return new Response(
+        JSON.stringify({ error: "Missing payment_id" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("[check-payment] Checking payment:", payment_id);
+
     // Get payment record
     const { data: paymentRecord, error: dbError } = await supabaseAdmin
       .from("payments")
