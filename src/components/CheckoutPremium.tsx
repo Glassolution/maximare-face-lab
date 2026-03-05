@@ -7,6 +7,7 @@ import { Loader2, QrCode, CreditCard, AlertCircle, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
+import { getValidAccessToken } from "@/lib/session";
 
 // Planos disponiveis
 // TESTE: Mensal a R$ 1,00 para testes
@@ -83,8 +84,17 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
 
       console.log('[Checkout] Creating payment for user:', user.id, 'plan:', selectedPlan);
 
-      // CORRIGIDO: supabase.functions.invoke adiciona o token de autenticacao automaticamente
+      const accessToken = await getValidAccessToken();
+      if (!accessToken) {
+        toast.error("Sua sessão expirou. Faça login novamente.");
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke("create-payment", {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
         body: {
           user_id: user.id,
           user_email: user.email,
@@ -108,8 +118,6 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
       // Avancar para o step de pagamento (PIX ou Cartao)
       if (paymentMethod === "pix") {
         setStep("pix");
-        // Iniciar polling para PIX
-        startPolling(data.payment_id);
       } else {
         setStep("card");
       }
@@ -139,8 +147,18 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
       try {
         console.log('[Checkout] Polling check-payment-status for:', internalPaymentId);
 
-        // CORRIGIDO: supabase.functions.invoke adiciona o token de autenticacao automaticamente
+        const accessToken = await getValidAccessToken();
+        if (!accessToken) {
+          console.error("[Checkout] Polling aborted: missing access token");
+          clearInterval(interval);
+          toast.error("Sua sessão expirou. Faça login novamente.");
+          return;
+        }
+
         const { data, error } = await supabase.functions.invoke("check-payment-status", {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
           body: { payment_id: internalPaymentId },
         });
 
@@ -342,6 +360,9 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
                 paymentMethods: {
                   bankTransfer: "all",
                   mercadoPago: "all",
+                  types: {
+                    included: ["bank_transfer"],
+                  },
                 } as any,
               }}
               onSubmit={handlePixPayment}
@@ -390,6 +411,9 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
                 creditCard: "all",
                 debitCard: "all",
                 mercadoPago: "all",
+                types: {
+                  included: ["creditCard", "debitCard"],
+                },
               } as any,
             }}
             onSubmit={handleCardPayment}

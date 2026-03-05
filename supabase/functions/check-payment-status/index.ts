@@ -54,11 +54,14 @@ serve(async (req) => {
 
   try {
     // Verificar autenticacao do usuario
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      console.error("[check-payment] Missing Authorization header");
+    const authHeader = req.headers.get("Authorization");
+    const sbAccessToken = req.headers.get("sb-access-token");
+    const token = authHeader?.replace(/^Bearer\s+/i, "") || sbAccessToken;
+
+    if (!token) {
+      console.error("[check-payment] Missing auth token");
       return new Response(
-        JSON.stringify({ error: "Unauthorized - Missing Authorization header" }),
+        JSON.stringify({ error: "Unauthorized - Missing auth token" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -79,8 +82,7 @@ serve(async (req) => {
     // Usar service role para verificar o token do usuario e acessar dados
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Extrair token do header e verificar usuario
-    const token = authHeader.replace('Bearer ', '');
+    // Verificar usuario autenticado com o token recebido
     const { data: { user } } = await supabaseAdmin.auth.getUser(token);
 
     if (!user) {
