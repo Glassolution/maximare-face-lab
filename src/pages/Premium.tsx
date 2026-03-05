@@ -2,69 +2,23 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { PLAN_CONFIG, PlanType } from "@/config/plans";
-
-import { getValidAccessToken } from "@/lib/session";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { toast } from "sonner";
-import { Crown, Check, ArrowLeft, Loader2, Sparkles, Shield } from "lucide-react";
+import { Crown, Check, ArrowLeft, Sparkles, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Premium() {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
-  const [loading, setLoading] = useState<string | null>(null);
 
   const isPremium = profile?.is_premium || profile?.subscription_status === "active";
 
-  const handleSubscribe = async (planId: PlanType) => {
+  const handleSubscribe = (planId: PlanType) => {
     if (!user) {
-      toast.error("Faça login para continuar");
       navigate("/login");
       return;
     }
-
-    setLoading(planId);
-
-    try {
-      const token = await getValidAccessToken();
-      if (!token) {
-        throw new Error("Sessão inválida. Faça login novamente.");
-      }
-
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-subscription`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({ planId }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data?.error || "Erro ao criar assinatura");
-      }
-
-      if (data?.init_point) {
-        // Redirect to Mercado Pago Checkout Pro
-        window.location.href = data.init_point;
-      } else {
-        throw new Error("URL de pagamento não recebida");
-      }
-
-      if (data.init_point) {
-        // Redirect to Mercado Pago Checkout Pro
-        window.location.href = data.init_point;
-      } else {
-        throw new Error("URL de pagamento não recebida");
-      }
-    } catch (err: any) {
-      console.error("[Premium] Error:", err);
-      toast.error(err.message || "Erro ao processar. Tente novamente.");
-      setLoading(null);
-    }
+    navigate(`/checkout?plan=${planId}`);
   };
 
   if (isPremium) {
@@ -95,7 +49,6 @@ export default function Premium() {
   return (
     <div className="min-h-screen bg-background px-4 py-8">
       <div className="max-w-lg mx-auto space-y-6">
-        {/* Header */}
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="w-5 h-5" />
@@ -103,7 +56,6 @@ export default function Premium() {
           <h1 className="text-xl font-bold text-foreground">Seja Premium</h1>
         </div>
 
-        {/* Hero */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -118,7 +70,6 @@ export default function Premium() {
           </p>
         </motion.div>
 
-        {/* Plans */}
         <div className="space-y-4">
           {(Object.entries(PLAN_CONFIG.PLANS) as [PlanType, typeof PLAN_CONFIG.PLANS[PlanType]][]).map(
             ([key, plan], index) => (
@@ -165,17 +116,9 @@ export default function Premium() {
                   <Button
                     className="w-full"
                     variant={plan.badge === "Mais Popular" ? "default" : "outline"}
-                    disabled={loading !== null}
                     onClick={() => handleSubscribe(key)}
                   >
-                    {loading === key ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Processando...
-                      </>
-                    ) : (
-                      "Assinar agora"
-                    )}
+                    Assinar agora
                   </Button>
                 </Card>
               </motion.div>
@@ -183,7 +126,6 @@ export default function Premium() {
           )}
         </div>
 
-        {/* Trust badges */}
         <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground pt-2">
           <Shield className="w-4 h-4" />
           <span>Pagamento seguro via Mercado Pago • Cancele quando quiser</span>
