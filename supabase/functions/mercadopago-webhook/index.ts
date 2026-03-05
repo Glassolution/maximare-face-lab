@@ -22,8 +22,16 @@ serve(async (req) => {
     const query = Object.fromEntries(url.searchParams.entries());
     const bodyText = await req.text();
     const eventTypePre = query.topic || 'unknown';
-    const resourceIdPre = query.id;
     const actionPre = query.action || 'unknown';
+    // Extract resourceId before signature check (from query or raw body text)
+    let resourceIdPre = query.id || '';
+    if (!resourceIdPre && bodyText) {
+      const m =
+        /"data"\s*:\s*\{\s*"id"\s*:\s*"([^"]+)"/.exec(bodyText) ||
+        /"id"\s*:\s*"([^"]+)"/.exec(bodyText) ||
+        /"id"\s*:\s*(\d+)/.exec(bodyText);
+      if (m) resourceIdPre = m[1];
+    }
 
     if (!MP_WEBHOOK_SECRET) {
       console.warn("[SECURITY WARNING] MP_WEBHOOK_SECRET not set — webhook running without signature enforcement");
@@ -44,7 +52,7 @@ serve(async (req) => {
       if (!ts || !v1) {
         return new Response(JSON.stringify({ error: "invalid_signature_format" }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
-      const manifest = `id:${resourceId};request-timestamp:${ts};requestId:${xRequestId};signed_payload:${bodyText}`;
+      const manifest = `id:${resourceIdPre};request-timestamp:${ts};requestId:${xRequestId};signed_payload:${bodyText}`;
       const key = await crypto.subtle.importKey(
         "raw",
         new TextEncoder().encode(MP_WEBHOOK_SECRET),
@@ -68,7 +76,7 @@ serve(async (req) => {
         .maybeSingle();
 
     if (existing) {
-        console.log("Event already processed:", resourceId);
+        console.log("Event already processed:", resourceIdPre);
         return new Response(JSON.stringify({ message: "Already processed" }), { status: 200 });
     }
 

@@ -185,12 +185,7 @@ export default function BattleRoom() {
       window.clearTimeout(timeout);
     };
   }, [myStablePhotoUrl, opponentStablePhotoUrl]);
-  const isCreator = battle?.created_by === userProfile?.id;
   const { nowServerApprox, processingDeadlineMs: hookProcessingDeadlineMs, hardTimedOut } = useBattleTimeout(battle, result, serverTimeOffsetMs);
-  const { myStablePhotoUrl, opponentStablePhotoUrl } = {
-    myStablePhotoUrl: isCreator ? stableCreatorPhotoUrl : stableOpponentPhotoUrl,
-    opponentStablePhotoUrl: isCreator ? stableOpponentPhotoUrl : stableCreatorPhotoUrl,
-  };
   const processingDeadlineMsResolved = processingDeadlineMs ?? hookProcessingDeadlineMs;
 
   useEffect(() => {
