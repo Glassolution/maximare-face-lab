@@ -284,26 +284,30 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                 logger.error("[Checkout]", "Edge Function invoke error:", invokeError);
                 // Continue polling even if EF fails
               }
-                  // Final fallback: ask server to look up latest approved for this user
-                  const { data: latestData, error: latestErr } = await supabase.functions.invoke('check-payment-latest', {
-                    headers: {
-                      apikey: (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "",
-                      "sb-access-token": token,
-                      "x-supabase-auth": token
-                    },
-                    body: {}
-                  });
-                  logger.log("[Checkout]", "EF latest response:", { latestData, latestErr: latestErr?.message });
-                  if (!latestErr && latestData?.ok && latestData?.status === 'approved') {
-                    if (!notifiedRef.current) {
-                      notifiedRef.current = true;
-                      toast.success("Pagamento confirmado! Acesso liberado.");
-                    }
-                    setVerifying(false);
-                    await refreshProfile();
-                    onSuccess(email);
-                    return true;
+              
+              // Final fallback: ask server to look up latest approved for this user
+              try {
+                const { data: latestData, error: latestErr } = await supabase.functions.invoke('check-payment-latest', {
+                  headers: {
+                    apikey: (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "",
+                    "sb-access-token": token,
+                    "x-supabase-auth": token
+                  },
+                  body: {}
+                });
+                logger.log("[Checkout]", "EF latest response:", { latestData, latestErr: latestErr?.message });
+                if (!latestErr && latestData?.ok && latestData?.status === 'approved') {
+                  if (!notifiedRef.current) {
+                    notifiedRef.current = true;
+                    toast.success("Pagamento confirmado! Acesso liberado.");
                   }
+                  setVerifying(false);
+                  await refreshProfile();
+                  onSuccess(email);
+                  return true;
+                }
+              } catch (latestErr) {
+                logger.error("[Checkout]", "Latest payment check error:", latestErr);
               }
            } catch (err) {
                logger.error("[Checkout]", "Polling Error:", err);
