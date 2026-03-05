@@ -14,9 +14,23 @@ import { trackEvent, captureException } from "@/lib/posthog";
 import { motion } from "framer-motion";
 import { getValidAccessToken } from "@/lib/session";
 
-initMercadoPago(import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY || 'TEST-539d056c-2673-4566-a401-4475f82245c7', {
-  locale: 'pt-BR'
-});
+// CORRIGIDO: Inicialização do MercadoPago com tratamento de erro
+const MERCADOPAGO_PUBLIC_KEY = import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY || 'TEST-539d056c-2673-4566-a401-4475f82245c7';
+
+// CORRIGIDO: Verificar se a chave está configurada
+if (!MERCADOPAGO_PUBLIC_KEY || MERCADOPAGO_PUBLIC_KEY === 'TEST-539d056c-2673-4566-a401-4475f82245c7') {
+  console.warn('[Checkout] ATENÇÃO: Usando chave de teste do MercadoPago. Configure VITE_MERCADOPAGO_PUBLIC_KEY no .env');
+}
+
+// CORRIGIDO: Inicializar SDK com tratamento de erro
+try {
+  initMercadoPago(MERCADOPAGO_PUBLIC_KEY, {
+    locale: 'pt-BR'
+  });
+  console.log('[Checkout] MercadoPago SDK inicializado com sucesso');
+} catch (error) {
+  console.error('[Checkout] ERRO ao inicializar MercadoPago SDK:', error);
+}
 
 interface CheckoutPremiumProps {
   plan: 'weekly' | 'monthly' | 'yearly';
@@ -99,7 +113,8 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
   const { refreshSession, refreshProfile } = useAuth(); 
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
-  const [sdkReady] = useState(true);
+  const [sdkReady, setSdkReady] = useState(false);  // CORRIGIDO: Iniciar como false
+  const [sdkError, setSdkError] = useState<string | null>(null);  // CORRIGIDO: Estado para erro do SDK
   const [loadingUser, setLoadingUser] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'pix'>('card');
   const cardPaymentBrickController = useRef<any>(null);
@@ -155,6 +170,34 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
         hidePaymentButton: false,
     },
   }), []);
+
+  // CORRIGIDO: Verificar carregamento do MercadoPago SDK
+  useEffect(() => {
+    const checkSdkLoaded = () => {
+      // Verificar se o objeto MercadoPago está disponível globalmente
+      if (typeof window !== 'undefined' && (window as any).MercadoPago) {
+        console.log('[Checkout] MercadoPago SDK carregado com sucesso');
+        setSdkReady(true);
+        setSdkError(null);
+      } else {
+        // Tentar novamente após 500ms
+        setTimeout(checkSdkLoaded, 500);
+      }
+    };
+    
+    // Iniciar verificação
+    checkSdkLoaded();
+    
+    // Timeout de segurança: se não carregar em 10s, mostrar erro
+    const timeout = setTimeout(() => {
+      if (!sdkReady) {
+        console.error('[Checkout] Timeout: MercadoPago SDK não carregou após 10s');
+        setSdkError('Erro ao carregar o sistema de pagamento. Verifique sua conexão.');
+      }
+    }, 10000);
+    
+    return () => clearTimeout(timeout);
+  }, []);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -953,7 +996,21 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                     <p className="text-sm font-bold text-gray-900 dark:text-white mb-2">Cartão de crédito ou débito</p>
                     {/* Card Form handled by Brick */}
                     <div className="bg-transparent dark:bg-transparent rounded-2xl p-1 border-none min-h-[300px]">
-                        {sdkReady ? (
+                        {/* CORRIGIDO: Mostrar erro se SDK não carregou */}
+                        {sdkError ? (
+                            <div className="flex flex-col items-center justify-center p-8 text-center">
+                                <AlertTriangle className="h-12 w-12 text-yellow-500 mb-4" />
+                                <p className="text-gray-900 dark:text-white font-bold mb-2">Erro ao carregar pagamento</p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{sdkError}</p>
+                                <Button 
+                                    onClick={() => window.location.reload()} 
+                                    variant="outline"
+                                    className="border-blue-500 text-blue-500 hover:bg-blue-500/10"
+                                >
+                                    <RefreshCw className="mr-2 h-4 w-4" /> Tentar novamente
+                                </Button>
+                            </div>
+                        ) : sdkReady ? (
                             <CardPayment
                                 initialization={initialization}
                                 customization={customization}
@@ -962,9 +1019,16 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                                 onError={(error) => {
                                     console.error('Brick Error:', error);
                                     toast.error("Erro ao carregar formulário de pagamento.");
+                                    setSdkError('Erro ao inicializar formulário de pagamento.');
                                 }}
                             />
-                        ) : null}
+                        ) : (
+                            // CORRIGIDO: Mostrar loading enquanto SDK carrega
+                            <div className="flex flex-col items-center justify-center p-8">
+                                <Loader2 className="h-8 w-8 animate-spin text-blue-500 mb-4" />
+                                <p className="text-sm text-gray-500 dark:text-gray-400">Carregando formulário de pagamento...</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
