@@ -14,9 +14,10 @@ export function useBattles() {
     setLoading(true);
     try {
       // Fetch battles where user is creator or opponent
+      // CORRIGIDO: Selecionar apenas campos necessários
       const { data, error } = await supabase
         .from('battles')
-        .select('*')
+        .select('id, created_by, opponent_id, status, created_at, expires_at, theme, stake, winner_id, created_by_ready, opponent_ready')
         .or(`created_by.eq.${user.id},opponent_id.eq.${user.id}`)
         .order('created_at', { ascending: false });
 

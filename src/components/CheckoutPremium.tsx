@@ -311,9 +311,14 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                   await refreshProfile();
                   
                   // 2. Double check profile state after refresh (Optional, for logging)
+                  // CORRIGIDO: Selecionar apenas campos necessários
                   const { data: { user: updatedUser } } = await supabase.auth.getUser();
                   if (updatedUser) {
-                      const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', updatedUser.id).single();
+                      const { data: updatedProfile } = await supabase
+                          .from('profiles')
+                          .select('is_premium, subscription_status, plan_type, subscription_expires_at')
+                          .eq('id', updatedUser.id)
+                          .single();
                       logger.log("[Checkout]", "Final Profile State:", {
                           is_premium: updatedProfile?.is_premium,
                           status: updatedProfile?.subscription_status,
@@ -355,9 +360,14 @@ export const CheckoutPremium = ({ plan, price, onSuccess, onCancel }: CheckoutPr
                     }
                     setVerifying(false);
                     await refreshProfile();
+                    // CORRIGIDO: Selecionar apenas campos necessários
                     const { data: { user: updatedUser } } = await supabase.auth.getUser();
                     if (updatedUser) {
-                        const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', updatedUser.id).single();
+                        const { data: updatedProfile } = await supabase
+                            .from('profiles')
+                            .select('is_premium, subscription_status, plan_type, subscription_expires_at')
+                            .eq('id', updatedUser.id)
+                            .single();
                         logger.log("[Checkout]", "Final Profile State:", {
                             is_premium: updatedProfile?.is_premium,
                             status: updatedProfile?.subscription_status,

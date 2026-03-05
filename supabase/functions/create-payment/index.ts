@@ -70,9 +70,10 @@ serve(async (req) => {
 
     // 1. Fetch Plan Details from Database (Price Security)
     console.log("[Create-Payment] Buscando plano:", plan_id);
+    // CORRIGIDO: Selecionar apenas campos necessários
     const { data: planData, error: planError } = await supabaseAdmin
         .from('plans')
-        .select('*')
+        .select('id, name, interval, price_cents, currency, active')
         .eq('id', plan_id)
         .single();
 

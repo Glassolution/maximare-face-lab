@@ -1,5 +1,54 @@
 import { supabase } from "@/integrations/supabase/client";
 
+// CORRIGIDO: Função para comprimir imagem antes do upload
+async function compressImage(file: File, maxWidth: number, quality: number): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        // Redimensionar se maior que maxWidth
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Failed to get canvas context'));
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Converter para WebP com qualidade especificada
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Failed to compress image'));
+            }
+          },
+          'image/webp',
+          quality
+        );
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
 export interface AvatarUploadResult {
   publicUrl: string;
   path: string;
@@ -43,20 +92,27 @@ export const avatarService = {
 
     const userId = session.user.id;
     const filePath = `${userId}/avatar.webp`;
-    
+
     console.log(`[AvatarService] Target user: ${userId}`);
     console.log(`[AvatarService] Target path: ${filePath}`);
 
+    // CORRIGIDO: Comprimir imagem antes do upload para reduzir egress
+    let optimizedFile: File | Blob = file;
+    try {
+      optimizedFile = await compressImage(file, 400, 0.8); // Max 400px, qualidade 80%
+      console.log(`[AvatarService] Imagem comprimida: ${file.size} -> ${optimizedFile.size} bytes`);
+    } catch (compressError) {
+      console.warn('[AvatarService] Falha ao comprimir imagem, usando original:', compressError);
+    }
+
     // 2. Upload to Storage (Force upsert)
-    // Note: We are uploading the file directly as 'avatar.webp' regardless of its original type.
-    // Modern browsers handle image types well even with wrong extension, but ideally we would convert.
-    // For this requirement, we stick to the file path requested.
+    // CORRIGIDO: Cache de 1 ano para avatares (mudam pouco)
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('avatars')
-      .upload(filePath, file, {
-        cacheControl: '3600',
+      .upload(filePath, optimizedFile, {
+        cacheControl: '31536000', // 1 ano de cache
         upsert: true,
-        contentType: file.type // Preserve original content type (e.g. image/jpeg) even if named .webp
+        contentType: 'image/webp' // CORRIGIDO: Sempre WebP para otimização
       });
 
     if (uploadError) {
@@ -110,14 +166,26 @@ export const avatarService = {
 
     const filePath = `${effectiveUserId}/avatar.webp`;
 
-    const contentType = blob.type || 'image/jpeg';
+    // CORRIGIDO: Comprimir blob se for imagem grande
+    let optimizedBlob = blob;
+    if (blob.size > 100 * 1024) { // Se maior que 100KB
+      try {
+        // Converter blob para File temporário para compressão
+        const tempFile = new File([blob], 'temp.jpg', { type: blob.type || 'image/jpeg' });
+        optimizedBlob = await compressImage(tempFile, 400, 0.8);
+        console.log(`[AvatarService] Blob comprimido: ${blob.size} -> ${optimizedBlob.size} bytes`);
+      } catch (compressError) {
+        console.warn('[AvatarService] Falha ao comprimir blob:', compressError);
+      }
+    }
 
+    // CORRIGIDO: Cache de 1 ano
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('avatars')
-      .upload(filePath, blob, {
-        cacheControl: '3600',
+      .upload(filePath, optimizedBlob, {
+        cacheControl: '31536000', // 1 ano
         upsert: true,
-        contentType,
+        contentType: 'image/webp',
       });
 
     if (uploadError) {
@@ -149,19 +217,33 @@ export const avatarService = {
 
   /**
    * Helper to get renderable URL from a path or full URL
+   * CORRIGIDO: Adiciona parâmetros de transformação para reduzir egress
    */
-  getAvatarPublicUrl(pathOrUrl: string | null | undefined): string | null {
+  getAvatarPublicUrl(pathOrUrl: string | null | undefined, width: number = 200, quality: number = 75): string | null {
     if (!pathOrUrl) return null;
-    
+
     if (pathOrUrl.startsWith('http') || pathOrUrl.startsWith('data:')) {
+      // Se já for URL completa, adicionar parâmetros de transformação se for do Supabase
+      if (pathOrUrl.includes('.supabase.co/storage/')) {
+        const separator = pathOrUrl.includes('?') ? '&' : '?';
+        return `${pathOrUrl}${separator}width=${width}&quality=${quality}`;
+      }
       return pathOrUrl;
     }
-    
-    // It's a path, resolve it
+
+    // It's a path, resolve it with transform options
+    // CORRIGIDO: Usar download com transform para otimizar imagem
     const { data } = supabase.storage
       .from('avatars')
-      .getPublicUrl(pathOrUrl);
-      
+      .getPublicUrl(pathOrUrl, {
+        transform: {
+          width: width,
+          height: width, // Manter proporção quadrada para avatares
+          quality: quality,
+          resize: 'cover'
+        }
+      });
+
     return data.publicUrl;
   }
 };

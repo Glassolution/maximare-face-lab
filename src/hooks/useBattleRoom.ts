@@ -37,9 +37,10 @@ export function useBattleRoom(battleId: string) {
   const fetchBattleState = useCallback(async () => {
     try {
       // 1. Get Battle
+      // CORRIGIDO: Selecionar apenas campos necessários em vez de *
       const { data: battleData, error: battleError } = await supabase
         .from('battles')
-        .select('*')
+        .select('id, created_by, opponent_id, status, created_at, expires_at, theme, stake, winner_id, created_by_ready, opponent_ready')
         .eq('id', battleId)
         .single();
 
@@ -48,20 +49,30 @@ export function useBattleRoom(battleId: string) {
       latestBattleRef.current = battleData as Battle;
 
       // 2. Get Opponent Profile
+      // CORRIGIDO: Selecionar apenas campos necessários
       const opponentId = battleData.created_by === user?.id ? battleData.opponent_id : battleData.created_by;
       if (opponentId) {
-        const { data: profile } = await supabase.from('profiles').select('*').eq('id', opponentId).single();
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, username, display_name, full_name, avatar_url, is_premium')
+          .eq('id', opponentId)
+          .single();
         setOpponentProfile(profile);
       }
 
       // 3. Get Submissions
-      const { data: subs } = await supabase.from('battle_submissions').select('*').eq('battle_id', battleId);
+      // CORRIGIDO: Selecionar apenas campos necessários
+      const { data: subs } = await supabase
+        .from('battle_submissions')
+        .select('id, user_id, battle_id, photo_front_url, photo_side_url, status, submitted_at')
+        .eq('battle_id', battleId);
       if (subs) setSubmissions(subs as BattleSubmission[]);
 
       if (battleData.status !== 'waiting') {
+        // CORRIGIDO: Selecionar apenas campos necessários
         const { data: res } = await supabase
           .from('battle_results')
-          .select('*')
+          .select('id, battle_id, winner_id, loser_id, draw, completed_at, winner_score, loser_score')
           .eq('battle_id', battleId)
           .maybeSingle();
         if (res) setResult(res as BattleResult);
