@@ -70,18 +70,10 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
     };
   }, [pollingInterval]);
 
-  // CORRIGIDO: Criar pagamento via Edge Function com autenticacao
+  // CORRIGIDO: Criar pagamento via Edge Function (supabase.functions.invoke adiciona token automaticamente)
   const createPayment = useCallback(async () => {
     setLoading(true);
     try {
-      // Obter sessao para autenticacao
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        toast.error("Sessao expirada. Faca login novamente.");
-        setLoading(false);
-        return;
-      }
-
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.email) {
         toast.error("Usuario nao autenticado");
@@ -91,15 +83,12 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
 
       console.log('[Checkout] Creating payment for user:', user.id, 'plan:', selectedPlan);
 
-      // CORRIGIDO: Chamar Edge Function com headers de autenticacao
+      // CORRIGIDO: supabase.functions.invoke adiciona o token de autenticacao automaticamente
       const { data, error } = await supabase.functions.invoke("create-payment", {
         body: {
           user_id: user.id,
           user_email: user.email,
           plan_id: selectedPlan,
-        },
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
         },
       });
 
@@ -133,7 +122,7 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
     }
   }, [selectedPlan, paymentMethod]);
 
-  // CORRIGIDO: Polling com autenticacao
+  // CORRIGIDO: Polling (supabase.functions.invoke adiciona token automaticamente)
   const startPolling = (internalPaymentId: string) => {
     let attempts = 0;
     const maxAttempts = 120; // 10 minutos (5s * 120)
@@ -148,20 +137,11 @@ export function CheckoutPremium({ plan, price, onSuccess, onCancel }: CheckoutPr
       }
 
       try {
-        // Obter sessao atual para autenticacao
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.access_token) {
-          console.error('[Checkout] No session token for polling');
-          return;
-        }
-
         console.log('[Checkout] Polling check-payment-status for:', internalPaymentId);
 
+        // CORRIGIDO: supabase.functions.invoke adiciona o token de autenticacao automaticamente
         const { data, error } = await supabase.functions.invoke("check-payment-status", {
           body: { payment_id: internalPaymentId },
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-          },
         });
 
         if (error) {
