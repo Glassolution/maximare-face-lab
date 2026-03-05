@@ -596,60 +596,109 @@ function StepGender({ onNext, initialGender }: { onNext: (id: string) => void; i
 
 /* ─── Step 5: Authority / Modules ─── */
 function StepAuthority({ onNext }: { onNext: () => void }) {
-  const modules = [
-    { icon: Star, name: "PSLMAX", desc: "Sistema de pontuação de atratividade", color: "text-primary" },
-    { icon: Sparkles, name: "ASTRA", desc: "Análise de Cor e Pele", color: "text-primary" },
-    { icon: Dumbbell, name: "GYMMAX", desc: "Projeção Física", color: "text-primary" },
+  const benefits = [
+    { icon: "face", title: "Análise Facial Completa", desc: "Simetria, estrutura óssea e harmonia" },
+    { icon: "assignment", title: "Plano de Melhoria Personalizado", desc: "Protocolos baseados no seu rosto" },
+    { icon: "trending_up", title: "Acompanhamento de Evolução", desc: "Veja sua pontuação crescer" },
   ];
 
   return (
-    <div className="flex flex-col items-center text-center flex-1 justify-between py-6 -mx-6 px-6 h-full">
-      <div className="flex flex-col items-center gap-4">
+    <div
+      className="flex flex-col min-h-screen"
+      style={{ backgroundColor: "#0D0D14", fontFamily: "Inter, sans-serif" }}
+    >
+      {/* Spacer for status bar */}
+      <div className="h-12 w-full"></div>
+
+      {/* Header */}
+      <header className="px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-            <span className="font-heading font-extrabold text-sm text-primary-foreground">M</span>
-          </div>
-          <span className="font-heading font-bold text-foreground">
-            Maximare <span className="text-primary">AI</span>
-          </span>
+          <Sparkles className="w-5 h-5 text-[#4F6EF7]" />
+          <span className="font-bold text-sm tracking-wider uppercase text-white">Maximare AI</span>
         </div>
+        <button
+          onClick={onNext}
+          className="text-xs font-medium text-white/50 hover:text-[#4F6EF7] transition-colors"
+        >
+          Salvar e sair
+        </button>
+      </header>
 
-        <h1 className="font-heading text-2xl font-extrabold text-foreground leading-tight">
-          Controle Total
-          <br />
-          da Atratividade
-        </h1>
-        <p className="text-muted-foreground text-xs leading-relaxed max-w-xs">
-          Do seu Ângulo Goniaco à sua Estação de Cor,
-          <br />
-          nossa IA otimiza cada pixel da sua aparência.
-        </p>
-
-        <div className="flex flex-col gap-2 w-full mt-2">
-          {modules.map((m) => (
-            <div
-              key={m.name}
-              className="flex items-center gap-3 p-3 rounded-2xl border border-primary/30 bg-secondary/30"
-            >
-              <div className="h-12 w-12 rounded-xl bg-secondary flex items-center justify-center shrink-0 border border-primary/20">
-                <m.icon className={`h-5 w-5 ${m.color}`} />
-              </div>
-              <div className="text-left">
-                <span className="font-heading font-bold text-foreground">{m.name}</span>
-                <p className="text-muted-foreground text-xs mt-0.5">{m.desc}</p>
-              </div>
-            </div>
-          ))}
+      {/* Progress bar */}
+      <div className="px-6 mt-2">
+        <div className="h-1 w-full bg-white/10 rounded-full overflow-hidden">
+          <div className="h-full bg-[#4F6EF7] w-3/4 rounded-full"></div>
         </div>
       </div>
 
-      <Button
-        onClick={onNext}
-        className="w-full h-14 bg-white text-primary font-bold rounded-full shadow-lg shadow-primary/20 text-base tracking-wide hover:bg-white/90 hover:scale-[1.02] active:scale-[0.98] transition-all"
+      {/* Main Content */}
+      <main className="flex-1 px-6 pt-10 pb-32 max-w-md mx-auto w-full">
+        <div className="mb-10">
+          <h1 className="text-[32px] leading-tight font-extrabold tracking-tight mb-3 text-white">
+            O que você vai <span className="text-[#4F6EF7]">desbloquear</span>
+          </h1>
+          <p className="text-[13px] font-medium text-white/50">
+            Seu plano personalizado inclui:
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          {benefits.map((b, i) => (
+            <div
+              key={i}
+              className="group flex items-center p-4 rounded-[20px] bg-[#13131F] border border-white/5 shadow-sm transition-all active:scale-[0.98]"
+            >
+              <div className="w-12 h-12 rounded-xl bg-[#4F6EF7]/10 flex items-center justify-center mr-4">
+                <span
+                  className="material-symbols-outlined text-[#4F6EF7] text-[24px]"
+                  style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24" }}
+                >
+                  {b.icon}
+                </span>
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-[15px] text-white">{b.title}</h3>
+                <p className="text-[12px] text-white/50">{b.desc}</p>
+              </div>
+              <span
+                className="material-symbols-outlined text-white/20 text-[20px]"
+                style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24" }}
+              >
+                chevron_right
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-12 flex flex-col items-center gap-2.5">
+          <div className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[rgba(79,110,247,0.1)] border border-[rgba(79,110,247,0.3)]">
+            <Sparkles className="w-3.5 h-3.5 text-[#4F6EF7]" />
+            <p className="text-[12px] font-bold text-[#4F6EF7] text-center uppercase tracking-wide">
+              Criado exclusivamente para você
+            </p>
+          </div>
+          <p className="text-[11px] text-white/40 font-medium">Com base nas suas respostas de hoje</p>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <div
+        className="fixed bottom-0 left-0 right-0 p-6 pb-10"
+        style={{
+          background: "linear-gradient(to top, #0D0D14, rgba(13, 13, 20, 0.95), transparent)",
+        }}
       >
-        <ArrowRight className="h-4 w-4" />
-        Continuar
-      </Button>
+        <button
+          onClick={onNext}
+          className="w-full h-[60px] bg-white text-[#4F6EF7] rounded-full font-bold text-base flex items-center justify-center gap-2 shadow-xl hover:opacity-95 active:scale-[0.98] transition-all"
+        >
+          Criar meu plano
+          <ArrowRight className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Bottom safe area */}
+      <div className="h-6 w-full fixed bottom-0"></div>
     </div>
   );
 }
