@@ -1,3 +1,4 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -7,56 +8,60 @@ const corsHeaders = {
 };
 
 const PLANS: Record<string, { price: number; frequency: number; frequencyType: string; reason: string }> = {
-  monthly: { price: 49.90, frequency: 1, frequencyType: "months", reason: "Maximare Premium - Mensal" },
-  yearly: { price: 499.90, frequency: 12, frequencyType: "months", reason: "Maximare Premium - Anual" },
+  monthly: { price: 49.9, frequency: 1, frequencyType: "months", reason: "Maximare Premium - Mensal" },
+  yearly: { price: 499.9, frequency: 12, frequencyType: "months", reason: "Maximare Premium - Anual" },
 };
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    // 1. Auth
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+    const authHeader = req.headers.get("Authorization") || "";
+    if (!authHeader.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const supabase = createClient(
+    const token = authHeader.replace("Bearer ", "");
+    const supabaseAuth = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: "Invalid token" }), { status: 401, headers: corsHeaders });
+    const { data: userData } = await supabaseAuth.auth.getUser(token);
+    if (!userData?.user) {
+      return new Response(JSON.stringify({ error: "Invalid token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const userId = claimsData.claims.sub as string;
-    const userEmail = (claimsData.claims.email as string) || "";
+    const userId = userData.user.id;
+    const userEmail = userData.user.email || "";
 
-    // 2. Parse body
     const { planId } = await req.json();
     const plan = PLANS[planId];
     if (!plan) {
-      return new Response(JSON.stringify({ error: "Invalid plan" }), { status: 400, headers: corsHeaders });
+      return new Response(JSON.stringify({ error: "Invalid plan" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // 3. Get Mercado Pago access token
-    const mpAccessToken = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
-    if (!mpAccessToken) {
-      console.error("MERCADOPAGO_ACCESS_TOKEN not configured");
-      return new Response(JSON.stringify({ error: "Payment not configured" }), { status: 500, headers: corsHeaders });
+    const mpAccessToken = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN") || "";
+    if (!mpAccessToken || !mpAccessToken.startsWith("APP_USR-")) {
+      return new Response(JSON.stringify({ error: "Mercado Pago token inválido ou não configurado" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // 4. Build the back_url (where MP redirects after payment)
-    // Use the published app URL or preview URL
     const appUrl = req.headers.get("origin") || "https://maximare-glow-up-ai.lovable.app";
-
-    // 5. Create MP preapproval (subscription) without plan
     const preapprovalBody = {
       reason: plan.reason,
       auto_recurring: {
@@ -71,8 +76,6 @@ Deno.serve(async (req) => {
       status: "pending",
     };
 
-    console.log("[create-subscription] Creating preapproval:", JSON.stringify(preapprovalBody));
-
     const mpResponse = await fetch("https://api.mercadopago.com/preapproval", {
       method: "POST",
       headers: {
@@ -83,18 +86,13 @@ Deno.serve(async (req) => {
     });
 
     const mpData = await mpResponse.json();
-
     if (!mpResponse.ok) {
-      console.error("[create-subscription] MP error:", JSON.stringify(mpData));
-      return new Response(
-        JSON.stringify({ error: "Failed to create subscription", details: mpData.message || mpData }),
-        { status: 500, headers: corsHeaders }
-      );
+      return new Response(JSON.stringify({ error: "Falha ao criar assinatura", details: mpData }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    console.log("[create-subscription] Preapproval created:", mpData.id, "init_point:", mpData.init_point);
-
-    // 6. Record purchase in database
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -109,19 +107,14 @@ Deno.serve(async (req) => {
       mp_preference_id: mpData.id,
     });
 
-    // 7. Return redirect URL
-    return new Response(
-      JSON.stringify({
-        init_point: mpData.init_point,
-        subscription_id: mpData.id,
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ init_point: mpData.init_point, subscription_id: mpData.id }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (err) {
-    console.error("[create-subscription] Unexpected error:", err);
-    return new Response(
-      JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: corsHeaders }
-    );
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

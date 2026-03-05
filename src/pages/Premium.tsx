@@ -26,30 +26,19 @@ export default function Premium() {
     setLoading(planId);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        toast.error("Sessão expirada. Faça login novamente.");
-        setLoading(null);
-        return;
-      }
-
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      const url = `https://${projectId}.supabase.co/functions/v1/create-subscription`;
-
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        },
-        body: JSON.stringify({ planId }),
+      const { data, error } = await supabase.functions.invoke("create-subscription", {
+        body: { planId },
       });
 
-      const data = await res.json();
+      if (error) {
+        throw new Error(error.message || "Erro ao criar assinatura");
+      }
 
-      if (!res.ok) {
-        throw new Error(data.error || "Erro ao criar assinatura");
+      if (data?.init_point) {
+        // Redirect to Mercado Pago Checkout Pro
+        window.location.href = data.init_point;
+      } else {
+        throw new Error("URL de pagamento não recebida");
       }
 
       if (data.init_point) {
