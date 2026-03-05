@@ -233,26 +233,57 @@ function StepImpact({ onNext, onBack }: { onNext: (habits: number[]) => void; on
 
 /* ─── Step 2: Age Picker ─── */
 function StepAge({ onNext, onBack, initialAge }: { onNext: (age: number) => void; onBack: () => void; initialAge: number }) {
-  const [selectedAge, setSelectedAge] = useState(initialAge);
+  const [scrollPosition, setScrollPosition] = useState(0);
   const ages = Array.from({ length: 83 }, (_, i) => i + 12); // Range 12-94
   const scrollRef = useRef<HTMLDivElement>(null);
+  const ITEM_HEIGHT = 72; // px
 
   useEffect(() => {
     if (scrollRef.current) {
-      const idx = ages.indexOf(selectedAge);
-      scrollRef.current.scrollTop = idx * 72; // 72px item height
+      const idx = ages.indexOf(initialAge);
+      scrollRef.current.scrollTop = idx * ITEM_HEIGHT;
+      setScrollPosition(idx * ITEM_HEIGHT);
     }
   }, []);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const target = e.currentTarget;
-    const scrollTop = target.scrollTop;
-    const centerIdx = Math.round(scrollTop / 72);
-    const clamped = Math.max(0, Math.min(ages.length - 1, centerIdx));
-    if (ages[clamped] !== selectedAge) {
-      setSelectedAge(ages[clamped]);
-    }
+    const scrollTop = e.currentTarget.scrollTop;
+    setScrollPosition(scrollTop);
   };
+
+  // Calculate visual properties for each age based on distance from center
+  const getAgeStyle = (index: number) => {
+    const containerHeight = scrollRef.current?.clientHeight || 600;
+    const itemCenter = index * ITEM_HEIGHT + ITEM_HEIGHT / 2;
+    const containerCenter = scrollPosition + containerHeight / 2;
+    const distance = Math.abs(itemCenter - containerCenter);
+    const maxDistance = 200; // Distance at which effect is minimum
+
+    // Normalize distance (0 to 1)
+    const normalizedDistance = Math.min(distance / maxDistance, 1);
+
+    // Calculate opacity (1 at center, 0.2 at max distance)
+    const opacity = 1 - normalizedDistance * 0.8;
+
+    // Calculate scale (1.2 at center, 0.75 at max distance)
+    const scale = 1.2 - normalizedDistance * 0.45;
+
+    // Calculate color intensity (1 at center = white, 0.2 at distance = gray)
+    const colorIntensity = 1 - normalizedDistance * 0.8;
+
+    // Font size varies from 56px at center to 28px at distance
+    const fontSize = 56 - normalizedDistance * 28;
+
+    return {
+      opacity: Math.max(0.2, opacity),
+      transform: `scale(${Math.max(0.75, scale)})`,
+      color: `rgba(255, 255, 255, ${Math.max(0.2, colorIntensity)})`,
+      fontSize: `${Math.max(28, fontSize)}px`,
+      transition: 'all 0.05s linear',
+    };
+  };
+
+  const selectedAge = ages[Math.round(scrollPosition / ITEM_HEIGHT)] || initialAge;
 
   return (
     <div
@@ -301,11 +332,11 @@ function StepAge({ onNext, onBack, initialAge }: { onNext: (age: number) => void
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-20">
             <div
               className="w-20 h-[2px] bg-[#4F6EF7] absolute"
-              style={{ marginBottom: "72px", left: "50%", transform: "translateX(-50%)" }}
+              style={{ marginBottom: "36px", left: "50%", transform: "translateX(-50%)" }}
             />
             <div
               className="w-20 h-[2px] bg-[#4F6EF7] absolute"
-              style={{ marginTop: "72px", left: "50%", transform: "translateX(-50%)" }}
+              style={{ marginTop: "36px", left: "50%", transform: "translateX(-50%)" }}
             />
           </div>
 
@@ -313,35 +344,39 @@ function StepAge({ onNext, onBack, initialAge }: { onNext: (age: number) => void
           <div
             ref={scrollRef}
             onScroll={handleScroll}
-            className="overflow-y-auto w-full h-full snap-y snap-mandatory flex flex-col items-center relative z-0 no-scrollbar"
+            className="overflow-y-auto w-full h-full flex flex-col items-center relative z-0 no-scrollbar"
             style={{
               scrollbarWidth: "none",
               msOverflowStyle: "none",
+              scrollSnapType: "y mandatory",
             }}
           >
-            <div className="h-[40%] shrink-0"></div>
-            {ages.map((age) => {
-              const isSelected = age === selectedAge;
+            <div style={{ height: "calc(50% - 36px)", flexShrink: 0 }}></div>
+            {ages.map((age, index) => {
+              const style = getAgeStyle(index);
               return (
                 <div
                   key={age}
-                  className="snap-center py-2 transition-all duration-200 cursor-pointer"
+                  className="shrink-0 flex items-center justify-center cursor-pointer"
                   style={{
-                    fontSize: isSelected ? "56px" : "30px",
+                    height: `${ITEM_HEIGHT}px`,
+                    scrollSnapAlign: "center",
                     fontWeight: 700,
-                    color: isSelected ? "#ffffff" : "rgba(255, 255, 255, 0.2)",
                     lineHeight: 1,
+                    ...style,
                   }}
                   onClick={() => {
-                    setSelectedAge(age);
-                    scrollRef.current?.scrollTo({ top: ages.indexOf(age) * 72, behavior: "smooth" });
+                    scrollRef.current?.scrollTo({
+                      top: index * ITEM_HEIGHT,
+                      behavior: "smooth",
+                    });
                   }}
                 >
                   {age}
                 </div>
               );
             })}
-            <div className="h-[40%] shrink-0"></div>
+            <div style={{ height: "calc(50% - 36px)", flexShrink: 0 }}></div>
           </div>
 
           {/* Gradient mask */}
@@ -350,10 +385,12 @@ function StepAge({ onNext, onBack, initialAge }: { onNext: (age: number) => void
             style={{
               background: `linear-gradient(to bottom,
                 #0D0D14 0%,
-                rgba(13, 13, 20, 0.7) 15%,
-                rgba(13, 13, 20, 0) 40%,
-                rgba(13, 13, 20, 0) 60%,
-                rgba(13, 13, 20, 0.7) 85%,
+                rgba(13, 13, 20, 0.98) 5%,
+                rgba(13, 13, 20, 0.85) 15%,
+                rgba(13, 13, 20, 0) 35%,
+                rgba(13, 13, 20, 0) 65%,
+                rgba(13, 13, 20, 0.85) 85%,
+                rgba(13, 13, 20, 0.98) 95%,
                 #0D0D14 100%)`,
             }}
           />
@@ -393,40 +430,9 @@ function StepGoal({ onNext, initialGoal }: { onNext: (idx: number) => void; init
   ];
 
   return (
-    <div
-      className="min-h-screen flex flex-col"
-      style={{ backgroundColor: "#0D0D14", fontFamily: "Inter, sans-serif" }}
-    >
-      {/* Header */}
-      <header
-        className="px-6 pt-14 pb-4 flex flex-col gap-4 sticky top-0 z-50"
-        style={{ backgroundColor: "rgba(13, 13, 20, 0.8)", backdropFilter: "blur(12px)" }}
-      >
-        <div className="flex items-center justify-between">
-          <button
-            onClick={() => onNext(selected ?? 0)}
-            className="flex items-center gap-1 text-white/50 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-[#4F6EF7]" />
-            <span className="text-[#4F6EF7] text-sm font-bold tracking-widest">MAXIMARE AI</span>
-          </div>
-          <button
-            onClick={() => onNext(selected ?? 0)}
-            className="text-white/50 text-[13px] font-medium hover:text-white transition-colors"
-          >
-            Salvar e sair
-          </button>
-        </div>
-        <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
-          <div className="w-1/3 h-full bg-[#4F6EF7] rounded-full" />
-        </div>
-      </header>
-
+    <div className="flex flex-col flex-1 h-full">
       {/* Main Content */}
-      <main className="flex-1 px-6 pt-6 pb-32">
+      <main className="flex-1">
         <h1 className="text-[28px] font-extrabold leading-tight tracking-tight mb-8 text-white">
           Qual é sua <span className="text-[#4F6EF7]">meta principal?</span>
         </h1>
@@ -485,12 +491,7 @@ function StepGoal({ onNext, initialGoal }: { onNext: (idx: number) => void; init
       </main>
 
       {/* Footer */}
-      <div
-        className="fixed bottom-0 left-0 right-0 p-6"
-        style={{
-          background: "linear-gradient(to top, #0D0D14, rgba(13, 13, 20, 0.9), transparent)",
-        }}
-      >
+      <div className="mt-8">
         <button
           onClick={() => selected !== null && onNext(selected)}
           disabled={selected === null}
