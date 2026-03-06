@@ -141,7 +141,7 @@ export const avatarService = {
         avatar_url: filePath, // Storing "userid/avatar.webp"
         updated_at: new Date().toISOString()
       })
-      .eq('id', userId);
+      .eq('user_id', userId);
 
     if (updateError) {
       console.error('[AvatarService] Profile update error:', updateError);
@@ -205,7 +205,7 @@ export const avatarService = {
         avatar_url: filePath,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', effectiveUserId);
+      .eq('user_id', effectiveUserId);
 
     if (updateError) {
       console.error('[AvatarService] Profile update error:', updateError);

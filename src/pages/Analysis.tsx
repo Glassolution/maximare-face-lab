@@ -529,7 +529,7 @@ export default function Analysis() {
         
         await saveAnalysis(result);
 
-        if (user && frontPhoto && !profile?.avatar_url) {
+        if (user && frontPhoto) {
           try {
             const res = await fetch(frontPhoto);
             const blob = await res.blob();
