@@ -168,6 +168,7 @@ export type Database = {
           premium_since: string | null
           provider_payment_id: string | null
           provider_subscription_id: string | null
+          short_id: string | null
           subscription_expires_at: string | null
           subscription_status: string
           updated_at: string | null
@@ -196,6 +197,7 @@ export type Database = {
           premium_since?: string | null
           provider_payment_id?: string | null
           provider_subscription_id?: string | null
+          short_id?: string | null
           subscription_expires_at?: string | null
           subscription_status?: string
           updated_at?: string | null
@@ -224,6 +226,7 @@ export type Database = {
           premium_since?: string | null
           provider_payment_id?: string | null
           provider_subscription_id?: string | null
+          short_id?: string | null
           subscription_expires_at?: string | null
           subscription_status?: string
           updated_at?: string | null
@@ -460,6 +463,7 @@ export type Database = {
       }
       block_user: { Args: { target_uid: string }; Returns: Json }
       cancel_friend_request: { Args: { target_uid: string }; Returns: Json }
+      generate_short_id: { Args: never; Returns: string }
       get_admin_purchases: {
         Args: never
         Returns: {
