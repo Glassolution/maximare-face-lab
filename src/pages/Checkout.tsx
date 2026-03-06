@@ -296,7 +296,7 @@ export default function Checkout() {
           {step === "success" ? "Pagamento Aprovado" : "Checkout"}
         </h1>
         <button className="w-7 h-7 bg-[#2C2C2E] rounded-full flex items-center justify-center active:opacity-50 transition-opacity">
-          <span className="material-symbols-outlined text-[18px] text-white">more_horiz</span>
+          <MoreHorizontal className="w-[18px] h-[18px] text-white" />
         </button>
       </header>
 
