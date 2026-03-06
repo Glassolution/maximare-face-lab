@@ -77,51 +77,43 @@ const AdminFinance = () => {
   const [methodPieData, setMethodPieData] = useState<Array<{ name: string; value: number; color: string }>>([]);
   const [methodTotal, setMethodTotal] = useState(0);
 
-  // Hook para buscar receita diária real
-  const fetchRevenueChartData = async (days: number) => {
+  const buildRevenueChartData = (rows: AdminPurchase[], days: number) => {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const { data, error } = await supabase
-      .from('purchases')
-      .select('amount_cents, created_at')
-      .eq('status', 'approved')
-      .gte('created_at', startDate.toISOString())
-      .order('created_at', { ascending: true });
-
-    if (error) {
-        console.error("Error fetching revenue chart data:", error);
-        return;
-    }
-
-    // Agrupa por dia
     const grouped: Record<string, number> = {};
-    
-    (data || []).forEach((purchase: any) => {
-      const day = new Date(purchase.created_at).toLocaleDateString('pt-BR', {
-        day: '2-digit', month: 'short'
-      });
-      grouped[day] = (grouped[day] || 0) + (purchase.amount_cents / 100);
-    });
 
-    // Preenche dias sem vendas com 0
+    rows
+      .filter(
+        (purchase) =>
+          (purchase.status === 'approved' || purchase.status === 'paid') &&
+          new Date(purchase.created_at) >= startDate,
+      )
+      .forEach((purchase) => {
+        const day = new Date(purchase.created_at).toLocaleDateString('pt-BR', {
+          day: '2-digit',
+          month: 'short',
+        });
+        grouped[day] = (grouped[day] || 0) + (purchase.amount_cents / 100);
+      });
+
     const result = [];
     for (let i = days - 1; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
       const label = date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
       result.push({
-        name: label, 
-        value: grouped[label] || 0
+        name: label,
+        value: grouped[label] || 0,
       });
     }
-    
-    setRevenueChartData(result);
+
+    return result;
   };
 
   useEffect(() => {
-    fetchRevenueChartData(revenueDays);
-  }, [revenueDays]);
+    setRevenueChartData(buildRevenueChartData(purchases, revenueDays));
+  }, [purchases, revenueDays]);
 
   // Mock data for the basic chart (fallback)
   const basicChartData = [
@@ -295,19 +287,20 @@ const AdminFinance = () => {
         arrReal,
         totalSubscribers: subscribersData?.length || 0
       });
-      const { data: pmRows } = await supabase
-        .from('purchases')
-        .select('provider, amount_cents, status')
-        .in('status', ['approved', 'paid']);
       const totals: Record<string, number> = {};
-      (pmRows || []).forEach((r: any) => {
-        const m = (r.provider || '').toString().toLowerCase();
-        const method =
-          m === 'pix' ? 'pix'
-          : m === 'credit_card' || m === 'card' || m === 'stripe' ? 'credit_card'
-          : 'credit_card';
-        totals[method] = (totals[method] || 0) + (r.amount_cents || 0) / 100;
-      });
+      purchaseList
+        .filter((r: any) => r.status === 'approved' || r.status === 'paid')
+        .forEach((r: any) => {
+          const m = (r.provider || '').toString().toLowerCase();
+          const method =
+            m === 'pix'
+              ? 'pix'
+              : m === 'credit_card' || m === 'card' || m === 'stripe'
+                ? 'credit_card'
+                : 'credit_card';
+          totals[method] = (totals[method] || 0) + (r.amount_cents || 0) / 100;
+        });
+
       const pie = Object.entries(totals).map(([method, value]) => ({
         name: method === 'pix' ? 'PIX' : 'Cartão de Crédito',
         value,
