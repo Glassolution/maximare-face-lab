@@ -59,17 +59,13 @@ function Layout() {
     return <Navigate to="/analysis" replace />;
   }
 
-  const hasAccessedQuiz = localStorage.getItem('maximare_quiz_accessed') === 'true';
-  if (hasAccessedQuiz && (location.pathname === "/onboarding" || location.pathname === "/")) {
-    return <Navigate to={user ? "/analysis" : "/login"} replace />;
-  }
+  // No longer redirect quiz users to login - lazy auth allows free browsing
 
+  // Lazy auth: only protect checkout, profile, subscription, cancel-subscription
+  const protectedPaths = ["/checkout", "/profile", "/subscription", "/cancel-subscription"];
   if (
     !user &&
-    location.pathname !== "/login" &&
-    location.pathname !== "/" &&
-    location.pathname !== "/onboarding" &&
-    location.pathname !== "/update-password"
+    protectedPaths.some(p => location.pathname.startsWith(p))
   ) {
     return <Navigate to="/login" replace />;
   }

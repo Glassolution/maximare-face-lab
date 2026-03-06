@@ -1,9 +1,13 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { PLAN_CONFIG, PlanType } from "@/config/plans";
-import { ArrowLeft, Lock, ChevronRight, ArrowRight, Sparkles, CheckCircle2 } from "lucide-react";
-import { motion } from "framer-motion";
+import { ArrowLeft, Lock, ChevronRight, ArrowRight, Sparkles, CheckCircle2, Mail, KeyRound } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { usePremiumStatus } from "@/hooks/usePremiumStatus";
+import { supabase } from "@/integrations/supabase/client";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 const COLORS = {
   bg: "#0D0D14",
@@ -21,13 +25,36 @@ export default function Premium() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { isPremium, expiresAt, planType } = usePremiumStatus();
+  const [showSignup, setShowSignup] = useState(false);
+  const [pendingPlan, setPendingPlan] = useState<PlanType | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [signupLoading, setSignupLoading] = useState(false);
+  const [signupError, setSignupError] = useState<string | null>(null);
 
   const handleSubscribe = (planId: PlanType) => {
     if (!user) {
-      navigate("/login");
+      setPendingPlan(planId);
+      setShowSignup(true);
       return;
     }
     navigate(`/checkout?plan=${planId}`);
+  };
+
+  const handleSignupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSignupError(null);
+    setSignupLoading(true);
+    try {
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) throw error;
+      // Auto-confirmed, user is now logged in — go to checkout
+      navigate(`/checkout?plan=${pendingPlan}`);
+    } catch (err: any) {
+      setSignupError(err?.message || "Erro ao criar conta.");
+    } finally {
+      setSignupLoading(false);
+    }
   };
 
   const formatDate = (date: Date | string | null) => {
@@ -239,6 +266,81 @@ export default function Premium() {
           </div>
         </footer>
       </main>
+
+      {/* Inline Signup Overlay */}
+      <AnimatePresence>
+        {showSignup && !user && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center px-6"
+            style={{ backgroundColor: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)" }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="w-full max-w-sm rounded-2xl p-7"
+              style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+            >
+              <h2 className="text-xl font-bold text-white mb-1">Criar sua conta</h2>
+              <p className="text-sm mb-6" style={{ color: COLORS.textSecondary }}>
+                Para finalizar sua assinatura
+              </p>
+
+              <form onSubmit={handleSignupSubmit} className="space-y-4">
+                <div className="relative">
+                  <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: COLORS.textTertiary }} />
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    placeholder="Seu melhor e-mail"
+                    className="bg-black/40 border-white/10 pl-10 text-sm text-white placeholder:text-white/30"
+                  />
+                </div>
+                <div className="relative">
+                  <KeyRound className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: COLORS.textTertiary }} />
+                  <Input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    placeholder="Crie uma senha"
+                    className="bg-black/40 border-white/10 pl-10 text-sm text-white placeholder:text-white/30"
+                  />
+                </div>
+
+                {signupError && <p className="text-xs text-red-400">{signupError}</p>}
+
+                <Button
+                  type="submit"
+                  disabled={signupLoading}
+                  className="w-full font-bold text-sm text-white"
+                  style={{ backgroundColor: COLORS.blue, borderRadius: 50, height: 48 }}
+                >
+                  {signupLoading ? "Criando conta..." : "Continuar para pagamento →"}
+                </Button>
+              </form>
+
+              <p className="text-center mt-4 text-[11px]" style={{ color: COLORS.textTertiary }}>
+                Sem spam. Cancele quando quiser.
+              </p>
+
+              <button
+                onClick={() => setShowSignup(false)}
+                className="w-full mt-3 text-center text-xs font-medium"
+                style={{ color: COLORS.textSecondary }}
+              >
+                Voltar
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
