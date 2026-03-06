@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { User, Mail, Lock } from "lucide-react";
 import loginHero from "@/assets/login-hero.jpg";
 
 export default function Login() {
@@ -265,12 +266,7 @@ export default function Login() {
                     border: "1px solid rgba(255, 255, 255, 0.08)",
                   }}
                 >
-                  <span
-                    className="material-symbols-outlined text-white/40 text-[18px] mr-3 group-focus-within:text-[#4F6EF7] transition-colors"
-                    style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24" }}
-                  >
-                    person
-                  </span>
+                  <User className="text-white/40 w-[18px] h-[18px] mr-3 group-focus-within:text-[#4F6EF7] transition-colors" />
                   <input
                     type="text"
                     value={name}
@@ -292,12 +288,7 @@ export default function Login() {
                   border: "1px solid rgba(255, 255, 255, 0.08)",
                 }}
               >
-                <span
-                  className="material-symbols-outlined text-white/40 text-[18px] mr-3 group-focus-within:text-[#4F6EF7] transition-colors"
-                  style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24" }}
-                >
-                  mail
-                </span>
+                <Mail className="text-white/40 w-[18px] h-[18px] mr-3 group-focus-within:text-[#4F6EF7] transition-colors" />
                 <input
                   type="email"
                   value={email}
@@ -318,12 +309,7 @@ export default function Login() {
                   border: "1px solid rgba(255, 255, 255, 0.08)",
                 }}
               >
-                <span
-                  className="material-symbols-outlined text-white/40 text-[18px] mr-3 group-focus-within:text-[#4F6EF7] transition-colors"
-                  style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24" }}
-                >
-                  lock
-                </span>
+                <Lock className="text-white/40 w-[18px] h-[18px] mr-3 group-focus-within:text-[#4F6EF7] transition-colors" />
                 <input
                   type="password"
                   value={password}
