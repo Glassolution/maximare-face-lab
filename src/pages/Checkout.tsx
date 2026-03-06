@@ -615,7 +615,7 @@ export default function Checkout() {
               {loading ? (
                 <><Loader2 className="w-5 h-5 animate-spin" /> Processando...</>
               ) : (
-                <>Pagar {priceFormatted} <span className="material-symbols-outlined font-bold text-[20px] ml-1">arrow_forward</span></>
+                <>Pagar {priceFormatted} <ArrowRight className="w-5 h-5 ml-1" /></>
               )}
             </button>
             {/* Home indicator */}
