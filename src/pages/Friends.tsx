@@ -11,7 +11,9 @@ import { FriendActionButtons } from "@/components/friends/FriendActionButtons";
 import { FriendProfile } from "@/types/friendship";
 import { Button } from "@/components/ui/button";
 import { PublicProfileModal } from "@/components/profile/PublicProfileModal";
+import { UsernameSetupModal } from "@/components/friends/UsernameSetupModal";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const ResolvedAvatarImage = ({ avatarUrl }: { avatarUrl: string | null | undefined }) => {
   const [src, setSrc] = useState<string | undefined>(undefined);
