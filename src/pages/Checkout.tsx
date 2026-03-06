@@ -342,9 +342,11 @@ export default function Checkout() {
                       <p className="text-[17px] leading-tight font-medium text-white">Cartão de Crédito</p>
                       <p className="text-[13px] text-white/40">Aprovação imediata</p>
                     </div>
-                    <span className="material-symbols-outlined text-[24px]" style={{ color: paymentMethod === "credit_card" ? C.blue : "rgba(255,255,255,0.3)" }}>
-                      {paymentMethod === "credit_card" ? "check_circle" : "radio_button_unchecked"}
-                    </span>
+                    {paymentMethod === "credit_card" ? (
+                      <CheckCircle className="w-6 h-6" style={{ color: C.blue }} />
+                    ) : (
+                      <Circle className="w-6 h-6" style={{ color: "rgba(255,255,255,0.3)" }} />
+                    )}
                   </div>
                 </div>
 
