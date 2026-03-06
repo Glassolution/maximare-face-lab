@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, Crown, Trophy, User, Camera, ScanFace, BarChart3, Sparkles } from "lucide-react";
+import { Home, Crown, Users, User, Camera, ScanFace, BarChart3, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
