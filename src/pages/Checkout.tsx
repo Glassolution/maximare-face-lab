@@ -16,6 +16,13 @@ import {
   Crown,
   ArrowRight,
   Sparkles,
+  ChevronLeft,
+  MoreHorizontal,
+  Wifi,
+  Signal,
+  Battery,
+  CheckCircle,
+  Circle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -269,9 +276,9 @@ export default function Checkout() {
       <div className="h-[47px] flex justify-between items-end px-8 pb-2">
         <span className="text-[15px] font-semibold text-white">9:41</span>
         <div className="flex gap-1.5 items-center text-white">
-          <span className="material-symbols-outlined text-[18px]">signal_cellular_alt</span>
-          <span className="material-symbols-outlined text-[18px]">wifi</span>
-          <span className="material-symbols-outlined text-[20px]">battery_full</span>
+          <Signal className="w-[18px] h-[18px]" />
+          <Wifi className="w-[18px] h-[18px]" />
+          <Battery className="w-[20px] h-[20px]" />
         </div>
       </div>
 
@@ -282,14 +289,14 @@ export default function Checkout() {
           style={{ color: C.blue }}
           onClick={() => step === "method" ? navigate("/premium") : setStep("method")}
         >
-          <span className="material-symbols-outlined text-[24px]">chevron_left</span>
+          <ChevronLeft className="w-6 h-6" />
           <span>Voltar</span>
         </button>
         <h1 className="absolute left-1/2 -translate-x-1/2 text-[17px] font-semibold text-white">
           {step === "success" ? "Pagamento Aprovado" : "Checkout"}
         </h1>
         <button className="w-7 h-7 bg-[#2C2C2E] rounded-full flex items-center justify-center active:opacity-50 transition-opacity">
-          <span className="material-symbols-outlined text-[18px] text-white">more_horiz</span>
+          <MoreHorizontal className="w-[18px] h-[18px] text-white" />
         </button>
       </header>
 
@@ -309,15 +316,17 @@ export default function Checkout() {
                     onClick={() => setPaymentMethod("pix")}
                   >
                     <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-                      <span className="material-symbols-outlined text-[32px] fill-current" style={{ color: C.pixGreen }}>qr_code_2</span>
+                      <QrCode className="w-8 h-8" style={{ color: C.pixGreen }} />
                     </div>
                     <div className="flex-1">
                       <p className="text-[17px] leading-tight font-medium text-white">PIX</p>
                       <p className="text-[13px] text-white/40">Confirmação instantânea</p>
                     </div>
-                    <span className="material-symbols-outlined text-[24px]" style={{ color: paymentMethod === "pix" ? C.blue : "rgba(255,255,255,0.3)" }}>
-                      {paymentMethod === "pix" ? "check_circle" : "radio_button_unchecked"}
-                    </span>
+                    {paymentMethod === "pix" ? (
+                      <CheckCircle className="w-6 h-6" style={{ color: C.blue }} />
+                    ) : (
+                      <Circle className="w-6 h-6" style={{ color: "rgba(255,255,255,0.3)" }} />
+                    )}
                   </div>
 
                   {/* Credit Card Option */}
@@ -327,15 +336,17 @@ export default function Checkout() {
                     onClick={() => setPaymentMethod("credit_card")}
                   >
                     <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-                      <span className="material-symbols-outlined text-[28px] text-white/60">credit_card</span>
+                      <CreditCard className="w-7 h-7 text-white/60" />
                     </div>
                     <div className="flex-1">
                       <p className="text-[17px] leading-tight font-medium text-white">Cartão de Crédito</p>
                       <p className="text-[13px] text-white/40">Aprovação imediata</p>
                     </div>
-                    <span className="material-symbols-outlined text-[24px]" style={{ color: paymentMethod === "credit_card" ? C.blue : "rgba(255,255,255,0.3)" }}>
-                      {paymentMethod === "credit_card" ? "check_circle" : "radio_button_unchecked"}
-                    </span>
+                    {paymentMethod === "credit_card" ? (
+                      <CheckCircle className="w-6 h-6" style={{ color: C.blue }} />
+                    ) : (
+                      <Circle className="w-6 h-6" style={{ color: "rgba(255,255,255,0.3)" }} />
+                    )}
                   </div>
                 </div>
 
@@ -402,7 +413,7 @@ export default function Checkout() {
               {/* Trust badges */}
               <div className="flex flex-col items-center justify-center gap-3 pt-2">
                 <div className="flex items-center gap-1.5 text-white/40 text-[12px]">
-                  <span className="material-symbols-outlined text-[14px]">lock</span>
+                  <Lock className="w-3.5 h-3.5" />
                   <span>Pagamento seguro via Mercado Pago</span>
                   <span className="ml-1 font-medium" style={{ color: C.green }}>✓ Valid</span>
                 </div>
@@ -604,7 +615,7 @@ export default function Checkout() {
               {loading ? (
                 <><Loader2 className="w-5 h-5 animate-spin" /> Processando...</>
               ) : (
-                <>Pagar {priceFormatted} <span className="material-symbols-outlined font-bold text-[20px] ml-1">arrow_forward</span></>
+                <>Pagar {priceFormatted} <ArrowRight className="w-5 h-5 ml-1" /></>
               )}
             </button>
             {/* Home indicator */}
