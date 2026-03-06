@@ -16,6 +16,13 @@ import {
   Crown,
   ArrowRight,
   Sparkles,
+  ChevronLeft,
+  MoreHorizontal,
+  Wifi,
+  Signal,
+  Battery,
+  CheckCircle,
+  Circle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
