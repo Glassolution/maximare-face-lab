@@ -453,10 +453,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_friend_request: { Args: { requester_uid: string }; Returns: Json }
       ban_user: {
         Args: { reason?: string; target_user_id: string }
         Returns: Json
       }
+      block_user: { Args: { target_uid: string }; Returns: Json }
+      cancel_friend_request: { Args: { target_uid: string }; Returns: Json }
       get_admin_purchases: {
         Args: never
         Returns: {
@@ -496,8 +499,29 @@ export type Database = {
         Returns: Json
       }
       grant_ugc: { Args: { target_user_id: string }; Returns: Json }
+      reject_friend_request: { Args: { requester_uid: string }; Returns: Json }
       revoke_ugc: { Args: { target_user_id: string }; Returns: Json }
+      search_users: {
+        Args: {
+          limit_count?: number
+          offset_count?: number
+          search_query: string
+        }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          friendship_status: string
+          full_name: string
+          id: string
+          public_id: string
+          short_id: string
+          username: string
+        }[]
+      }
+      send_friend_request: { Args: { target_user_id: string }; Returns: Json }
       unban_user: { Args: { target_user_id: string }; Returns: Json }
+      unblock_user: { Args: { target_uid: string }; Returns: Json }
+      unfriend: { Args: { target_uid: string }; Returns: Json }
     }
     Enums: {
       [_ in never]: never
