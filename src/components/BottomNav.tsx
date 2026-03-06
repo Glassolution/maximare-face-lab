@@ -152,7 +152,7 @@ export default function BottomNav() {
           </DrawerContent>
         </Drawer>
 
-        <NavItem to="/friends" icon={Trophy} label="Ranking" active={isActive("/friends")} />
+        <NavItem to="/friends" icon={Users} label="Social" active={isActive("/friends")} />
         <NavItem to="/profile" icon={User} label="Perfil" active={isActive("/profile")} />
       </div>
     </nav>
