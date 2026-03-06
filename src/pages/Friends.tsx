@@ -217,7 +217,7 @@ export default function Friends() {
           <Card className="h-full">
             <CardHeader>
               <CardTitle>Adicionar Amigo</CardTitle>
-              <CardDescription>Busque por @username, nome ou ID.</CardDescription>
+              <CardDescription>Busque pelo @username do seu amigo.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="relative">
