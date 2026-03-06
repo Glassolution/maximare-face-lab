@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight, Sparkles } from "lucide-react";
-import faceScanHero from "@/assets/face-scan-hero.jpg";
+import faceScanHero from "@/assets/face-scan-hero-clean.jpg";
 
 // Biometric dot component
 const BiometricDot = ({ style, delay }: { style: React.CSSProperties; delay: number }) => (
