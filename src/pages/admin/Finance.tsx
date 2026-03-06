@@ -301,7 +301,7 @@ const AdminFinance = () => {
         .in('status', ['approved', 'paid']);
       const totals: Record<string, number> = {};
       (pmRows || []).forEach((r: any) => {
-        const m = (r.payment_method || '').toString().toLowerCase() || '';
+        const m = (r.provider || '').toString().toLowerCase();
         const method =
           m === 'pix' ? 'pix'
           : m === 'credit_card' || m === 'card' || m === 'stripe' ? 'credit_card'
