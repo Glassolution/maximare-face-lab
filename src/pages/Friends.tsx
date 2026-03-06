@@ -78,7 +78,8 @@ export default function Friends() {
     };
     checkUsername();
   }, [user]);
-    if (!shortId) return null;
+
+  const formatShortId = (shortId: string | null | undefined) => {
     const digits = shortId.toString().replace(/\D/g, '');
     if (!digits) return `#${shortId}`;
     return `#${digits.padStart(4, '0')}`;
