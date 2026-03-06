@@ -297,7 +297,7 @@ const AdminFinance = () => {
       });
       const { data: pmRows } = await supabase
         .from('purchases')
-        .select('payment_method, provider, amount_cents, status')
+        .select('provider, amount_cents, status')
         .in('status', ['approved', 'paid']);
       const totals: Record<string, number> = {};
       (pmRows || []).forEach((r: any) => {
