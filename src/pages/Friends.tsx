@@ -116,11 +116,9 @@ export default function Friends() {
           <AvatarFallback>{initials}</AvatarFallback>
         </Avatar>
         <div>
-          <p className="font-medium text-sm">
-            {displayName}
-          </p>
+          <p className="font-medium text-sm">{displayName}</p>
           <div className="flex items-center gap-2">
-             {shortIdFormatted && <span className="text-[10px] bg-muted px-1 rounded text-muted-foreground">{shortIdFormatted}</span>}
+            {user.username && <span className="text-[11px] text-muted-foreground">@{user.username}</span>}
           </div>
         </div>
       </div>
