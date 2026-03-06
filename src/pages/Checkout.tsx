@@ -336,7 +336,7 @@ export default function Checkout() {
                     onClick={() => setPaymentMethod("credit_card")}
                   >
                     <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-                      <span className="material-symbols-outlined text-[28px] text-white/60">credit_card</span>
+                      <CreditCard className="w-7 h-7 text-white/60" />
                     </div>
                     <div className="flex-1">
                       <p className="text-[17px] leading-tight font-medium text-white">Cartão de Crédito</p>
