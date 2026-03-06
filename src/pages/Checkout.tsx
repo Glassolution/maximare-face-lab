@@ -413,7 +413,7 @@ export default function Checkout() {
               {/* Trust badges */}
               <div className="flex flex-col items-center justify-center gap-3 pt-2">
                 <div className="flex items-center gap-1.5 text-white/40 text-[12px]">
-                  <span className="material-symbols-outlined text-[14px]">lock</span>
+                  <Lock className="w-3.5 h-3.5" />
                   <span>Pagamento seguro via Mercado Pago</span>
                   <span className="ml-1 font-medium" style={{ color: C.green }}>✓ Valid</span>
                 </div>
