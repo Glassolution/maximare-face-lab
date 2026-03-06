@@ -289,7 +289,7 @@ export default function Checkout() {
           style={{ color: C.blue }}
           onClick={() => step === "method" ? navigate("/premium") : setStep("method")}
         >
-          <span className="material-symbols-outlined text-[24px]">chevron_left</span>
+          <ChevronLeft className="w-6 h-6" />
           <span>Voltar</span>
         </button>
         <h1 className="absolute left-1/2 -translate-x-1/2 text-[17px] font-semibold text-white">
