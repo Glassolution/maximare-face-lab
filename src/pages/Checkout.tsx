@@ -18,16 +18,43 @@ import {
   Sparkles,
   ChevronLeft,
   MoreHorizontal,
-  Wifi,
-  Signal,
-  Battery,
   CheckCircle,
   Circle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 type PaymentMethod = "pix" | "credit_card";
-type CheckoutStep = "method" | "card_form" | "pix_qr" | "success";
+type CheckoutStep = "method" | "add_method" | "card_form" | "pix_qr" | "success";
+
+type SavedPaymentMethod = {
+  id: string;
+  type: PaymentMethod;
+  last4?: string;
+  brand?: string;
+  email?: string;
+  name?: string;
+};
+
+const CARD_BRANDS: Record<string, { name: string; pattern: RegExp; color: string }> = {
+  visa: { name: "Visa", pattern: /^4/, color: "#1A1F71" },
+  mastercard: { name: "Mastercard", pattern: /^(5[1-5]|2[2-7])/, color: "#EB001B" },
+  amex: { name: "Amex", pattern: /^3[47]/, color: "#006FCF" },
+  elo: { name: "Elo", pattern: /^(4011|4312|4389|4514|4576|5041|5066|5067|509)/, color: "#FF7800" },
+  hipercard: { name: "Hipercard", pattern: /^(6062|6376|6381|3841)/, color: "#790098" },
+  discover: { name: "Discover", pattern: /^6011/, color: "#FF6000" },
+};
+
+const detectCardBrand = (number: string): { name: string; color: string } | null => {
+  const cleaned = number.replace(/\D/g, "");
+  if (cleaned.length < 2) return null;
+
+  for (const [key, brand] of Object.entries(CARD_BRANDS)) {
+    if (brand.pattern.test(cleaned)) {
+      return { name: brand.name, color: brand.color };
+    }
+  }
+  return null;
+};
 
 const C = {
   bg: "#000000",
@@ -54,6 +81,14 @@ export default function Checkout() {
   const [step, setStep] = useState<CheckoutStep>("method");
   const [loading, setLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("pix");
+  const [showAddMethod, setShowAddMethod] = useState(false);
+
+  // Saved payment methods
+  const [savedMethods, setSavedMethods] = useState<SavedPaymentMethod[]>([]);
+  const [selectedSavedMethod, setSelectedSavedMethod] = useState<string | null>(null);
+
+  // Card brand detection
+  const [detectedBrand, setDetectedBrand] = useState<{ name: string; color: string } | null>(null);
 
   // Coupon state
   const [couponCode, setCouponCode] = useState("");
@@ -249,8 +284,20 @@ export default function Checkout() {
 
   const formatCardNumber = (v: string) => {
     const d = v.replace(/\D/g, "").slice(0, 16);
+    // Detect brand as user types
+    const brand = detectCardBrand(d);
+    setDetectedBrand(brand);
     return d.replace(/(\d{4})(?=\d)/g, "$1 ");
   };
+
+  const handleCardNumberChange = (v: string) => {
+    const d = v.replace(/\D/g, "").slice(0, 16);
+    const formatted = d.replace(/(\d{4})(?=\d)/g, "$1 ");
+    setCardNumber(formatted);
+    const brand = detectCardBrand(d);
+    setDetectedBrand(brand);
+  };
+
   const formatExpiry = (v: string) => {
     const d = v.replace(/\D/g, "").slice(0, 4);
     if (d.length >= 3) return `${d.slice(0, 2)}/${d.slice(2)}`;
@@ -272,16 +319,6 @@ export default function Checkout() {
 
   return (
     <div className="min-h-screen flex flex-col bg-iosBg" style={{ backgroundColor: C.bg, fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
-      {/* iOS Status Bar */}
-      <div className="h-[47px] flex justify-between items-end px-8 pb-2">
-        <span className="text-[15px] font-semibold text-white">9:41</span>
-        <div className="flex gap-1.5 items-center text-white">
-          <Signal className="w-[18px] h-[18px]" />
-          <Wifi className="w-[18px] h-[18px]" />
-          <Battery className="w-[20px] h-[20px]" />
-        </div>
-      </div>
-
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 h-11 relative">
         <button
@@ -306,6 +343,49 @@ export default function Checkout() {
           {/* ═══ STEP: METHOD ═══ */}
           {step === "method" && (
             <motion.div key="method" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
+
+              {/* Saved Payment Methods */}
+              {savedMethods.length > 0 && (
+                <div className="space-y-3">
+                  <h2 className="text-[13px] text-white/50 uppercase px-1 font-medium tracking-wide">Métodos Salvos</h2>
+                  {savedMethods.map((method) => (
+                    <div
+                      key={method.id}
+                      className="bg-iosCard rounded-[12px] overflow-hidden cursor-pointer"
+                      style={{ backgroundColor: C.card }}
+                      onClick={() => {
+                        setSelectedSavedMethod(method.id);
+                        setPaymentMethod(method.type);
+                      }}
+                    >
+                      <div className="flex items-center p-4 gap-4">
+                        {method.type === "pix" ? (
+                          <div className="w-10 h-10 rounded-lg flex items-center justify-center">
+                            <QrCode className="w-8 h-8" style={{ color: C.pixGreen }} />
+                          </div>
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white/10">
+                            <CreditCard className="w-6 h-6 text-white/80" />
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          <p className="text-[15px] leading-tight font-medium text-white">
+                            {method.type === "pix" ? "PIX" : method.brand}
+                          </p>
+                          <p className="text-[13px] text-white/40">
+                            {method.type === "pix" ? method.email : `**** ${method.last4}`}
+                          </p>
+                        </div>
+                        {selectedSavedMethod === method.id || (paymentMethod === method.type && !selectedSavedMethod) ? (
+                          <CheckCircle className="w-6 h-6" style={{ color: C.blue }} />
+                        ) : (
+                          <Circle className="w-6 h-6" style={{ color: "rgba(255,255,255,0.3)" }} />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Payment methods */}
               <div className="space-y-3">
@@ -351,7 +431,11 @@ export default function Checkout() {
                 </div>
 
                 {/* Add payment method button */}
-                <button className="w-full bg-iosCard h-[54px] rounded-[12px] flex items-center justify-center text-primary font-medium text-[16px] active:opacity-80 transition-opacity" style={{ backgroundColor: C.card, color: C.blue }}>
+                <button
+                  className="w-full bg-iosCard h-[54px] rounded-[12px] flex items-center justify-center text-primary font-medium text-[16px] active:opacity-80 transition-opacity"
+                  style={{ backgroundColor: C.card, color: C.blue }}
+                  onClick={() => setShowAddMethod(true)}
+                >
                   + Adicionar método de pagamento
                 </button>
               </div>
@@ -605,6 +689,16 @@ export default function Checkout() {
               disabled={step === "method" ? (!paymentMethod || loading) : loading}
               onClick={() => {
                 if (step === "method") {
+                  // Use saved method if selected
+                  if (selectedSavedMethod) {
+                    const savedMethod = savedMethods.find(m => m.id === selectedSavedMethod);
+                    if (savedMethod?.type === "pix") {
+                      handlePixPayment();
+                    } else {
+                      setStep("card_form");
+                    }
+                    return;
+                  }
                   if (paymentMethod === "pix") handlePixPayment();
                   else setStep("card_form");
                 } else {
