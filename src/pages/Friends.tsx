@@ -135,7 +135,17 @@ export default function Friends() {
 
   return (
     <div className="container mx-auto pb-24 pt-6 px-4">
-      <h1 className="text-2xl font-bold mb-6">Amigos</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Social</h1>
+        {currentUsername && (
+          <button 
+            onClick={() => setShowUsernameSetup(true)}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors bg-muted px-3 py-1.5 rounded-full"
+          >
+            @{currentUsername}
+          </button>
+        )}
+      </div>
 
       <Tabs defaultValue="list" className="w-full">
         <TabsList className="grid w-full grid-cols-3 mb-6">
