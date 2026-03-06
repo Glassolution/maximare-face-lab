@@ -276,9 +276,9 @@ export default function Checkout() {
       <div className="h-[47px] flex justify-between items-end px-8 pb-2">
         <span className="text-[15px] font-semibold text-white">9:41</span>
         <div className="flex gap-1.5 items-center text-white">
-          <span className="material-symbols-outlined text-[18px]">signal_cellular_alt</span>
-          <span className="material-symbols-outlined text-[18px]">wifi</span>
-          <span className="material-symbols-outlined text-[20px]">battery_full</span>
+          <Signal className="w-[18px] h-[18px]" />
+          <Wifi className="w-[18px] h-[18px]" />
+          <Battery className="w-[20px] h-[20px]" />
         </div>
       </div>
 
