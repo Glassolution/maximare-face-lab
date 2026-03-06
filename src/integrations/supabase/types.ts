@@ -41,6 +41,42 @@ export type Database = {
         }
         Relationships: []
       }
+      page_views: {
+        Row: {
+          created_at: string | null
+          duration_seconds: number | null
+          id: string
+          is_exit: boolean | null
+          page_path: string
+          referrer: string | null
+          session_id: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          duration_seconds?: number | null
+          id?: string
+          is_exit?: boolean | null
+          page_path: string
+          referrer?: string | null
+          session_id: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          duration_seconds?: number | null
+          id?: string
+          is_exit?: boolean | null
+          page_path?: string
+          referrer?: string | null
+          session_id?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number | null
@@ -496,6 +532,18 @@ export type Database = {
           subscription_expires_at: string
           subscription_status: string
           username: string
+        }[]
+      }
+      get_page_analytics: {
+        Args: { days_back?: number }
+        Returns: {
+          anonymous_visitors: number
+          daily_visitors: Json
+          pages: Json
+          registered_visitors: number
+          total_pageviews: number
+          total_visitors: number
+          unique_sessions: number
         }[]
       }
       grant_premium: {

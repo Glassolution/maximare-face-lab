@@ -6,7 +6,7 @@ import {
   LayoutDashboard, 
   Users, 
   CreditCard, 
-  Swords, 
+  BarChart3, 
   Palette, 
   Settings, 
   LogOut,
@@ -25,8 +25,8 @@ import AdminDashboard from "./admin/Dashboard";
 import AdminUsers from "./admin/Users";
 import AdminFinance from "./admin/Finance";
 import AdminUGC from "./admin/UGC";
+import AdminAnalytics from "./admin/Analytics";
 
-const AdminBattles = () => <div className="p-8 text-2xl font-bold">Batalhas (Em desenvolvimento)</div>;
 const AdminSettings = () => <div className="p-8 text-2xl font-bold">Configurações (Em desenvolvimento)</div>;
 
 const Admin = () => {
@@ -49,7 +49,7 @@ const Admin = () => {
     { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
     { icon: Users, label: "Usuários", path: "/admin/users" },
     { icon: CreditCard, label: "Financeiro", path: "/admin/finance" },
-    { icon: Swords, label: "Batalhas", path: "/admin/battles" },
+    { icon: BarChart3, label: "Analytics", path: "/admin/analytics" },
     { icon: Palette, label: "Criadores UGC", path: "/admin/ugc" },
     { icon: Settings, label: "Configurações", path: "/admin/settings" },
   ];
@@ -144,7 +144,7 @@ const Admin = () => {
             <Route path="/" element={<AdminDashboard />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="finance" element={<AdminFinance />} />
-            <Route path="battles" element={<AdminBattles />} />
+            <Route path="analytics" element={<AdminAnalytics />} />
             <Route path="ugc" element={<AdminUGC />} />
             <Route path="settings" element={<AdminSettings />} />
           </Routes>
