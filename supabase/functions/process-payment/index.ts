@@ -53,7 +53,7 @@ serve(async (req) => {
 
     // Plan prices
     const PLANS: Record<string, { price: number; description: string }> = {
-      monthly: { price: 1.00, description: "Maximare Premium - Mensal" },
+      monthly: { price: 24.90, description: "Maximare Premium - Mensal" },
       yearly: { price: 499.90, description: "Maximare Premium - Anual" },
     };
 
