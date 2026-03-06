@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 const PLANS: Record<string, { price: number; frequency: number; frequencyType: string; reason: string }> = {
-  monthly: { price: 49.9, frequency: 1, frequencyType: "months", reason: "Maximare Premium - Mensal" },
+  monthly: { price: 1.00, frequency: 1, frequencyType: "months", reason: "Maximare Premium - Mensal" },
   yearly: { price: 499.9, frequency: 12, frequencyType: "months", reason: "Maximare Premium - Anual" },
 };
 
