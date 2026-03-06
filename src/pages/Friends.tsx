@@ -250,6 +250,12 @@ export default function Friends() {
         onClose={() => setSelectedProfile(null)} 
         profile={selectedProfile} 
       />
+
+      <UsernameSetupModal
+        isOpen={showUsernameSetup}
+        onClose={() => setShowUsernameSetup(false)}
+        onUsernameSet={(newUsername) => setCurrentUsername(newUsername)}
+      />
     </div>
   );
 }
