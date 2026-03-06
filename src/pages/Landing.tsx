@@ -43,18 +43,18 @@ const ScanLine = () => (
 export default function Landing() {
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-between px-8 py-12 overflow-hidden max-w-md mx-auto relative"
+      className="min-h-screen flex flex-col items-center px-6 pb-8 overflow-hidden max-w-md mx-auto relative"
       style={{
         background: "linear-gradient(180deg, #0D0D14 0%, #0D1A3D 100%)",
         fontFamily: "'Plus Jakarta Sans', Inter, sans-serif",
       }}
     >
-      {/* Top Badge */}
+      {/* Top Badge - pushed down from top */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="z-10"
+        className="z-10 mt-16 mb-6"
       >
         <div
           className="px-4 py-2 rounded-full flex items-center gap-2 border"
@@ -70,19 +70,19 @@ export default function Landing() {
         </div>
       </motion.div>
 
-      {/* Hero Image with Scan Ring */}
+      {/* Hero Image with Scan Ring - much larger, takes most of the space */}
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.8, delay: 0.2 }}
-        className="flex-1 flex items-center justify-center w-full my-8"
+        className="flex items-center justify-center w-full flex-1 min-h-[45vh]"
       >
-        <div className="relative w-64 h-64">
+        <div className="relative w-[85vw] h-[85vw] max-w-[380px] max-h-[380px]">
           {/* Rotating gradient ring */}
           <motion.div
-            className="absolute inset-[-4px] rounded-full"
+            className="absolute inset-[-6px] rounded-full"
             style={{
-              padding: "4px",
+              padding: "6px",
               background: "conic-gradient(from 0deg, #4F6EF7, #2D4FD6, #4F6EF7)",
               WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
               WebkitMaskComposite: "xor",
@@ -94,10 +94,10 @@ export default function Landing() {
 
           {/* Glow effect */}
           <div
-            className="absolute inset-0 rounded-full"
+            className="absolute inset-[-20px] rounded-full"
             style={{
-              backgroundColor: "rgba(79, 110, 247, 0.2)",
-              filter: "blur(24px)",
+              backgroundColor: "rgba(79, 110, 247, 0.15)",
+              filter: "blur(40px)",
             }}
           />
 
@@ -123,12 +123,12 @@ export default function Landing() {
         </div>
       </motion.div>
 
-      {/* Bottom Content */}
+      {/* Bottom Content - pushed to bottom with mt-auto */}
       <motion.div
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, delay: 0.5 }}
-        className="w-full space-y-8 text-center z-10"
+        className="w-full space-y-6 text-center z-10 mt-auto pt-8"
       >
         {/* Title and subtitle */}
         <div className="space-y-3">
