@@ -357,51 +357,53 @@ export default function Checkout() {
           {step === "method" && (
             <motion.div key="method" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
 
-              {/* Saved Payment Methods */}
+              {/* Saved Payment Method - Only show selected one */}
               {savedMethods.length > 0 && (
                 <div className="space-y-3">
-                  <h2 className="text-[13px] text-white/50 uppercase px-1 font-medium tracking-wide">Métodos Salvos</h2>
-                  {savedMethods.map((method) => (
-                    <div
-                      key={method.id}
-                      className="bg-iosCard rounded-[12px] overflow-hidden cursor-pointer"
-                      style={{ backgroundColor: C.card }}
-                      onClick={() => {
-                        setSelectedSavedMethod(method.id);
-                        setPaymentMethod(method.type);
-                      }}
-                    >
-                      <div className="flex items-center p-4 gap-4">
-                        {method.type === "pix" ? (
-                          <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-                            <QrCode className="w-8 h-8" style={{ color: C.pixGreen }} />
+                  <h2 className="text-[13px] text-white/50 uppercase px-1 font-medium tracking-wide">Método Salvo</h2>
+                  {(() => {
+                    const method = savedMethods.find(m => m.id === selectedSavedMethod) || savedMethods[0];
+                    return (
+                      <div
+                        key={method.id}
+                        className="bg-iosCard rounded-[12px] overflow-hidden cursor-pointer"
+                        style={{ backgroundColor: C.card }}
+                        onClick={() => {
+                          setSelectedSavedMethod(method.id);
+                          setPaymentMethod(method.type);
+                        }}
+                      >
+                        <div className="flex items-center p-4 gap-4">
+                          {method.type === "pix" ? (
+                            <div className="w-10 h-10 rounded-lg flex items-center justify-center">
+                              <QrCode className="w-8 h-8" style={{ color: C.pixGreen }} />
+                            </div>
+                          ) : (
+                            <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white/10">
+                              <CreditCard className="w-6 h-6 text-white/80" />
+                            </div>
+                          )}
+                          <div className="flex-1">
+                            <p className="text-[15px] leading-tight font-medium text-white">
+                              {method.type === "pix" ? "PIX" : method.brand}
+                            </p>
+                            <p className="text-[13px] text-white/40">
+                              {method.type === "pix" ? method.email : `**** ${method.last4}`}
+                            </p>
                           </div>
-                        ) : (
-                          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white/10">
-                            <CreditCard className="w-6 h-6 text-white/80" />
-                          </div>
-                        )}
-                        <div className="flex-1">
-                          <p className="text-[15px] leading-tight font-medium text-white">
-                            {method.type === "pix" ? "PIX" : method.brand}
-                          </p>
-                          <p className="text-[13px] text-white/40">
-                            {method.type === "pix" ? method.email : `**** ${method.last4}`}
-                          </p>
-                        </div>
-                        {selectedSavedMethod === method.id || (paymentMethod === method.type && !selectedSavedMethod) ? (
                           <CheckCircle className="w-6 h-6" style={{ color: C.blue }} />
-                        ) : (
-                          <Circle className="w-6 h-6" style={{ color: "rgba(255,255,255,0.3)" }} />
-                        )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })()}
                 </div>
               )}
 
               {/* Payment methods */}
               <div className="space-y-3">
+                {savedMethods.length > 0 && (
+                  <h2 className="text-[13px] text-white/50 uppercase px-1 font-medium tracking-wide">Novo Pagamento</h2>
+                )}
                 {/* PIX */}
                 <div className="bg-iosCard rounded-[12px] overflow-hidden" style={{ backgroundColor: C.card }}>
                   <div
@@ -442,15 +444,6 @@ export default function Checkout() {
                     )}
                   </div>
                 </div>
-
-                {/* Add payment method button */}
-                <button
-                  className="w-full bg-iosCard h-[54px] rounded-[12px] flex items-center justify-center text-primary font-medium text-[16px] active:opacity-80 transition-opacity"
-                  style={{ backgroundColor: C.card, color: C.blue }}
-                  onClick={() => setShowAddMethod(true)}
-                >
-                  + Adicionar método de pagamento
-                </button>
               </div>
 
               {/* Coupon */}
