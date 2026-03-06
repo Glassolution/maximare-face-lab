@@ -367,16 +367,18 @@ export default function Analysis() {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         let darkPixels = 0;
         const totalPixels = imageData.data.length / 4;
+        const sampleSize = Math.floor(totalPixels / 10);
         
         for (let i = 0; i < imageData.data.length; i += 4 * 10) {
             const r = imageData.data[i];
             const g = imageData.data[i+1];
             const b = imageData.data[i+2];
             const brightness = (r + g + b) / 3;
-            if (brightness < 30) darkPixels++;
+            if (brightness < 15) darkPixels++;
         }
         
-        if (darkPixels / (totalPixels / 10) > 0.5) resolve(false);
+        // Only reject if >85% of sampled pixels are extremely dark (nearly black)
+        if (darkPixels / sampleSize > 0.85) resolve(false);
         else resolve(true);
       };
       img.src = dataUrl;
