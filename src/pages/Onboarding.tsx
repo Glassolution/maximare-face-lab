@@ -286,7 +286,7 @@ function StepAge({ onNext, onBack, initialAge, currentStep }: { onNext: (age: nu
   };
 
   // Calculate visual properties for each age based on distance from center
-  const getAgeStyle = (index: number) => {
+  const getAgeStyle = (index: number, isSelected: boolean) => {
     const containerHeight = scrollRef.current?.clientHeight || 600;
     const itemCenter = index * ITEM_HEIGHT + ITEM_HEIGHT / 2;
     const containerCenter = scrollPosition + containerHeight / 2;
@@ -296,28 +296,28 @@ function StepAge({ onNext, onBack, initialAge, currentStep }: { onNext: (age: nu
     // Normalize distance (0 to 1)
     const normalizedDistance = Math.min(distance / maxDistance, 1);
 
-    // Calculate opacity (1 at center, 0.2 at max distance)
-    const opacity = 1 - normalizedDistance * 0.8;
+    // Calculate opacity (1 at center, 0.15 at max distance)
+    const opacity = isSelected ? 1 : (1 - normalizedDistance * 0.85);
 
     // Calculate scale (1.2 at center, 0.75 at max distance)
-    const scale = 1.2 - normalizedDistance * 0.45;
-
-    // Calculate color intensity (1 at center = white, 0.2 at distance = gray)
-    const colorIntensity = 1 - normalizedDistance * 0.8;
+    const scale = isSelected ? 1.3 : (1.2 - normalizedDistance * 0.45);
 
     // Font size varies from 56px at center to 28px at distance
-    const fontSize = 56 - normalizedDistance * 28;
+    const fontSize = isSelected ? 64 : (56 - normalizedDistance * 28);
 
     return {
-      opacity: Math.max(0.2, opacity),
+      opacity,
       transform: `scale(${Math.max(0.75, scale)})`,
-      color: `rgba(255, 255, 255, ${Math.max(0.2, colorIntensity)})`,
+      color: isSelected ? '#4F6EF7' : `rgba(255, 255, 255, ${Math.max(0.15, 1 - normalizedDistance * 0.85)})`,
       fontSize: `${Math.max(28, fontSize)}px`,
-      transition: 'all 0.05s linear',
+      fontWeight: isSelected ? 800 : 700,
+      textShadow: isSelected ? '0 0 20px rgba(79, 110, 247, 0.5)' : 'none',
+      transition: 'all 0.15s ease-out',
     };
   };
 
   const selectedAge = ages[Math.round(scrollPosition / ITEM_HEIGHT)] || initialAge;
+  const selectedIndex = ages.indexOf(selectedAge);
 
   return (
     <div
@@ -386,17 +386,20 @@ function StepAge({ onNext, onBack, initialAge, currentStep }: { onNext: (age: nu
           >
             <div style={{ height: "calc(50% - 36px)", flexShrink: 0 }}></div>
             {ages.map((age, index) => {
-              const style = getAgeStyle(index);
+              const isSelected = index === selectedIndex;
+              const style = getAgeStyle(index, isSelected);
               return (
                 <div
                   key={age}
-                  className="shrink-0 flex items-center justify-center cursor-pointer"
+                  className="shrink-0 flex items-center justify-center cursor-pointer rounded-xl"
                   style={{
                     height: `${ITEM_HEIGHT}px`,
                     scrollSnapAlign: "center",
-                    fontWeight: 700,
                     lineHeight: 1,
                     ...style,
+                    backgroundColor: isSelected ? 'rgba(79, 110, 247, 0.1)' : 'transparent',
+                    padding: isSelected ? '0 20px' : '0',
+                    margin: isSelected ? '0 -10px' : '0',
                   }}
                   onClick={() => {
                     scrollRef.current?.scrollTo({
