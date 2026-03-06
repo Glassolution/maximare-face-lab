@@ -628,7 +628,7 @@ function StepGender({ onNext, initialGender }: { onNext: (id: string) => void; i
 }
 
 /* ─── Step 5: Authority / Modules ─── */
-function StepAuthority({ onNext }: { onNext: () => void }) {
+function StepAuthority({ onNext, currentStep }: { onNext: () => void; currentStep: number }) {
   const benefits = [
     { icon: "face", title: "Análise Facial Completa", desc: "Simetria, estrutura óssea e harmonia" },
     { icon: "assignment", title: "Plano de Melhoria Personalizado", desc: "Protocolos baseados no seu rosto" },
@@ -644,25 +644,22 @@ function StepAuthority({ onNext }: { onNext: () => void }) {
       <div className="h-12 w-full"></div>
 
       {/* Header */}
-      <header className="px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-[#4F6EF7]" />
-          <span className="font-bold text-sm tracking-wider uppercase text-white">Maximare AI</span>
+      <header className="px-6 py-4 flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-[#4F6EF7]" />
+            <span className="font-bold text-sm tracking-wider uppercase text-white">Maximare AI</span>
+          </div>
+          <button
+            onClick={onNext}
+            className="text-xs font-medium text-white/50 hover:text-[#4F6EF7] transition-colors"
+          >
+            Salvar e sair
+          </button>
         </div>
-        <button
-          onClick={onNext}
-          className="text-xs font-medium text-white/50 hover:text-[#4F6EF7] transition-colors"
-        >
-          Salvar e sair
-        </button>
+        {/* Progress Dots */}
+        <ProgressDots currentStep={currentStep} totalSteps={TOTAL_STEPS} />
       </header>
-
-      {/* Progress bar */}
-      <div className="px-6 mt-2">
-        <div className="h-1 w-full bg-white/10 rounded-full overflow-hidden">
-          <div className="h-full bg-[#4F6EF7] w-3/4 rounded-full"></div>
-        </div>
-      </div>
 
       {/* Main Content */}
       <main className="flex-1 px-6 pt-10 pb-32 max-w-md mx-auto w-full">
@@ -1069,28 +1066,22 @@ export default function Onboarding() {
   return (
     <div className="min-h-[100dvh] flex flex-col bg-[#0D0D14] relative overflow-hidden">
       <div className="relative z-10 flex flex-col flex-1 min-h-[100dvh] max-w-md mx-auto w-full">
-        <div className="px-6 pt-6 pb-0 flex items-center justify-between">
-          <button onClick={back} className="p-2 -ml-2 text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="h-6 w-6" />
-          </button>
-          <div className="flex gap-1">
-            {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
-              <div
-                key={i}
-                className={`h-1 rounded-full transition-all duration-300 ${
-                  i === step ? "w-8 bg-primary" : i < step ? "w-2 bg-primary/50" : "w-2 bg-secondary"
-                }`}
-              />
-            ))}
+        <div className="px-6 pt-6 pb-4 flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <button onClick={back} className="p-2 -ml-2 text-white/50 hover:text-white transition-colors">
+              <ArrowLeft className="h-6 w-6" />
+            </button>
+            <button
+              onClick={next}
+              className={`text-sm font-bold transition-colors ${
+                step === TOTAL_STEPS - 1 ? "opacity-0 pointer-events-none" : "text-[#4F6EF7] hover:text-[#4F6EF7]/80"
+              }`}
+            >
+              Pular
+            </button>
           </div>
-          <button
-            onClick={next}
-            className={`text-sm font-bold transition-colors ${
-              step === TOTAL_STEPS - 1 ? "opacity-0 pointer-events-none" : "text-primary hover:text-primary/80"
-            }`}
-          >
-            Pular
-          </button>
+          {/* Progress Dots */}
+          <ProgressDots currentStep={step} totalSteps={TOTAL_STEPS} />
         </div>
 
         <div className="flex-1 flex flex-col p-6">
@@ -1107,7 +1098,7 @@ export default function Onboarding() {
               {/* StepAge is handled by the conditional return above */}
               {step === 2 && <StepGoal onNext={handleGoalNext} initialGoal={userData.goal} />}
               {step === 3 && <StepGender onNext={handleGenderNext} initialGender={userData.gender} />}
-              {step === 4 && <StepAuthority onNext={next} />}
+              {step === 4 && <StepAuthority onNext={next} currentStep={step} />}
               {step === 5 && <StepProjection onNext={next} userData={userData} />}
               {step === 6 && <StepBrutalTruth onNext={next} userData={userData} />}
               {step === 7 && <StepFinalCTA onFinish={finish} />}
