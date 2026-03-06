@@ -219,19 +219,6 @@ export default function Checkout() {
       if (!res.ok) throw new Error(data?.error || "Erro ao processar pagamento");
       setPaymentId(String(data.payment_id || ""));
       if (data.status === "approved") {
-        // Save card to saved methods
-        const last4 = cardNumber.replace(/\s/g, "").slice(-4);
-        const brand = detectedBrand?.name || "Cartão";
-        const newCardMethod: SavedPaymentMethod = {
-          id: `card_${Date.now()}`,
-          type: "credit_card",
-          last4,
-          brand,
-          name: cardName,
-        };
-        setSavedMethods([...savedMethods, newCardMethod]);
-        setSelectedSavedMethod(newCardMethod.id);
-
         setStep("success");
         setTimeout(() => refreshProfile(), 1500);
       } else if (data.status === "in_process" || data.status === "pending") {
@@ -528,22 +515,14 @@ export default function Checkout() {
             <motion.div key="card_form" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-4">
               <div className="space-y-2">
                 <label className="text-[13px] text-white/50">Número do Cartão</label>
-                <div className="bg-iosCard rounded-[12px] p-4 flex items-center gap-3" style={{ backgroundColor: C.card }}>
+                <div className="bg-iosCard rounded-[12px] p-4" style={{ backgroundColor: C.card }}>
                   <input
                     placeholder="0000 0000 0000 0000"
                     value={cardNumber}
-                    onChange={(e) => handleCardNumberChange(e.target.value)}
+                    onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
                     maxLength={19}
-                    className="bg-transparent border-none focus:ring-0 flex-1 text-[17px] text-white placeholder:text-white/20 outline-none"
+                    className="bg-transparent border-none focus:ring-0 w-full text-[17px] text-white placeholder:text-white/20 outline-none"
                   />
-                  {detectedBrand && (
-                    <div
-                      className="px-2 py-1 rounded text-[10px] font-bold text-white"
-                      style={{ backgroundColor: detectedBrand.color }}
-                    >
-                      {detectedBrand.name}
-                    </div>
-                  )}
                 </div>
               </div>
               <div className="space-y-2">
@@ -738,99 +717,6 @@ export default function Checkout() {
           </div>
         </div>
       )}
-
-      {/* Add Payment Method Modal */}
-      <AnimatePresence>
-        {showAddMethod && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-end justify-center"
-            style={{ backgroundColor: "rgba(0, 0, 0, 0.6)" }}
-            onClick={() => setShowAddMethod(false)}
-          >
-            <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="w-full max-w-md rounded-t-[24px] p-6 pb-10"
-              style={{ backgroundColor: C.card }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Handle bar */}
-              <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6" />
-
-              {/* Header */}
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-[20px] font-bold text-white">Adicionar Método</h2>
-                <button
-                  onClick={() => setShowAddMethod(false)}
-                  className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center"
-                >
-                  <span className="text-white/60 text-[18px]" style={{ fontFamily: "material-symbols-outlined" }}>close</span>
-                </button>
-              </div>
-
-              {/* Payment Options */}
-              <div className="space-y-3">
-                {/* PIX Option */}
-                <button
-                  className="w-full flex items-center p-4 rounded-[16px] gap-4 active:scale-[0.98] transition-transform"
-                  style={{ backgroundColor: "rgba(79, 110, 247, 0.1)", border: `1px solid ${C.blue}30` }}
-                  onClick={() => {
-                    // Save PIX method
-                    const newMethod: SavedPaymentMethod = {
-                      id: `pix_${Date.now()}`,
-                      type: "pix",
-                      email: user?.email || "pix@email.com",
-                    };
-                    setSavedMethods([...savedMethods, newMethod]);
-                    setPaymentMethod("pix");
-                    setSelectedSavedMethod(newMethod.id);
-                    setShowAddMethod(false);
-                  }}
-                >
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: C.pixGreen }}>
-                    <QrCode className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <p className="text-white font-semibold text-[16px]">PIX</p>
-                    <p className="text-white/50 text-[13px]">Pagamento instantâneo</p>
-                  </div>
-                  <ArrowRight className="w-5 h-5 text-white/40" />
-                </button>
-
-                {/* Credit Card Option */}
-                <button
-                  className="w-full flex items-center p-4 rounded-[16px] gap-4 active:scale-[0.98] transition-transform"
-                  style={{ backgroundColor: "rgba(79, 110, 247, 0.1)", border: `1px solid ${C.blue}30` }}
-                  onClick={() => {
-                    setShowAddMethod(false);
-                    setStep("card_form");
-                  }}
-                >
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-white/10">
-                    <CreditCard className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <p className="text-white font-semibold text-[16px]">Cartão de Crédito</p>
-                    <p className="text-white/50 text-[13px]">Visa, Mastercard, Elo, etc</p>
-                  </div>
-                  <ArrowRight className="w-5 h-5 text-white/40" />
-                </button>
-              </div>
-
-              {/* Security note */}
-              <p className="text-center text-white/30 text-[12px] mt-6 flex items-center justify-center gap-1">
-                <Lock className="w-3 h-3" />
-                Seus dados são criptografados e seguros
-              </p>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
