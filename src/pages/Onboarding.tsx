@@ -51,8 +51,43 @@ const GENDERS = [
   { id: "nonbinary", label: "Não Binário", img: genderNonbinary },
 ];
 
+/* ─── Progress Dots Component ─── */
+function ProgressDots({ currentStep, totalSteps }: { currentStep: number; totalSteps: number }) {
+  const totalDots = 11;
+  const centerDot = Math.floor(totalDots / 2);
+
+  return (
+    <div className="flex items-center justify-center gap-1.5">
+      {Array.from({ length: totalDots }).map((_, i) => {
+        // Calculate which step this dot represents (for 8 steps, map to 11 dots)
+        const stepRatio = (i - centerDot) / (totalDots - 1);
+        const stepPosition = Math.round(stepRatio * (totalSteps - 1));
+        const isActive = stepPosition === currentStep;
+        const isPast = stepPosition < currentStep;
+
+        return (
+          <div
+            key={i}
+            className={`rounded-full transition-all duration-300 ${
+              isActive
+                ? "bg-[#4F6EF7] shadow-[0_0_10px_rgba(79,110,247,0.5)]"
+                : isPast
+                ? "bg-[#4F6EF7]/40"
+                : "bg-white/20"
+            }`}
+            style={{
+              width: isActive ? "8px" : "6px",
+              height: isActive ? "8px" : "6px",
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 /* ─── Step 1: Emotional Impact ─── */
-function StepImpact({ onNext, onBack }: { onNext: (habits: number[]) => void; onBack: () => void }) {
+function StepImpact({ onNext, onBack, currentStep }: { onNext: (habits: number[]) => void; onBack: () => void; currentStep: number }) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
   const toggleSelection = (index: number) => {
@@ -92,9 +127,8 @@ function StepImpact({ onNext, onBack }: { onNext: (habits: number[]) => void; on
             Salvar e sair
           </button>
         </div>
-        <div className="w-full h-[4px] bg-white/10 rounded-full overflow-hidden">
-          <div className="w-2/3 h-full bg-[#4F6EF7] rounded-full" />
-        </div>
+        {/* Progress Dots */}
+        <ProgressDots currentStep={currentStep} totalSteps={TOTAL_STEPS} />
       </header>
 
       {/* Main Content */}
@@ -232,7 +266,7 @@ function StepImpact({ onNext, onBack }: { onNext: (habits: number[]) => void; on
 }
 
 /* ─── Step 2: Age Picker ─── */
-function StepAge({ onNext, onBack, initialAge }: { onNext: (age: number) => void; onBack: () => void; initialAge: number }) {
+function StepAge({ onNext, onBack, initialAge, currentStep }: { onNext: (age: number) => void; onBack: () => void; initialAge: number; currentStep: number }) {
   const [scrollPosition, setScrollPosition] = useState(0);
   const ages = Array.from({ length: 83 }, (_, i) => i + 12); // Range 12-94
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -311,9 +345,8 @@ function StepAge({ onNext, onBack, initialAge }: { onNext: (age: number) => void
               Salvar e sair
             </button>
           </div>
-          <div className="w-full h-[3px] bg-white/10 rounded-full overflow-hidden">
-            <div className="w-1/3 h-full bg-[#4F6EF7]"></div>
-          </div>
+          {/* Progress Dots */}
+          <ProgressDots currentStep={currentStep} totalSteps={TOTAL_STEPS} />
         </header>
 
         {/* Title */}
