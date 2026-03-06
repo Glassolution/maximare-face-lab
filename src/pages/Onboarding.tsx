@@ -1060,10 +1060,10 @@ export default function Onboarding() {
 
   // Render StepAge in full screen mode without the default wrapper
   if (step === 0) {
-    return <StepImpact onNext={(habits) => { setUserData((prev) => ({ ...prev, habits })); next(); }} onBack={back} />;
+    return <StepImpact onNext={(habits) => { setUserData((prev) => ({ ...prev, habits })); next(); }} onBack={back} currentStep={step} />;
   }
   if (step === 1) {
-    return <StepAge onNext={handleAgeNext} onBack={back} initialAge={userData.age} />;
+    return <StepAge onNext={handleAgeNext} onBack={back} initialAge={userData.age} currentStep={step} />;
   }
 
   return (
