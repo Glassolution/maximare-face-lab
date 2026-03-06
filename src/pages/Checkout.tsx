@@ -322,9 +322,11 @@ export default function Checkout() {
                       <p className="text-[17px] leading-tight font-medium text-white">PIX</p>
                       <p className="text-[13px] text-white/40">Confirmação instantânea</p>
                     </div>
-                    <span className="material-symbols-outlined text-[24px]" style={{ color: paymentMethod === "pix" ? C.blue : "rgba(255,255,255,0.3)" }}>
-                      {paymentMethod === "pix" ? "check_circle" : "radio_button_unchecked"}
-                    </span>
+                    {paymentMethod === "pix" ? (
+                      <CheckCircle className="w-6 h-6" style={{ color: C.blue }} />
+                    ) : (
+                      <Circle className="w-6 h-6" style={{ color: "rgba(255,255,255,0.3)" }} />
+                    )}
                   </div>
 
                   {/* Credit Card Option */}
