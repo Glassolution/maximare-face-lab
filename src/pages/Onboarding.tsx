@@ -89,7 +89,7 @@ function StepImpact({ onNext, onBack }: { onNext: (habits: number[]) => void; on
             onClick={() => onNext(Array.from(selected))}
             className="text-white/50 text-[13px] font-medium hover:text-white/70 transition-colors"
           >
-            Salvar e sair
+            Pular
           </button>
         </div>
         <div className="w-full h-[4px] bg-white/10 rounded-full overflow-hidden">
@@ -308,7 +308,7 @@ function StepAge({ onNext, onBack, initialAge }: { onNext: (age: number) => void
               onClick={() => onNext(selectedAge)}
               className="text-[13px] font-medium text-white/50 hover:text-white transition-colors"
             >
-              Salvar e sair
+              Pular
             </button>
           </div>
           <div className="w-full h-[3px] bg-white/10 rounded-full overflow-hidden">
@@ -620,7 +620,7 @@ function StepAuthority({ onNext }: { onNext: () => void }) {
           onClick={onNext}
           className="text-xs font-medium text-white/50 hover:text-[#4F6EF7] transition-colors"
         >
-          Salvar e sair
+          Pular
         </button>
       </header>
 
