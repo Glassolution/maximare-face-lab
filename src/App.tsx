@@ -32,12 +32,15 @@ import { ThemeProvider } from "@/theme/ThemeProvider";
 import { useEffect } from "react";
 import { syncHistoryWithSupabase } from "@/lib/mockData";
 import UpdatePassword from "@/pages/UpdatePassword";
+import { usePageTracking } from "@/hooks/usePageTracking";
 
 const queryClient = new QueryClient();
 
 function Layout() {
   const location = useLocation();
   const hideNav = ["/", "/onboarding", "/login", "/premium", "/checkout", "/landing", "/update-password", "/subscription", "/payment-callback", "/cancel-subscription"].includes(location.pathname) || location.pathname.startsWith("/admin");
+
+  usePageTracking();
 
   const { user, loading } = useAuth();
 
