@@ -405,19 +405,39 @@ export default function Profile() {
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
           <Link
             to="/look-alike"
-            className="block rounded-[20px] p-5 transition-all hover:opacity-90"
-            style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.blue}30` }}
+            className="block rounded-[20px] p-5 transition-all hover:opacity-90 relative overflow-hidden"
+            style={{
+              background: isPremium
+                ? COLORS.card
+                : `linear-gradient(135deg, ${COLORS.blue}15 0%, ${COLORS.card} 100%)`,
+              border: `1px solid ${isPremium ? COLORS.blue + '30' : COLORS.blue + '50'}`,
+            }}
           >
+            {/* Premium badge for free users */}
+            {!isPremium && (
+              <div
+                className="absolute top-3 right-3 px-2 py-1 rounded-full flex items-center gap-1"
+                style={{ backgroundColor: COLORS.blue }}
+              >
+                <Crown className="w-3 h-3 text-white" />
+                <span className="text-[10px] font-bold text-white">PRO</span>
+              </div>
+            )}
             <div className="flex items-center gap-4">
               <div
                 className="h-12 w-12 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: `${COLORS.blue}15` }}
+                style={{ backgroundColor: `${COLORS.blue}20` }}
               >
                 <Search className="h-6 w-6" style={{ color: COLORS.blue }} />
               </div>
               <div className="flex-1">
-                <h3 className="text-[16px] font-bold" style={{ color: COLORS.textPrimary }}>Quem é seu sósia?</h3>
-                <p className="text-[12px]" style={{ color: COLORS.textSecondary }}>Descubra com qual famoso você se parece.</p>
+                <h3 className="text-[16px] font-bold" style={{ color: COLORS.textPrimary }}>
+                  Quem é seu sósia?
+                  {!isPremium && <Crown className="inline-block w-4 h-4 ml-1" style={{ color: COLORS.blue }} />}
+                </h3>
+                <p className="text-[12px]" style={{ color: COLORS.textSecondary }}>
+                  {isPremium ? "Descubra com qual famoso você se parece." : "Descubra — exclusivo Premium"}
+                </p>
               </div>
               <ChevronRight className="h-5 w-5" style={{ color: COLORS.textTertiary }} />
             </div>
