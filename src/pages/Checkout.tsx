@@ -316,7 +316,7 @@ export default function Checkout() {
                     onClick={() => setPaymentMethod("pix")}
                   >
                     <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-                      <span className="material-symbols-outlined text-[32px] fill-current" style={{ color: C.pixGreen }}>qr_code_2</span>
+                      <QrCode className="w-8 h-8" style={{ color: C.pixGreen }} />
                     </div>
                     <div className="flex-1">
                       <p className="text-[17px] leading-tight font-medium text-white">PIX</p>
